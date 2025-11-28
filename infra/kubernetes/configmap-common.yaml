@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tradingbot-common-config
+  namespace: tradingbot
+data:
+  NODE_ENV: "production"
+  BOT_EXECUTION_MODE: "simulation"
+  BOT_RISK_LEVEL: "medium"
+  VALIDATOR_SERVICE_URL: "http://validator:4001"
+  SIGNAL_SERVICE_URL: "http://signal:4002"
+  EXECUTOR_SERVICE_URL: "http://executor:4003"
+  NEXT_PUBLIC_API_URL: "https://api.tradingbot.local"
+  CORS_ORIGIN: "https://app.tradingbot.local"
+  POSTGRES_SSL: "true"
+  INGESTION_INTERVAL_MS: "60000"
+  INGESTION_FRESHNESS_MINUTES: "180"
+

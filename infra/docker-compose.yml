@@ -1,0 +1,171 @@
+services:
+  # ======================================================
+  # 🧱 POSTGRESQL DATABASE
+  # ======================================================
+  db:
+    image: postgres:15-alpine
+    container_name: tradingbot_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-botuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-botpass}
+      POSTGRES_DB: ${POSTGRES_DB:-tradingbot}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - tradingbot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-botuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ======================================================
+  # 📦 API GATEWAY
+  # ======================================================
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: tradingbot_api_gateway
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-botuser}:${POSTGRES_PASSWORD:-botpass}@db:5432/${POSTGRES_DB:-tradingbot}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-1h}
+      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      VALIDATOR_SERVICE_URL: http://validator:4001
+      SIGNAL_SERVICE_URL: http://signal:4002
+      EXECUTOR_SERVICE_URL: http://executor:4003
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tradingbot_network
+    volumes:
+      - ../services/api-gateway:/app
+      - /app/node_modules
+
+  # ======================================================
+  # 🔍 VALIDATOR SERVICE
+  # ======================================================
+  validator:
+    build:
+      context: ..
+      dockerfile: services/validator/Dockerfile
+    container_name: tradingbot_validator
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-botuser}:${POSTGRES_PASSWORD:-botpass}@db:5432/${POSTGRES_DB:-tradingbot}
+      BSC_RPC_URL: ${BSC_RPC_URL:-https://data-seed-prebsc-1-s1.binance.org:8545/}
+      BSC_TESTNET_RPC: ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/}
+      BSCSCAN_API_KEY: ${BSCSCAN_API_KEY}
+      DEX_API_URL: ${DEX_API_URL:-https://api.dexscreener.com/latest/dex}
+      COINGECKO_API_URL: ${COINGECKO_API_URL:-https://api.coingecko.com/api/v3}
+    ports:
+      - "4001:4001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tradingbot_network
+    volumes:
+      - ../services/validator:/app
+      - /app/node_modules
+
+  # ======================================================
+  # 🧠 SIGNAL SERVICE (IA)
+  # ======================================================
+  signal:
+    build:
+      context: ..
+      dockerfile: services/signal/Dockerfile
+    container_name: tradingbot_signal
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-botuser}:${POSTGRES_PASSWORD:-botpass}@db:5432/${POSTGRES_DB:-tradingbot}
+      AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-0.8}
+      AI_SCAN_INTERVAL: ${AI_SCAN_INTERVAL:-60}
+    ports:
+      - "4002:4002"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tradingbot_network
+    volumes:
+      - ../services/signal:/app
+      - /app/node_modules
+
+  # ======================================================
+  # ⚙️ EXECUTOR SERVICE
+  # ======================================================
+  executor:
+    build:
+      context: ..
+      dockerfile: services/executor/Dockerfile
+    container_name: tradingbot_executor
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-botuser}:${POSTGRES_PASSWORD:-botpass}@db:5432/${POSTGRES_DB:-tradingbot}
+      BSC_RPC_URL: ${BSC_RPC_URL:-https://data-seed-prebsc-1-s1.binance.org:8545/}
+      BSC_TESTNET_RPC: ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/}
+      PANCAKESWAP_ROUTER: ${PANCAKESWAP_ROUTER:-0xD99D1c33F9fC3444f8101754aBC46c52416550D1}
+      WBNB_ADDRESS: ${WBNB_ADDRESS:-0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd}
+      BOT_EXECUTION_MODE: ${BOT_EXECUTION_MODE:-simulation}
+      BOT_REFRESH_INTERVAL: ${BOT_REFRESH_INTERVAL:-5}
+      BOT_RISK_LEVEL: ${BOT_RISK_LEVEL:-medium}
+      BOT_WALLET_PRIVATE_KEY: ${BOT_WALLET_PRIVATE_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    ports:
+      - "4003:4003"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tradingbot_network
+    volumes:
+      - ../services/executor:/app
+      - /app/node_modules
+
+  # ======================================================
+  # 🌐 FRONTEND (NEXT.JS)
+  # ======================================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: web/frontend/Dockerfile
+    container_name: tradingbot_frontend
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${BACKEND_URL:-http://localhost:4000}
+      NEXT_PUBLIC_WS_URL: ${WS_URL:-ws://localhost:4000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - tradingbot_network
+    volumes:
+      - ../web/frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+networks:
+  tradingbot_network:
+    driver: bridge
+    name: tradingbot_network
+
+volumes:
+  postgres_data:
+    name: tradingbot_postgres_data

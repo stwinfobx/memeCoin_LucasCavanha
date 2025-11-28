@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signal
+  namespace: tradingbot
+  labels:
+    app: signal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: signal
+  template:
+    metadata:
+      labels:
+        app: signal
+    spec:
+      containers:
+        - name: signal
+          image: ghcr.io/sua-org/tradingbot-signal:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4002
+          envFrom:
+            - configMapRef:
+                name: tradingbot-common-config
+            - secretRef:
+                name: tradingbot-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4002
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4002
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signal
+  namespace: tradingbot
+  labels:
+    app: signal
+spec:
+  selector:
+    app: signal
+  ports:
+    - name: http
+      port: 4002
+      targetPort: 4002
+  type: ClusterIP
+

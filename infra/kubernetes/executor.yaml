@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: executor
+  namespace: tradingbot
+  labels:
+    app: executor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: executor
+  template:
+    metadata:
+      labels:
+        app: executor
+    spec:
+      containers:
+        - name: executor
+          image: ghcr.io/sua-org/tradingbot-executor:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4003
+          envFrom:
+            - configMapRef:
+                name: tradingbot-common-config
+            - secretRef:
+                name: tradingbot-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 35
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 400m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: executor
+  namespace: tradingbot
+  labels:
+    app: executor
+spec:
+  selector:
+    app: executor
+  ports:
+    - name: http
+      port: 4003
+      targetPort: 4003
+  type: ClusterIP
+
