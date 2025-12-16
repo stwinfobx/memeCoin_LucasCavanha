@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-neutral-950 text-neutral-100 antialiased;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+a {
+  @apply text-purple-300 transition-colors duration-200;
+}
+
+a:hover {
+  @apply text-purple-200;
+}
+
+.surface {
+  @apply bg-neutral-900 border border-neutral-800 rounded-xl;
+}
+
+.surface-strong {
+  @apply bg-neutral-900 border border-neutral-700 rounded-2xl;
+}
+
+.surface-muted {
+  @apply bg-neutral-900/60 border border-neutral-800 rounded-xl;
+}
+
+.badge {
+  @apply inline-flex items-center gap-2 rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs font-medium text-neutral-300;
+}
+
+.input-field {
+  @apply w-full rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 placeholder-neutral-500 transition;
+}
+
+.input-field:focus {
+  @apply border-purple-400 outline-none ring-1 ring-purple-400/50;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-purple-500 px-4 py-2 text-sm font-medium text-white transition-colors duration-200;
+}
+
+.btn-primary:hover {
+  @apply bg-purple-400;
+}
+
+.btn-primary:focus-visible {
+  @apply outline-none ring-2 ring-purple-300 ring-offset-2 ring-offset-neutral-950;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-200 transition-colors duration-200;
+}
+
+.btn-secondary:hover {
+  @apply border-neutral-500 text-neutral-50;
+}
+
+.section-title {
+  @apply text-sm uppercase tracking-[0.3em] text-neutral-400;
+}
+
+.small-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 198, 0.5) transparent;
+}
+
+.small-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.small-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.small-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 198, 0.5);
+  border-radius: 999px;
+}
+
+::selection {
+  background-color: rgba(139, 92, 246, 0.3);
+  color: inherit;
+}

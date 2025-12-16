@@ -1,0 +1,254 @@
+import { WebSocket, WebSocketServer } from 'ws';
+import { Pool } from 'pg';
+import axios from 'axios';
+import jwt from 'jsonwebtoken';
+
+const GECKO_API_URL = process.env.GECKOTERMINAL_BASE_URL || 'https://api.geckoterminal.com/api/v2';
+const GECKO_HEADERS = {
+  'User-Agent': 'TradingBotWebSocket/1.0',
+  'Accept': 'application/json',
+};
+
+interface PriceUpdate {
+  tokenId: string;
+  symbol: string;
+  priceUsd: number;
+  priceChange24h?: number;
+  priceChangePercent?: number;
+  timestamp: number;
+}
+
+export class PriceUpdateService {
+  private wss: WebSocketServer;
+  private pool: Pool;
+  private clients: Map<WebSocket, string> = new Map(); // WebSocket -> userId
+  private priceUpdateInterval: NodeJS.Timeout | null = null;
+
+  constructor(server: any, pool: Pool) {
+    this.pool = pool;
+    // Não usar o parâmetro 'server' no construtor do WebSocketServer
+    // Vamos criar o WebSocketServer sem servidor e usar handleUpgrade manualmente
+    this.wss = new WebSocketServer({ 
+      noServer: true, // Criar sem servidor - vamos gerenciar upgrades manualmente
+    });
+
+    this.wss.on('connection', (ws: WebSocket, req) => {
+      console.log('[WebSocket] Connection event fired');
+      this.handleConnection(ws, req);
+    });
+    
+    // Handler de upgrade manual - capturar upgrades do servidor HTTP
+    // IMPORTANTE: Registrar ANTES do servidor começar a aceitar conexões
+    server.on('upgrade', (request: any, socket: any, head: any) => {
+      try {
+        console.log('[WebSocket] Upgrade request received:', request.url);
+        const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost:4000'}`);
+        
+        console.log('[WebSocket] Parsed pathname:', url.pathname);
+        
+        if (url.pathname === '/ws/prices') {
+          console.log('[WebSocket] Accepting upgrade for /ws/prices');
+          this.wss.handleUpgrade(request, socket, head, (ws) => {
+            console.log('[WebSocket] Upgrade successful, emitting connection event');
+            this.wss.emit('connection', ws, request);
+          });
+        } else {
+          console.log(`[WebSocket] Rejecting upgrade for path: ${url.pathname}`);
+          socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+          socket.destroy();
+        }
+      } catch (error: any) {
+        console.error('[WebSocket] Error handling upgrade:', error.message);
+        console.error('[WebSocket] Stack:', error.stack);
+        socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+        socket.destroy();
+      }
+    });
+
+    // Iniciar atualização de preços (a cada 10 segundos)
+    const updateInterval = Number(process.env.PRICE_UPDATE_INTERVAL_MS ?? 10000);
+    this.priceUpdateInterval = setInterval(() => {
+      this.broadcastPriceUpdates();
+    }, updateInterval);
+
+    console.log(`📡 WebSocket price update service started (interval: ${updateInterval / 1000}s)`);
+  }
+
+  private handleConnection(ws: WebSocket, req: any): void {
+    console.log('[WebSocket] New connection attempt...');
+    
+    // Extrair token JWT da query string
+    const url = new URL(req.url || '', `http://${req.headers.host || 'localhost:4000'}`);
+    const token = url.searchParams.get('token');
+
+    if (!token) {
+      console.warn('[WebSocket] Connection rejected: no token provided');
+      ws.close(1008, 'Authentication required');
+      return;
+    }
+
+    // Verificar token JWT
+    try {
+      const JWT_SECRET = process.env.JWT_SECRET;
+      if (!JWT_SECRET) {
+        throw new Error('JWT_SECRET not configured');
+      }
+
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const userId = decoded.userId || decoded.id;
+
+      if (!userId) {
+        console.warn('[WebSocket] Connection rejected: invalid token');
+        ws.close(1008, 'Invalid token');
+        return;
+      }
+
+      this.clients.set(ws, userId);
+      console.log(`[WebSocket] Client connected: userId=${userId}, total clients: ${this.clients.size}`);
+
+      ws.on('message', (message: Buffer) => {
+        try {
+          const data = JSON.parse(message.toString());
+          if (data.type === 'ping') {
+            ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+          }
+        } catch (error) {
+          console.error('[WebSocket] Error parsing message:', error);
+        }
+      });
+
+      ws.on('close', () => {
+        this.clients.delete(ws);
+        console.log(`[WebSocket] Client disconnected, total clients: ${this.clients.size}`);
+      });
+
+      ws.on('error', (error) => {
+        console.error('[WebSocket] Client error:', error);
+        this.clients.delete(ws);
+      });
+
+      // Enviar mensagem de boas-vindas
+      ws.send(
+        JSON.stringify({
+          type: 'connected',
+          message: 'Connected to price update stream',
+          timestamp: Date.now(),
+        })
+      );
+    } catch (error: any) {
+      console.error('[WebSocket] Authentication error:', error.message);
+      // Verificar se o erro é de token expirado
+      if (error.name === 'TokenExpiredError' || error.message.includes('expired')) {
+        ws.close(1008, '401 Unauthorized: Token expired');
+      } else if (error.name === 'JsonWebTokenError') {
+        ws.close(1008, '401 Unauthorized: Invalid token');
+      } else {
+        ws.close(1008, 'Authentication failed');
+      }
+    }
+  }
+
+  private async broadcastPriceUpdates(): Promise<void> {
+    // IMPORTANTE: Atualizar preços mesmo se não houver clientes conectados
+    // Isso garante que o banco tenha preços atualizados para o monitoramento de posições
+    try {
+      // Buscar tokens com sinais ativos ou posições abertas
+      const tokensResult = await this.pool.query(
+        `SELECT DISTINCT t.id, t.symbol, t.contract_address, t.chain, t.price_usd
+         FROM tokens t
+         WHERE EXISTS (
+           SELECT 1 FROM signals s WHERE s.token_id = t.id AND s.is_active = true
+         ) OR EXISTS (
+           SELECT 1 FROM positions p WHERE p.token_id = t.id AND p.status = 'open'
+         )
+         LIMIT 100`
+      );
+
+      const tokens = tokensResult.rows;
+      if (tokens.length === 0) {
+        return;
+      }
+
+      // Buscar preços atualizados via GeckoTerminal (em lotes)
+      const updates: PriceUpdate[] = [];
+      const network = 'bsc'; // Default, pode ser configurável
+      const batchSize = 10; // Processar em lotes de 10 para evitar sobrecarga
+
+      for (let i = 0; i < tokens.length; i += batchSize) {
+        const batch = tokens.slice(i, i + batchSize);
+
+        await Promise.all(
+          batch.map(async (token) => {
+            try {
+              const contractAddress = token.contract_address;
+
+              // Buscar pools do token para obter preço mais atualizado
+              const poolsResponse = await axios.get(
+                `${GECKO_API_URL}/networks/${network}/tokens/${contractAddress}?include=top_pools`,
+                {
+                  headers: GECKO_HEADERS,
+                  timeout: 5000,
+                }
+              );
+
+              const tokenData = poolsResponse.data?.data;
+              if (tokenData?.attributes?.price_usd) {
+                const newPrice = Number(tokenData.attributes.price_usd);
+                const oldPrice = Number(token.price_usd ?? 0);
+                const priceChange = oldPrice > 0 ? ((newPrice - oldPrice) / oldPrice) * 100 : 0;
+
+                updates.push({
+                  tokenId: token.id,
+                  symbol: token.symbol,
+                  priceUsd: newPrice,
+                  priceChangePercent: priceChange,
+                  timestamp: Date.now(),
+                });
+
+                // Atualizar preço no banco
+                await this.pool.query('UPDATE tokens SET price_usd = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [
+                  newPrice,
+                  token.id,
+                ]);
+              }
+            } catch (error: any) {
+              // Ignorar erros individuais e continuar
+              if (error.response?.status !== 404) {
+                console.warn(`[WebSocket] Failed to update price for token ${token.symbol}:`, error.message);
+              }
+            }
+          })
+        );
+      }
+
+      // Broadcast para todos os clientes conectados
+      if (updates.length > 0) {
+        const message = JSON.stringify({
+          type: 'price_update',
+          updates,
+          timestamp: Date.now(),
+        });
+
+        for (const [ws] of this.clients.entries()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(message);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('[WebSocket] Error broadcasting price updates:', error);
+    }
+  }
+
+  public get wssInstance(): WebSocketServer {
+    return this.wss;
+  }
+
+  public close(): void {
+    if (this.priceUpdateInterval) {
+      clearInterval(this.priceUpdateInterval);
+    }
+    this.wss.close();
+  }
+}
+

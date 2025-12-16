@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: validator
+  namespace: tradingbot
+  labels:
+    app: validator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: validator
+  template:
+    metadata:
+      labels:
+        app: validator
+    spec:
+      containers:
+        - name: validator
+          image: ghcr.io/sua-org/tradingbot-validator:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4001
+          env:
+            - name: ENABLE_INGESTION
+              value: "true"
+            - name: INGESTION_INTERVAL_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: tradingbot-common-config
+                  key: INGESTION_INTERVAL_MS
+            - name: INGESTION_FRESHNESS_MINUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: tradingbot-common-config
+                  key: INGESTION_FRESHNESS_MINUTES
+          envFrom:
+            - configMapRef:
+                name: tradingbot-common-config
+            - secretRef:
+                name: tradingbot-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4001
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4001
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: validator
+  namespace: tradingbot
+  labels:
+    app: validator
+spec:
+  selector:
+    app: validator
+  ports:
+    - name: http
+      port: 4001
+      targetPort: 4001
+  type: ClusterIP
+

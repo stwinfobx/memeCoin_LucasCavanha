@@ -1,0 +1,12 @@
+namespace: tradingbot
+resources:
+  - namespace.yaml
+  - configmap-common.yaml
+  - secret-example.yaml
+  - api-gateway.yaml
+  - validator.yaml
+  - signal.yaml
+  - executor.yaml
+  - frontend.yaml
+  - ingress.yaml
+
