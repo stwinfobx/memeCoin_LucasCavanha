@@ -7,6 +7,13 @@ const router = Router();
 
 // Helper para garantir saldo inicial do usuário
 async function ensureUserInitialBalance(userId: string): Promise<void> {
+  // IMPORTANTE: Verificar se o usuário existe na tabela users
+  const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+  if (userCheck.rows.length === 0) {
+    console.warn(`[Bot Router] ⚠️ User ${userId} does not exist in users table, skipping initial balance creation`);
+    return;
+  }
+  
   // Verificar se já existe um depósito inicial para evitar duplicação
   const existingDeposit = await pool.query(
     `SELECT COUNT(*) as count FROM ledger_entries 

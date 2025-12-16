@@ -18,6 +18,13 @@ interface Summary {
 
 // Helper para garantir saldo inicial
 async function ensureUserInitialBalance(pool: any, userId: string): Promise<void> {
+  // IMPORTANTE: Verificar se o usuário existe na tabela users
+  const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+  if (userCheck.rows.length === 0) {
+    console.warn(`[Dashboard] ⚠️ User ${userId} does not exist in users table, skipping initial balance creation`);
+    return;
+  }
+  
   // Verificar se já existe um depósito inicial para evitar duplicação
   const existingDeposit = await pool.query(
     `SELECT COUNT(*) as count FROM ledger_entries 
@@ -72,16 +79,8 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     // Garantir que o usuário tenha saldo inicial
     await ensureUserInitialBalance(pool, userId);
 
-    const [balanceResult, profitLossResult, tradesResult, riskResult, positionsResult, signalsResult, ordersResult] =
+    const [depositsResult, tradesResult, riskResult, positionsResult, signalsResult, ordersResult] =
       await Promise.all([
-        pool.query(
-          `SELECT 
-             COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-             COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-           FROM ledger_entries
-           WHERE user_id = $1`,
-          [userId]
-        ),
         pool.query(
           `SELECT
              COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
@@ -154,8 +153,25 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
         ),
       ]);
 
-    const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-    const debits = Number(balanceResult.rows[0]?.debits ?? 0);
+    // CORRIGIDO: Calcular saldo usando depósitos + lucros/perdas realizados das orders
+    // trade_profit do ledger representa valor total recebido, não lucro
+    // O saldo correto = depósitos + lucros realizados - perdas realizadas
+    const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
+    
+    // Declarar trades antes de usar
+    const trades = tradesResult.rows[0] ?? {
+      completed_trades: 0,
+      total_trades: 0,
+      completed_sells: 0,
+      total_profit_realized: 0,
+      total_loss_realized: 0,
+    };
+    
+    const realizedProfit = Number(trades.total_profit_realized ?? 0);
+    const realizedLoss = Number(trades.total_loss_realized ?? 0);
+    
+    // Saldo total = depósitos + lucros realizados - perdas realizadas
+    const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
     
     // Buscar investido em posições abertas e lucros/perdas não realizados
     const openPositionsBalance = await pool.query(
@@ -181,21 +197,12 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     const unrealizedProfit = Number(openPositionsBalance.rows[0]?.unrealized_profit ?? 0);
     const unrealizedLoss = Number(openPositionsBalance.rows[0]?.unrealized_loss ?? 0);
     
-    // Saldo disponível = créditos - débitos - investido em posições abertas
-    const totalBalance = Math.max(0, credits - debits);
+    // Saldo disponível = saldo total - investido em posições abertas
     const availableBalance = Math.max(0, totalBalance - investedInPositions);
     const balance = availableBalance; // Mostrar saldo disponível
     
-    const deposits = profitLossResult.rows[0] ?? {
+    const deposits = depositsResult.rows[0] ?? {
       total_deposits: 0,
-    };
-    
-    const trades = tradesResult.rows[0] ?? {
-      completed_trades: 0,
-      total_trades: 0,
-      completed_sells: 0,
-      total_profit_realized: 0,
-      total_loss_realized: 0,
     };
     
     // IMPORTANTE: Lucro/perda real vem das orders, não do ledger
@@ -207,7 +214,7 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     const totalProfit = totalProfitRealized + unrealizedProfit;
     const totalLoss = totalLossRealized + unrealizedLoss;
     
-    const totalDeposits = Number(deposits.total_deposits ?? 0);
+    // totalDeposits já foi declarado acima (linha 152)
     const riskStats = riskResult.rows[0] ?? {
       total_tokens: 0,
       low_risk: 0,

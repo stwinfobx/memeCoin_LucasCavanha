@@ -111,18 +111,30 @@ export class TradeExecutor {
     tokenId: string,
     signalId?: string
   ): Promise<{ amountUsd: number; baseAmount: number; confidenceFactor: number; multiplierFactor: number }> {
-    // Buscar saldo total (depósitos + lucros realizados - perdas realizadas)
-    const balanceResult = await this.pool.query(
-      `SELECT 
-         COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-         COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+    // CORRIGIDO: Calcular saldo usando depósitos + lucros/perdas realizados das orders
+    // trade_profit do ledger representa valor total recebido, não lucro
+    const depositsResult = await this.pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
        FROM ledger_entries
        WHERE user_id = $1`,
       [userId]
     );
-    const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-    const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-    const totalBalance = Math.max(0, credits - debits);
+    const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
+    
+    // Buscar lucros/perdas realizados das orders SELL
+    const realizedPLResult = await this.pool.query(
+      `SELECT 
+         COALESCE(SUM(profit_loss_usd) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd > 0), 0) AS realized_profit,
+         COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS realized_loss
+       FROM orders
+       WHERE user_id = $1`,
+      [userId]
+    );
+    const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
+    const realizedLoss = Number(realizedPLResult.rows[0]?.realized_loss ?? 0);
+    
+    // Saldo total = depósitos + lucros realizados - perdas realizadas
+    const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
 
     // Buscar investido em posições abertas
     const openPositionsResult = await this.pool.query(
@@ -209,17 +221,27 @@ export class TradeExecutor {
     const investedAmount = Number((order as any).invested_amount_usd ?? order.amount_usd ?? 0);
     const amountToken = investedAmount / price;
 
-    // Calcular saldo disponível antes da compra
-    const balanceBeforeResult = await this.pool.query(
-      `SELECT 
-         COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-         COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+    // CORRIGIDO: Calcular saldo disponível antes da compra
+    // Usar depósitos + lucros realizados - perdas realizadas
+    const depositsResult = await this.pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
        FROM ledger_entries
        WHERE user_id = $1`,
       [order.user_id]
     );
-    const credits = Number(balanceBeforeResult.rows[0]?.credits ?? 0);
-    const debits = Number(balanceBeforeResult.rows[0]?.debits ?? 0);
+    const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
+    
+    // Buscar lucros/perdas realizados das orders SELL
+    const realizedPLResult = await this.pool.query(
+      `SELECT 
+         COALESCE(SUM(profit_loss_usd) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd > 0), 0) AS realized_profit,
+         COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS realized_loss
+       FROM orders
+       WHERE user_id = $1`,
+      [order.user_id]
+    );
+    const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
+    const realizedLoss = Number(realizedPLResult.rows[0]?.realized_loss ?? 0);
     
     // Buscar investido em posições abertas
     const openPositionsResult = await this.pool.query(
@@ -230,8 +252,10 @@ export class TradeExecutor {
     );
     const investedInPositions = Number(openPositionsResult.rows[0]?.total_invested ?? 0);
     
-    // Saldo disponível = créditos - débitos - investido em posições abertas
-    const balanceBefore = Math.max(0, credits - debits - investedInPositions);
+    // Saldo total = depósitos + lucros realizados - perdas realizadas
+    const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
+    // Saldo disponível = saldo total - investido em posições abertas
+    const balanceBefore = Math.max(0, totalBalance - investedInPositions);
     const balanceAfter = Math.max(0, balanceBefore - investedAmount);
 
     // Atualizar ordem
@@ -335,11 +359,29 @@ export class TradeExecutor {
 
         if (amountToken >= currentBalance) {
           // Fechar posição completamente
-          const investedForSold = (amountToken / currentBalance) * investedAmount;
-          const profitLoss = soldValue - investedForSold;
-          const profitLossPercent = (profitLoss / investedForSold) * 100;
+          // Validação: evitar divisão por zero
+          if (currentBalance <= 0) {
+            throw new Error(`Invalid position balance: ${currentBalance} for position ${pos.id}`);
+          }
+          const ratio = Math.min(1, Math.max(0, amountToken / currentBalance));
+          const investedForSold = investedAmount * ratio;
+          let profitLoss = soldValue - investedForSold;
+          // Validação: evitar divisão por zero no cálculo de percentual
+          let profitLossPercent = investedForSold > 0 && !isNaN(investedForSold) && isFinite(investedForSold)
+            ? (profitLoss / investedForSold) * 100
+            : 0;
           const holdTimeHours = (Date.now() - buyTime.getTime()) / (1000 * 60 * 60);
           const isProfit = profitLoss >= 0;
+          
+          // Garantir que os valores são números válidos
+          if (isNaN(profitLoss) || !isFinite(profitLoss)) {
+            console.warn(`[Executor] Invalid profitLoss calculated: ${profitLoss}, setting to 0`);
+            profitLoss = 0;
+          }
+          if (isNaN(profitLossPercent) || !isFinite(profitLossPercent)) {
+            console.warn(`[Executor] Invalid profitLossPercent calculated: ${profitLossPercent}, setting to 0`);
+            profitLossPercent = 0;
+          }
 
           await this.pool.query(
             `UPDATE positions SET
@@ -446,11 +488,28 @@ export class TradeExecutor {
       }
 
       // Calcular invested amount proporcional à quantidade vendida
-      const ratio = Math.min(1, amountToken / currentBalance);
+      // Validação: evitar divisão por zero
+      if (currentBalance <= 0) {
+        throw new Error(`Invalid position balance: ${currentBalance} for position ${pos.id}`);
+      }
+      const ratio = Math.min(1, Math.max(0, amountToken / currentBalance));
       const investedForSold = totalInvested * ratio;
 
+      // Validação: evitar divisão por zero no cálculo de percentual
       profitLossUsd = amountUsd - investedForSold;
-      profitLossPercent = investedForSold > 0 ? (profitLossUsd / investedForSold) * 100 : 0;
+      profitLossPercent = investedForSold > 0 && !isNaN(investedForSold) && isFinite(investedForSold)
+        ? (profitLossUsd / investedForSold) * 100
+        : 0;
+      
+      // Garantir que os valores são números válidos
+      if (isNaN(profitLossUsd) || !isFinite(profitLossUsd)) {
+        console.warn(`[Executor] Invalid profitLossUsd calculated: ${profitLossUsd}, setting to 0`);
+        profitLossUsd = 0;
+      }
+      if (isNaN(profitLossPercent) || !isFinite(profitLossPercent)) {
+        console.warn(`[Executor] Invalid profitLossPercent calculated: ${profitLossPercent}, setting to 0`);
+        profitLossPercent = 0;
+      }
       holdTimeHours = (Date.now() - buyTime.getTime()) / (1000 * 60 * 60);
       
       console.log(`[Executor] 📊 SELL calculation: amountUsd=$${amountUsd.toFixed(2)}, investedForSold=$${investedForSold.toFixed(2)}, profitLoss=$${profitLossUsd.toFixed(2)} (${profitLossPercent.toFixed(2)}%)`);
@@ -653,12 +712,30 @@ export class TradeExecutor {
     signal: Signal,
     currentPrice: number,
     buyPrice: number,
-    buyTime: Date,
+    holdTimeMinutes: number,
     potentialMultiplier: number
   ): Promise<{ shouldSell: boolean; reason: string }> {
     // Critério 1: Sinal SELL - sempre vende
     if (signal.signal_type === 'SELL') {
       return { shouldSell: true, reason: 'Sinal SELL emitido' };
+    }
+
+    // ============================================================================
+    // PRIORIDADE MÁXIMA: TEMPO MÁXIMO DE HOLD (10 minutos) - VERIFICAR PRIMEIRO
+    // ============================================================================
+    // CRÍTICO: Verificar tempo ANTES de qualquer validação de preço
+    // Se passou 10 minutos, vender SEMPRE, independente de preço válido ou não
+    // CORRIGIDO: Usar holdTimeMinutes passado diretamente da query SQL (já calculado corretamente)
+    console.log(`[Executor] ⏱️ Checking hold time for position: ${holdTimeMinutes.toFixed(2)} minutes (threshold: 10 minutes)`);
+    if (holdTimeMinutes >= 10) {
+      console.error(`[Executor] 🚨🚨🚨 VENDA FORÇADA ABSOLUTA (PRIORIDADE MÁXIMA): ${holdTimeMinutes.toFixed(2)} minutos >= 10 minutos - FORÇANDO VENDA SEM EXCEÇÕES 🚨🚨🚨`);
+      console.error(`[Executor] Position details:`, {
+        user_id: userId,
+        token_id: tokenId,
+        hold_time_minutes: holdTimeMinutes.toFixed(2),
+        current_time: new Date().toISOString()
+      });
+      return { shouldSell: true, reason: `🚨 VENDA FORÇADA ABSOLUTA: ${holdTimeMinutes.toFixed(0)} minutos - limite de segurança` };
     }
 
     // Buscar perfil de risco do usuário
@@ -670,34 +747,73 @@ export class TradeExecutor {
     const maxGainPercent = Number(profile?.max_gain_percent ?? 25);
 
     // Calcular ganho/perda e tempo de hold
+    // Validações: evitar divisão por zero e garantir valores válidos
+    if (buyPrice <= 0 || isNaN(buyPrice) || !isFinite(buyPrice)) {
+      console.error(`[Executor] Invalid buyPrice: ${buyPrice}, using currentPrice as fallback`);
+      // Se passou 5 minutos sem preço válido, vender por segurança
+      if (holdTimeMinutes >= 5) {
+        return { shouldSell: true, reason: `⚠️ Venda forçada: preço inválido após ${holdTimeMinutes.toFixed(0)} minutos` };
+      }
+      return { shouldSell: false, reason: `Preço de compra inválido: ${buyPrice}` };
+    }
+    if (currentPrice <= 0 || isNaN(currentPrice) || !isFinite(currentPrice)) {
+      console.error(`[Executor] Invalid currentPrice: ${currentPrice}`);
+      // Se passou 5 minutos sem preço válido, vender por segurança
+      if (holdTimeMinutes >= 5) {
+        return { shouldSell: true, reason: `⚠️ Venda forçada: preço atual inválido após ${holdTimeMinutes.toFixed(0)} minutos` };
+      }
+      return { shouldSell: false, reason: `Preço atual inválido: ${currentPrice}` };
+    }
+    
     const gainPercent = ((currentPrice / buyPrice - 1) * 100);
     const lossPercent = ((buyPrice - currentPrice) / buyPrice) * 100;
-    const holdTimeMinutes = (Date.now() - buyTime.getTime()) / (1000 * 60);
     const holdTimeHours = holdTimeMinutes / 60;
     
-    // ============================================================================
-    // PRIORIDADE 1: TEMPO MÁXIMO DE HOLD (10 minutos padrão)
-    // ============================================================================
-    
-    // VENDA FORÇADA ABSOLUTA após 10 minutos - SEM EXCEÇÕES (PRIORIDADE MÁXIMA)
-    // Garantia adicional para evitar posições presas - SEMPRE VENDE após 10 min
-    // IMPORTANTE: Reduzido de 15 para 10 minutos para garantir vendas mais rápidas
-    // CRÍTICO: Esta é a PRIORIDADE MÁXIMA - sempre vende após 10 minutos
-    if (holdTimeMinutes >= 10) {
-      console.error(`[Executor] 🚨 VENDA FORÇADA ABSOLUTA: ${holdTimeMinutes.toFixed(0)} minutos - FORÇANDO VENDA SEM EXCEÇÕES`);
-      console.error(`[Executor] 🚨 Detalhes: gain=${gainPercent.toFixed(2)}%, loss=${lossPercent.toFixed(2)}%, price=${currentPrice.toFixed(8)}, buy=${buyPrice.toFixed(8)}`);
-      return { shouldSell: true, reason: `🚨 VENDA FORÇADA ABSOLUTA: ${holdTimeMinutes.toFixed(0)} minutos - limite de segurança` };
+    // Validação: garantir que os percentuais são números válidos
+    if (isNaN(gainPercent) || !isFinite(gainPercent)) {
+      console.error(`[Executor] Invalid gainPercent calculated: ${gainPercent}`);
+      // Se passou 5 minutos com cálculo inválido, vender por segurança
+      if (holdTimeMinutes >= 5) {
+        return { shouldSell: true, reason: `⚠️ Venda forçada: erro no cálculo após ${holdTimeMinutes.toFixed(0)} minutos` };
+      }
+      return { shouldSell: false, reason: `Erro no cálculo de ganho: ${gainPercent}` };
     }
-    
-    // VENDA FORÇADA após 5 minutos se não houver lucro significativo (>0.5%)
-    // Isso garante que posições sem movimento sejam vendidas rapidamente
-    if (holdTimeMinutes >= 5 && gainPercent < 0.5) {
-      console.log(`[Executor] ⏰ VENDA FORÇADA POR TEMPO: ${holdTimeMinutes.toFixed(0)} minutos sem lucro significativo (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`);
-      return { shouldSell: true, reason: `⏰ VENDA FORÇADA: ${holdTimeMinutes.toFixed(0)} minutos sem lucro significativo (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)` };
+    if (isNaN(lossPercent) || !isFinite(lossPercent)) {
+      console.error(`[Executor] Invalid lossPercent calculated: ${lossPercent}`);
+      // Se passou 5 minutos com cálculo inválido, vender por segurança
+      if (holdTimeMinutes >= 5) {
+        return { shouldSell: true, reason: `⚠️ Venda forçada: erro no cálculo após ${holdTimeMinutes.toFixed(0)} minutos` };
+      }
+      return { shouldSell: false, reason: `Erro no cálculo de perda: ${lossPercent}` };
     }
     
     // ============================================================================
-    // PRIORIDADE 2: STOP-LOSS AGRESSIVO (proteger capital rapidamente)
+    // PRIORIDADE 1: STOP-LOSS ABSOLUTO (configuração do usuário)
+    // ============================================================================
+    // CORRIGIDO: Stop-loss absoluto deve ter PRIORIDADE MÁXIMA
+    // Se a perda atingir ou exceder o limite configurado, vender SEMPRE, independente de tempo
+    if (lossPercent >= maxLossPercent) {
+      console.error(`[Executor] 🚨🚨🚨 STOP-LOSS ABSOLUTO (PRIORIDADE 1): ${lossPercent.toFixed(2)}% >= ${maxLossPercent}% - VENDENDO IMEDIATAMENTE 🚨🚨🚨`);
+      return { shouldSell: true, reason: `🛑 Stop-loss absoluto: ${lossPercent.toFixed(2)}% (limite: ${maxLossPercent}%)` };
+    }
+    
+    // VENDA FORÇADA após 7 minutos se não houver lucro significativo (>1%) OU se houver perda > 0.5%
+    // Ajustado: Aumentado tempo de 5 para 7 minutos e threshold de lucro de 0.5% para 1%
+    // Isso dá mais tempo para posições lucrarem antes de forçar venda
+    if (holdTimeMinutes >= 7 && (gainPercent < 1.0 || lossPercent > 0.5)) {
+      console.log(`[Executor] ⏰ VENDA FORÇADA POR TEMPO: ${holdTimeMinutes.toFixed(0)} minutos sem lucro significativo (>1%) ou com perda >0.5% (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%, loss: ${lossPercent.toFixed(2)}%)`);
+      return { shouldSell: true, reason: `⏰ VENDA FORÇADA: ${holdTimeMinutes.toFixed(0)} minutos sem lucro significativo (>1%) ou com perda >0.5% (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)` };
+    }
+    
+    // VENDA FORÇADA após 5 minutos APENAS se houver perda significativa (>1%)
+    // Isso protege contra perdas maiores enquanto dá mais tempo para posições neutras lucrarem
+    if (holdTimeMinutes >= 5 && lossPercent > 1.0) {
+      console.log(`[Executor] ⏰ VENDA FORÇADA POR PERDA: ${holdTimeMinutes.toFixed(0)} minutos com perda significativa (${lossPercent.toFixed(2)}%)`);
+      return { shouldSell: true, reason: `⏰ VENDA FORÇADA: ${holdTimeMinutes.toFixed(0)} minutos com perda significativa (${lossPercent.toFixed(2)}%)` };
+    }
+    
+    // ============================================================================
+    // PRIORIDADE 3: STOP-LOSS AGRESSIVO (proteger capital rapidamente)
     // ============================================================================
     
     // STOP-LOSS CRÍTICO: 2% de perda após 3 minutos → VENDE IMEDIATAMENTE
@@ -717,15 +833,9 @@ export class TradeExecutor {
       console.warn(`[Executor] ⚠️ STOP-LOSS ULTRA-PREVENTIVO: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos`);
       return { shouldSell: true, reason: `⚠️ Stop-loss: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos` };
     }
-    
-    // STOP-LOSS ABSOLUTO: qualquer perda >= maxLossPercent → VENDE
-    if (lossPercent >= maxLossPercent) {
-      console.error(`[Executor] 🚨 STOP-LOSS ABSOLUTO: ${lossPercent.toFixed(2)}% (limite: ${maxLossPercent}%)`);
-      return { shouldSell: true, reason: `🛑 Stop-loss absoluto: ${lossPercent.toFixed(2)}%` };
-    }
 
     // ============================================================================
-    // PRIORIDADE 3: VENDA RÁPIDA DE LUCROS (realização rápida)
+    // PRIORIDADE 4: VENDA RÁPIDA DE LUCROS (realização rápida)
     // ============================================================================
     
     // VENDA ULTRA-RÁPIDA (2-5 min): Qualquer lucro > 0.5% → vende imediatamente
@@ -750,7 +860,7 @@ export class TradeExecutor {
     }
 
     // ============================================================================
-    // PRIORIDADE 4: TAKE-PROFIT E GANHO MÁXIMO
+    // PRIORIDADE 5: TAKE-PROFIT E GANHO MÁXIMO
     // ============================================================================
     
     // TAKE-PROFIT: 30% do alvo → vende rápido
@@ -767,7 +877,7 @@ export class TradeExecutor {
     }
 
     // ============================================================================
-    // PRIORIDADE 5: HOLD PERSISTENTE SEM MOVIMENTO
+    // PRIORIDADE 6: HOLD PERSISTENTE SEM MOVIMENTO
     // ============================================================================
     
     // Se sinal HOLD e sem movimento significativo após 5 minutos → vende
@@ -1042,16 +1152,72 @@ export class TradeExecutor {
         // Verificar se o bot está habilitado para este usuário
         const botEnabled = await this.isBotEnabled(userId);
         if (!botEnabled) {
+          console.error(`[Executor] ⚠️ Bot disabled for user ${userId}, skipping position ${pos.symbol} (${pos.id})`);
           continue; // Pular se bot desabilitado
         }
         const buyPrice = Number(pos.buy_price_usd);
-        const buyTime = new Date(pos.buy_time);
+        // CORRIGIDO: Usar hold_time_minutes já calculado pela query SQL ao invés de recalcular
+        const holdTimeMinutes = Number(pos.hold_time_minutes ?? 0);
         // Priorizar: token.price_usd > position.current_price_usd > buy_price_usd
         const tokenPriceUsd = Number(pos.token_price_usd ?? null);
         const positionCurrentPrice = Number(pos.position_current_price ?? null);
         const currentPrice = tokenPriceUsd || positionCurrentPrice || buyPrice;
         const potentialMultiplier = Number(pos.potential_multiplier ?? 1.0);
         const tokenBalance = Number(pos.token_balance ?? 0);
+        
+        // VALIDAÇÃO CRÍTICA: Se hold_time_minutes >= 10, forçar venda ANTES de qualquer outra verificação
+        if (holdTimeMinutes >= 10) {
+          console.error(`[Executor] 🚨🚨🚨 FORÇANDO VENDA IMEDIATA: Posição ${pos.symbol} há ${holdTimeMinutes.toFixed(2)} minutos (>= 10 minutos) 🚨🚨🚨`);
+          console.error(`[Executor] Position details:`, {
+            position_id: pos.id,
+            user_id: userId,
+            symbol: pos.symbol,
+            hold_time_minutes: holdTimeMinutes.toFixed(2),
+            token_balance: tokenBalance
+          });
+          
+          // Executar venda imediatamente sem chamar shouldSellPosition
+          if (tokenBalance > 0) {
+            try {
+              console.error(`[Executor] 🚀🚀🚀 Executing FORCED SELL order for ${pos.symbol}: ${tokenBalance} tokens 🚀🚀🚀`);
+              const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance }, userId);
+              console.error(`[Executor] ✅✅✅ VENDA FORÇADA EXECUTADA COM SUCESSO: Order ${order.id} para ${pos.symbol} ✅✅✅`);
+              
+              await this.createNotification(
+                userId,
+                'position_closed',
+                'warning',
+                'Posição fechada automaticamente',
+                `🤖 Fechei a posição em ${pos.symbol} automaticamente após ${holdTimeMinutes.toFixed(0)} minutos (limite de segurança)`,
+                { order_id: order.id, symbol: pos.symbol, reason: `Venda forçada após ${holdTimeMinutes.toFixed(0)} minutos` }
+              );
+              continue; // Pular para próxima posição
+            } catch (error: any) {
+              console.error(`[Executor] ❌❌❌ FAILED TO FORCE-SELL POSITION ${pos.id} (${pos.symbol}):`, {
+                error_message: error.message,
+                error_stack: error.stack,
+                position_id: pos.id,
+                user_id: userId,
+                token_id: tokenId,
+                symbol: pos.symbol,
+                token_balance: tokenBalance,
+                hold_time_minutes: holdTimeMinutes.toFixed(2)
+              });
+              await this.createNotification(
+                userId,
+                'error_occurred',
+                'error',
+                'Erro ao vender posição',
+                `🤖 ⚠️ Erro ao vender ${pos.symbol} automaticamente após ${holdTimeMinutes.toFixed(0)} minutos: ${error.message}`,
+                { symbol: pos.symbol, error: error.message, position_id: pos.id }
+              );
+              continue; // Pular para próxima posição mesmo com erro
+            }
+          } else {
+            console.error(`[Executor] 🚨 CRITICAL: Should force sell ${pos.symbol} but tokenBalance is ${tokenBalance}!`);
+            continue; // Pular para próxima posição
+          }
+        }
         
         // Log detalhado do preço usado
         if (tokenPriceUsd && tokenPriceUsd !== buyPrice) {
@@ -1107,55 +1273,21 @@ export class TradeExecutor {
           } as Signal;
         }
 
-        // Verificar se deve vender
+        // Verificar se deve vender usando hold_time_minutes da query SQL
         const decision = await this.shouldSellPosition(
           userId,
           tokenId,
           signal,
           currentPrice,
           buyPrice,
-          buyTime,
+          holdTimeMinutes, // CORRIGIDO: Passar hold_time_minutes da query SQL
           potentialMultiplier
         );
 
         // Log detalhado da decisão de venda
         const gainPercent = ((currentPrice / buyPrice - 1) * 100);
         const lossPercent = ((buyPrice - currentPrice) / buyPrice) * 100;
-        const holdTimeMinutes = (Date.now() - buyTime.getTime()) / (1000 * 60);
         const holdTimeHours = holdTimeMinutes / 60;
-        
-        // Log crítico se posição está há muito tempo sem vender
-        if (holdTimeMinutes >= 10) {
-          console.error(`[Executor] 🚨 CRITICAL: Position ${pos.symbol} open for ${holdTimeMinutes.toFixed(0)} minutes!`, {
-            user_id: userId,
-            position_id: pos.id,
-            gain_percent: gainPercent.toFixed(2),
-            loss_percent: lossPercent.toFixed(2),
-            should_sell: decision.shouldSell,
-            reason: decision.reason,
-            buy_price: buyPrice,
-            current_price: currentPrice,
-            token_balance: tokenBalance,
-            buy_time: buyTime.toISOString(),
-            current_time: new Date().toISOString()
-          });
-          
-          // FORÇAR VENDA se estiver há mais de 10 minutos - SEMPRE
-          console.error(`[Executor] 🚨 FORÇANDO VENDA: Posição ${pos.symbol} há ${holdTimeMinutes.toFixed(0)} minutos - FORÇANDO VENDA AGORA!`);
-          // Sobrescrever decisão para forçar venda - SEMPRE após 10 minutos
-          decision.shouldSell = true;
-          decision.reason = `🚨 VENDA FORÇADA: ${holdTimeMinutes.toFixed(0)} minutos - limite de segurança excedido`;
-          
-          // Criar notificação crítica
-          await this.createNotification(
-            userId,
-            'error_occurred',
-            'error',
-            'Posição crítica detectada',
-            `🚨 Posição ${pos.symbol} está aberta há ${holdTimeMinutes.toFixed(0)} minutos! Forçando venda agora...`,
-            { symbol: pos.symbol, hold_time_minutes: holdTimeMinutes, position_id: pos.id }
-          );
-        }
         
         console.log(`[Executor] 🔍 Position monitoring for ${pos.symbol}:`, {
           user_id: userId,
@@ -1172,6 +1304,19 @@ export class TradeExecutor {
           reason: decision.reason || 'Não atende critérios de venda'
         });
 
+        // Log crítico se deveria vender mas não vai
+        if (decision.shouldSell && tokenBalance <= 0) {
+          console.error(`[Executor] 🚨🚨🚨 CRITICAL: Should sell ${pos.symbol} but tokenBalance is ${tokenBalance}! 🚨🚨🚨`);
+          console.error(`[Executor] Position details:`, {
+            position_id: pos.id,
+            user_id: userId,
+            symbol: pos.symbol,
+            token_balance: tokenBalance,
+            should_sell: decision.shouldSell,
+            reason: decision.reason
+          });
+        }
+        
         if (decision.shouldSell && tokenBalance > 0) {
           console.error(`[Executor] ⚡⚡⚡ AUTO-SELLING POSITION: ${pos.symbol} - ${decision.reason} ⚡⚡⚡`);
           console.error(`[Executor] 📊 Position details:`, {
@@ -1190,6 +1335,7 @@ export class TradeExecutor {
           
           try {
             console.error(`[Executor] 🚀🚀🚀 Executing SELL order for ${pos.symbol}: ${tokenBalance} tokens 🚀🚀🚀`);
+            console.error(`[Executor] Request params:`, { token_id: tokenId, amount_token: tokenBalance, user_id: userId });
             const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance }, userId);
             console.error(`[Executor] ✅✅✅ VENDA EXECUTADA COM SUCESSO: Order ${order.id} para ${pos.symbol} ✅✅✅`);
             
@@ -1217,14 +1363,24 @@ export class TradeExecutor {
               { order_id: order.id, symbol: pos.symbol, reason: decision.reason }
             );
           } catch (error: any) {
-            console.warn(`[Executor] Failed to auto-sell position ${pos.id}:`, error.message);
+            console.error(`[Executor] ❌❌❌ FAILED TO AUTO-SELL POSITION ${pos.id} (${pos.symbol}):`, {
+              error_message: error.message,
+              error_stack: error.stack,
+              position_id: pos.id,
+              user_id: userId,
+              token_id: tokenId,
+              symbol: pos.symbol,
+              token_balance: tokenBalance,
+              hold_time_minutes: holdTimeMinutes.toFixed(0),
+              reason: decision.reason
+            });
             await this.createNotification(
               userId,
               'error_occurred',
               'error',
               'Erro ao vender posição',
               `🤖 ⚠️ Erro ao vender ${pos.symbol} automaticamente: ${error.message}. Tentarei novamente na próxima verificação.`,
-              { symbol: pos.symbol, error: error.message }
+              { symbol: pos.symbol, error: error.message, position_id: pos.id, stack: error.stack }
             );
           }
         }
@@ -1819,3 +1975,4 @@ export class TradeExecutor {
     }
   }
 }
+

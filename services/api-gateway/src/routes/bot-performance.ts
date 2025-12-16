@@ -73,11 +73,9 @@ router.get('/performance', authenticate, async (req: AuthRequest, res: Response)
     
     console.log('[Bot Performance] 📈 Trade stats:', statsResult.rows[0]);
     
-    // Buscar lucros/perdas reais do ledger (mais confiável)
-    const ledgerProfitLoss = await pool.query(
+    // Buscar depósitos do ledger
+    const depositsResult = await pool.query(
       `SELECT
-         COALESCE(SUM(CASE WHEN entry_type = 'trade_profit' THEN amount_usd ELSE 0 END), 0) AS total_profit,
-         COALESCE(SUM(CASE WHEN entry_type = 'trade_loss' THEN ABS(amount_usd) ELSE 0 END), 0) AS total_loss,
          COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
        FROM ledger_entries
        WHERE user_id = $1`,
@@ -122,7 +120,11 @@ router.get('/performance', authenticate, async (req: AuthRequest, res: Response)
         t.name,
         p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) as current_value,
         (p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) - p.invested_amount_usd) as unrealized_pnl,
-        ((p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) - p.invested_amount_usd) / p.invested_amount_usd * 100) as unrealized_pnl_percent,
+        CASE 
+          WHEN p.invested_amount_usd > 0 AND p.invested_amount_usd IS NOT NULL
+          THEN ((p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) - p.invested_amount_usd) / p.invested_amount_usd * 100)
+          ELSE 0
+        END as unrealized_pnl_percent,
         EXTRACT(EPOCH FROM (NOW() - p.buy_time)) / 3600 as hold_time_hours
        FROM positions p
        JOIN tokens t ON p.token_id = t.id
@@ -146,36 +148,8 @@ router.get('/performance', authenticate, async (req: AuthRequest, res: Response)
     );
 
     // Buscar saldo atual do usuário
-    const balanceResult = await pool.query(
-      `SELECT 
-         COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-         COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-       FROM ledger_entries
-       WHERE user_id = $1`,
-      [userId]
-    );
-    const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-    const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-    
-    // Buscar investido em posições abertas
-    const openPositionsBalance = await pool.query(
-      `SELECT COALESCE(SUM(invested_amount_usd), 0) AS total_invested
-       FROM positions
-       WHERE user_id = $1 AND status = 'open'`,
-      [userId]
-    );
-    const investedInPositions = Number(openPositionsBalance.rows[0]?.total_invested ?? 0);
-    
-    const totalBalance = Math.max(0, credits - debits);
-    const availableBalance = Math.max(0, totalBalance - investedInPositions);
-    
-    console.log('[Bot Performance] 💰 Balance calculation:', {
-      credits,
-      debits,
-      total_balance: totalBalance,
-      invested_in_positions: investedInPositions,
-      available_balance: availableBalance
-    });
+    // CORRIGIDO: Saldo será calculado depois, usando depósitos + lucros/perdas realizados das orders
+    // Não usar mais trade_profit do ledger para cálculo de saldo
 
     // Buscar ordens recentes (últimas 50)
     const recentOrdersResult = await pool.query(
@@ -220,7 +194,6 @@ router.get('/performance', authenticate, async (req: AuthRequest, res: Response)
     const stats = statsResult.rows[0] || {};
     const positions = positionsResult.rows[0] || {};
     const signals = signalsResult.rows[0] || {};
-    const ledgerPL = ledgerProfitLoss.rows[0] || {};
     const allOrders = allOrdersResult.rows[0] || {};
     
     // Total de trades = SELL completadas (trades fechados)
@@ -229,12 +202,11 @@ router.get('/performance', authenticate, async (req: AuthRequest, res: Response)
       ? (Number(stats.winning_trades ?? 0) / totalTrades) * 100 
       : 0;
 
-    // IMPORTANTE: O ledger registra valores recebidos de vendas, não lucros
-    // Para métricas de lucro/perda, usar profit_loss_usd das orders (mais preciso)
-    // Para depósitos, usar o ledger
-    const totalDeposits = Number(ledgerPL.total_deposits ?? 0);
+    // CORRIGIDO: Calcular saldo usando depósitos + lucros/perdas realizados das orders
+    // trade_profit do ledger representa valor total recebido, não lucro
+    const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
     
-    // Lucro/perda realizado (trades fechados)
+    // Lucro/perda realizado (trades fechados) - vem das orders
     const realizedProfit = Number(stats.total_profit_from_orders ?? 0);
     const realizedLoss = Number(stats.total_loss_from_orders ?? 0);
     const netProfitRealized = realizedProfit - realizedLoss;
@@ -250,6 +222,12 @@ router.get('/performance', authenticate, async (req: AuthRequest, res: Response)
     const netProfitTotal = netProfitRealized + netProfitUnrealized;
     const roi = totalDeposits > 0 ? (netProfitTotal / totalDeposits) * 100 : 0;
     const avgHoldTimeHours = Number(positions.avg_hold_time_hours ?? 0);
+    
+    // Calcular saldo total e disponível corretamente
+    // Saldo total = depósitos + lucros realizados - perdas realizadas
+    const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
+    const investedInPositions = Number(positions.total_invested ?? 0);
+    const availableBalance = Math.max(0, totalBalance - investedInPositions);
     
     console.log('[Bot Performance] 📊 Data summary:', {
       total_buys: stats.total_buys,

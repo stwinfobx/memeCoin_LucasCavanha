@@ -213,7 +213,7 @@ export default function BotPerformancePage() {
         {/* Informações de Debug */}
         {performance.debug && (
           <div className="mt-8 surface-strong border border-amber-500/40 px-5 py-4 text-sm">
-            <p className="text-amber-200 font-semibold mb-2">🔍 Informações de Debug:</p>
+            <p className="text-amber-200 font-semibold mb-2">Informações de Debug:</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-neutral-400">
               <div>
                 <span className="text-neutral-500">User ID:</span> <span className="font-mono">{performance.debug.user_id}</span>
@@ -232,7 +232,7 @@ export default function BotPerformancePage() {
         {performance.balance && (
           <div className="mt-8">
             <div className="surface-strong p-6 border border-sky-500/40">
-              <h2 className="text-lg font-semibold text-neutral-100 mb-4">💰 Saldo Atual</h2>
+              <h2 className="text-lg font-semibold text-neutral-100 mb-4">Saldo Atual</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-neutral-500">Saldo Disponível</p>
@@ -268,7 +268,7 @@ export default function BotPerformancePage() {
                 </p>
                 <div className="mt-2 space-y-1 text-xs text-neutral-400">
                   <p>
-                    {isProfit ? '✅ Bot está lucrando!' : '⚠️ Bot está com prejuízo'}
+                    {isProfit ? 'Bot está lucrando!' : 'Bot está com prejuízo'}
                   </p>
                   {netProfitRealized !== 0 && (
                     <p>Realizado: <span className={netProfitRealized >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{formatCurrency(netProfitRealized)}</span></p>
@@ -448,7 +448,7 @@ export default function BotPerformancePage() {
         {performance.recent_orders && performance.recent_orders.length > 0 && (
           <div className="mt-8">
             <div className="surface-strong p-6">
-              <h2 className="text-lg font-semibold text-neutral-100 mb-4">📋 Ordens Recentes</h2>
+              <h2 className="text-lg font-semibold text-neutral-100 mb-4">Ordens Recentes</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -541,7 +541,7 @@ export default function BotPerformancePage() {
         {performance.positions.details && performance.positions.details.length > 0 && (
           <div className="mt-8">
             <div className="surface-strong p-6">
-              <h2 className="text-lg font-semibold text-neutral-100 mb-4">📊 Detalhes das Posições Abertas</h2>
+              <h2 className="text-lg font-semibold text-neutral-100 mb-4">Detalhes das Posições Abertas</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -613,7 +613,7 @@ export default function BotPerformancePage() {
           <div className="mt-8">
             <div className="surface-strong p-6 border border-amber-500/40">
               <p className="text-amber-200 text-center">
-                ⚠️ Nenhuma ordem encontrada no banco de dados. O bot pode não ter executado trades ainda.
+                Nenhuma ordem encontrada no banco de dados. O bot pode não ter executado trades ainda.
               </p>
               {performance.debug && (
                 <p className="text-neutral-400 text-center mt-2 text-sm">
