@@ -6,20 +6,33 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { Pool } from 'pg';
+// Rotas
 import authRoutes from './routes/auth';
-import tokensRoutes from './routes/tokensRouter';
 import profileRoutes from './routes/profileRouter';
+import tokensRoutes from './routes/tokensRouter';
+import signalsRoutes from './routes/signals';
+import ordersRoutes from './routes/orders';
+import positionsRoutes from './routes/positions';
+import notificationsRoutes from './routes/notifications';
+// import ledgerRoutes from './routes/ledger'; // TODO: Create this file
+// import statsRoutes from './routes/stats'; // TODO: Create this file
+// import configRoutes from './routes/config'; // TODO: Create this file
+import investmentRoutes from './routes/investment';
+// import auditRoutes from './routes/audit'; // TODO: Create this file
+import healthRoutes from './routes/health';
+import { initWalletRoutes } from './routes/wallet';
 import dashboardRoutes from './routes/dashboardRouter';
 import botRoutes from './routes/botRouter';
-import signalsRoutes from './routes/signals';
-import executorRoutes from './routes/executor';
-import positionsRoutes from './routes/positions';
-import investmentRoutes from './routes/investment';
-import notificationsRoutes from './routes/notifications';
 import botPerformanceRoutes from './routes/bot-performance';
+import executorRoutes from './routes/executor';
 import cleanupRoutes from './routes/cleanup';
 import { PriceUpdateService } from './websocket/price-updates';
 import { CleanupScheduler } from './services/cleanup-scheduler';
+import { DepositConfirmer } from './workers/deposit-confirmer';
+import { initDepositRoutes } from './routes/deposits';
+import { initBalanceRoutes } from './routes/balance';
+import statsRoutes from './routes/stats';
+import withdrawalsRoutes from './routes/withdrawals';
 
 const app: Express = express();
 const PORT = Number(process.env.API_GATEWAY_PORT ?? process.env.PORT ?? 4000);
@@ -31,23 +44,26 @@ const server = http.createServer(app);
 const connectionString = process.env.DATABASE_URL;
 const pool = connectionString
   ? new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-    })
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  })
   : new Pool({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5433'),
-      database: process.env.POSTGRES_DB || 'tradingbot',
-      user: process.env.POSTGRES_USER || 'botuser',
-      password: process.env.POSTGRES_PASSWORD || 'botpass',
-      ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-    });
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5433'),
+    database: process.env.POSTGRES_DB || 'tradingbot',
+    user: process.env.POSTGRES_USER || 'botuser',
+    password: process.env.POSTGRES_PASSWORD || 'botpass',
+    ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  });
 
 // Inicializar serviço WebSocket
 let priceUpdateService: PriceUpdateService | null = null;
 
 // Inicializar serviço de limpeza automática
 let cleanupScheduler: CleanupScheduler | null = null;
+
+// Inicializar worker de confirmação de depósitos
+let depositConfirmer: DepositConfirmer | null = null;
 
 // ======================================================
 // 🛡️ MIDDLEWARES DE SEGURANÇA
@@ -116,13 +132,26 @@ app.use('/api/tokens', tokensRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/bot', botRoutes);
-app.use('/api/bot', botPerformanceRoutes); // Rotas de performance do bot
+app.use('/api/bot', botPerformanceRoutes); // bot-performance.ts já define /performance
 app.use('/api/signals', signalsRoutes);
 app.use('/api/executor', executorRoutes);
 app.use('/api/positions', positionsRoutes);
 app.use('/api/investment', investmentRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/cleanup', cleanupRoutes);
+app.use('/api/health', healthRoutes);
+
+// Initialize wallet routes
+const walletRoutes = initWalletRoutes(pool);
+app.use('/api/wallet', walletRoutes);
+
+// Initialize deposit and balance routes
+const depositRoutes = initDepositRoutes(pool);
+const balanceRoutes = initBalanceRoutes(pool);
+app.use('/api/deposits', depositRoutes);
+app.use('/api/balance', balanceRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/withdrawals', withdrawalsRoutes);
 
 // Rotas de ordens (placeholder)
 app.get('/api/orders', (req: Request, res: Response) => {
@@ -150,7 +179,7 @@ app.use((req: Request, res: Response) => {
   if (req.headers.upgrade === 'websocket') {
     return;
   }
-  
+
   res.status(404).json({
     success: false,
     error: {
@@ -185,26 +214,44 @@ try {
   console.error('[API Gateway] Stack:', error.stack);
 }
 
+// Inicializar worker de confirmação de depósitos
+try {
+  const bscRpcUrl = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
+  depositConfirmer = new DepositConfirmer(pool, bscRpcUrl);
+  // Será iniciado após o servidor estar pronto
+} catch (error: any) {
+  console.error('[API Gateway] Failed to initialize deposit confirmer:', error.message);
+  console.error('[API Gateway] Stack:', error.stack);
+}
+
 server.listen(PORT, async () => {
   console.log(`🚀 API Gateway running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 WebSocket: ws://localhost:${PORT}/ws/prices`);
   console.log(`📊 Waiting for WebSocket connections...`);
-  
+
   // Iniciar cleanup scheduler após servidor estar pronto
   if (cleanupScheduler) {
     // Aguardar 30 segundos para garantir que o banco esteja pronto e estável
     setTimeout(() => {
       cleanupScheduler!.start(24); // Limpar a cada 24 horas
       console.log('✅ Cleanup scheduler started - will cleanup old data every 24 hours');
-      
+
       // Executar primeira limpeza após 1 minuto (banco já deve estar pronto)
       setTimeout(() => {
         console.log('[Cleanup Scheduler] 🧹 Running initial cleanup...');
         cleanupScheduler!.cleanupOldData();
       }, 60000);
     }, 30000);
+  }
+
+  // Iniciar deposit confirmer após servidor estar pronto
+  if (depositConfirmer) {
+    setTimeout(() => {
+      depositConfirmer!.start(15); // Check a cada 15 segundos
+      console.log('✅ Deposit confirmation worker started - checking every 15 seconds');
+    }, 5000); // Aguardar 5 segundos para garantir que o banco esteja pronto
   }
 });
 
@@ -216,6 +263,9 @@ process.on('SIGTERM', () => {
   }
   if (cleanupScheduler) {
     cleanupScheduler.stop();
+  }
+  if (depositConfirmer) {
+    depositConfirmer.stop();
   }
   pool.end();
   server.close(() => {

@@ -23,6 +23,7 @@ export default function BotPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showExtremeModal, setShowExtremeModal] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -186,6 +187,19 @@ export default function BotPage() {
           </Link>
         </header>
 
+        {/* Extreme Configuration Button */}
+        <div className="mt-8">
+          <button
+            onClick={() => setShowExtremeModal(true)}
+            className="btn-primary px-6 py-3 text-sm font-semibold bg-purple-600 hover:bg-purple-700 transition-colors"
+          >
+            Configuracoes Extremas
+          </button>
+          <p className="mt-2 text-xs text-neutral-500">
+            Acesse configuracoes avancadas com limites mais altos para estrategias agressivas
+          </p>
+        </div>
+
         {error && (
           <div className="surface-strong mt-8 border border-rose-500/40 px-5 py-4 text-sm text-rose-200">
             {error}
@@ -258,11 +272,10 @@ export default function BotPage() {
                 <button
                   key={profile}
                   onClick={() => updateConfig({ risk_profile: profile }, true)}
-                  className={`rounded-lg border-2 p-4 text-sm font-semibold transition-all ${
-                    botStatus.risk_profile === profile
-                      ? 'border-purple-500 bg-purple-500/20 text-purple-200'
-                      : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-700'
-                  }`}
+                  className={`rounded-lg border-2 p-4 text-sm font-semibold transition-all ${botStatus.risk_profile === profile
+                    ? 'border-purple-500 bg-purple-500/20 text-purple-200'
+                    : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-700'
+                    }`}
                 >
                   <div className="mb-2 text-lg font-bold capitalize">{profile}</div>
                   <div className="text-xs text-neutral-500">
@@ -290,7 +303,7 @@ export default function BotPage() {
               type="range"
               min="1"
               max="50"
-              value={botStatus.max_loss_percent}
+              value={Math.min(botStatus.max_loss_percent, 50)}
               onChange={(e) => updateConfig({ max_loss_percent: Number(e.target.value) }, false)}
               className="mt-6 h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-rose-500"
             />
@@ -298,6 +311,11 @@ export default function BotPage() {
               <span>1%</span>
               <span>50%</span>
             </div>
+            {botStatus.max_loss_percent > 50 && (
+              <p className="mt-2 text-xs text-amber-400">
+                Valor atual ({botStatus.max_loss_percent}%) configurado via modal extremo
+              </p>
+            )}
           </div>
 
           {/* Ganho Máximo */}
@@ -315,7 +333,7 @@ export default function BotPage() {
               type="range"
               min="5"
               max="500"
-              value={botStatus.max_gain_percent}
+              value={Math.min(botStatus.max_gain_percent, 500)}
               onChange={(e) => updateConfig({ max_gain_percent: Number(e.target.value) }, false)}
               className="mt-6 h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-emerald-500"
             />
@@ -323,6 +341,11 @@ export default function BotPage() {
               <span>5%</span>
               <span>500%</span>
             </div>
+            {botStatus.max_gain_percent > 500 && (
+              <p className="mt-2 text-xs text-amber-400">
+                Valor atual ({botStatus.max_gain_percent}%) configurado via modal extremo
+              </p>
+            )}
           </div>
 
           {/* Trades Paralelos */}
@@ -340,7 +363,7 @@ export default function BotPage() {
               type="range"
               min="1"
               max="10"
-              value={botStatus.max_open_trades}
+              value={Math.min(botStatus.max_open_trades, 10)}
               onChange={(e) => updateConfig({ max_open_trades: Number(e.target.value) }, false)}
               className="mt-6 h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-sky-500"
             />
@@ -348,6 +371,11 @@ export default function BotPage() {
               <span>1 posição</span>
               <span>10 posições</span>
             </div>
+            {botStatus.max_open_trades > 10 && (
+              <p className="mt-2 text-xs text-amber-400">
+                Valor atual ({botStatus.max_open_trades}) configurado via modal extremo
+              </p>
+            )}
           </div>
 
           {/* Link para Logs */}
@@ -365,6 +393,160 @@ export default function BotPage() {
             </div>
           </div>
         </div>
+
+        {/* Extreme Configuration Modal */}
+        {showExtremeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="surface-strong max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 border border-purple-500/30">
+              {/* Modal Header */}
+              <div className="border-b border-neutral-800 pb-6 mb-6">
+                <h2 className="text-2xl font-bold text-neutral-50">Configuracoes Extremas</h2>
+                <p className="mt-2 text-sm text-neutral-400">
+                  Ajuste os limites para estrategias mais agressivas. Use com cautela.
+                </p>
+              </div>
+
+              {/* Warning Alert */}
+              <div className="border border-amber-500/40 bg-amber-500/10 px-5 py-4 mb-8">
+                <div className="flex items-start gap-3">
+                  <div className="text-amber-400 font-bold text-lg">!</div>
+                  <div>
+                    <h3 className="text-amber-200 font-semibold text-sm mb-1">AVISO IMPORTANTE</h3>
+                    <p className="text-amber-200/80 text-xs">
+                      Configuracoes extremas podem resultar em perdas significativas. Use apenas se souber exatamente o que esta fazendo. Recomendamos comecar com valores moderados.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Extreme Configuration Controls */}
+              <div className="space-y-8">
+                {/* Ganho Máximo Extremo */}
+                <div className="surface p-6 border border-neutral-800">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-100">Ganho Maximo</h3>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Limite extremo: ate 1000% de ganho antes de vender automaticamente
+                      </p>
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-400">{botStatus?.max_gain_percent}%</div>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="1000"
+                    step="5"
+                    value={botStatus?.max_gain_percent || 25}
+                    onChange={(e) => updateConfig({ max_gain_percent: Number(e.target.value) }, false)}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-emerald-500"
+                  />
+                  <div className="mt-2 flex justify-between text-xs text-neutral-500">
+                    <span>5%</span>
+                    <span>1000%</span>
+                  </div>
+                </div>
+
+                {/* Perda Máxima Extrema */}
+                <div className="surface p-6 border border-neutral-800">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-100">Perda Maxima</h3>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Limite extremo: ate 100% de perda antes de vender automaticamente
+                      </p>
+                    </div>
+                    <div className="text-2xl font-bold text-rose-400">{botStatus?.max_loss_percent}%</div>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={botStatus?.max_loss_percent || 10}
+                    onChange={(e) => updateConfig({ max_loss_percent: Number(e.target.value) }, false)}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-rose-500"
+                  />
+                  <div className="mt-2 flex justify-between text-xs text-neutral-500">
+                    <span>1%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+
+                {/* Trades Paralelos Extremo */}
+                <div className="surface p-6 border border-neutral-800">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-100">Trades Paralelos</h3>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Limite extremo: ate 50 posicoes abertas simultaneamente
+                      </p>
+                    </div>
+                    <div className="text-2xl font-bold text-sky-400">{botStatus?.max_open_trades}</div>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    step="1"
+                    value={botStatus?.max_open_trades || 5}
+                    onChange={(e) => updateConfig({ max_open_trades: Number(e.target.value) }, false)}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-sky-500"
+                  />
+                  <div className="mt-2 flex justify-between text-xs text-neutral-500">
+                    <span>1 posicao</span>
+                    <span>50 posicoes</span>
+                  </div>
+                </div>
+
+                {/* Intensidade Extrema */}
+                <div className="surface p-6 border border-neutral-800">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-100">Intensidade</h3>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Controla quantas oportunidades o bot busca (10 = EXTREMO)
+                      </p>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-400">{botStatus?.bot_intensity}/10</div>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={botStatus?.bot_intensity || 5}
+                    onChange={(e) => updateConfig({ bot_intensity: Number(e.target.value) }, false)}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-800 accent-purple-500"
+                  />
+                  <div className="mt-2 flex justify-between text-xs text-neutral-500">
+                    <span>Conservador (1)</span>
+                    <span>EXTREMO (10)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-4 mt-8 pt-6 border-t border-neutral-800">
+                <button
+                  onClick={() => setShowExtremeModal(false)}
+                  className="btn-secondary flex-1 py-3 text-sm font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExtremeModal(false);
+                    // Configs are already being saved by updateConfig
+                  }}
+                  className="btn-primary flex-1 py-3 text-sm font-semibold"
+                  disabled={saving}
+                >
+                  {saving ? 'Salvando...' : 'Aplicar Configuracoes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

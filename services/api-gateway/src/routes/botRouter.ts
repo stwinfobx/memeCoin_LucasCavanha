@@ -6,55 +6,12 @@ import axios from 'axios';
 const router = Router();
 
 // Helper para garantir saldo inicial do usuário
+// DESATIVADO - Sistema agora é 100% REAL, sem saldo simulado
+// Usuarios devem fazer deposito real via MetaMask
 async function ensureUserInitialBalance(userId: string): Promise<void> {
-  // IMPORTANTE: Verificar se o usuário existe na tabela users
-  const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
-  if (userCheck.rows.length === 0) {
-    console.warn(`[Bot Router] ⚠️ User ${userId} does not exist in users table, skipping initial balance creation`);
-    return;
-  }
-  
-  // Verificar se já existe um depósito inicial para evitar duplicação
-  const existingDeposit = await pool.query(
-    `SELECT COUNT(*) as count FROM ledger_entries 
-     WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
-    [userId]
-  );
-  
-  // Se já existe depósito inicial, não criar outro
-  if (Number(existingDeposit.rows[0]?.count ?? 0) > 0) {
-    return;
-  }
-  
-  const balanceResult = await pool.query(
-    `SELECT 
-       COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-       COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-     FROM ledger_entries
-     WHERE user_id = $1`,
-    [userId]
-  );
-  const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-  const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-  const currentBalance = Math.max(0, credits - debits);
-
-  if (currentBalance < 100) {
-    const depositAmount = 100 - currentBalance;
-    await pool.query(
-      `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
-       VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
-      [userId, depositAmount, currentBalance, currentBalance + depositAmount]
-    );
-    
-    // Criar notificação de depósito inicial
-    await pool.query(
-      `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)
-       VALUES ($1, 'order_executed', 'success', 'Depósito inicial recebido', 
-       'Saldo inicial de $${depositAmount} USD foi creditado para iniciar as simulações!', 
-       $2::jsonb)`,
-      [userId, JSON.stringify({ amount: depositAmount, type: 'deposit' })]
-    );
-  }
+  // Funcao desativada para producao
+  // Nao adicionar saldo automatico
+  return;
 }
 
 const allowedRiskProfiles = new Set(['conservative', 'moderate', 'aggressive']);
@@ -99,7 +56,7 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
     };
 
     const botEnabled = toBoolean(profile.bot_enabled);
-    
+
     // Se o bot estiver habilitado, verificar se há sinais ativos para processar
     if (botEnabled) {
       // Processar sinais em background se bot estiver habilitado
@@ -182,8 +139,8 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
         Math.min(Math.max(intensity, 1), 10),
         parsedRiskProfile,
         Math.min(Math.max(maxLoss, 0), 100),
-        Math.min(Math.max(maxGain, 0), 500),
-        Math.min(Math.max(maxOpenTrades, 0), 100),
+        Math.min(Math.max(maxGain, 0), 1000),
+        Math.min(Math.max(maxOpenTrades, 0), 50),
       ]
     );
 
@@ -201,8 +158,8 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
           bot_intensity: finalIntensity,
           risk_profile: parsedRiskProfile,
           max_loss_percent: Math.min(Math.max(maxLoss, 0), 100),
-          max_gain_percent: Math.min(Math.max(maxGain, 0), 500),
-          max_open_trades: Math.min(Math.max(maxOpenTrades, 0), 100),
+          max_gain_percent: Math.min(Math.max(maxGain, 0), 1000),
+          max_open_trades: Math.min(Math.max(maxOpenTrades, 0), 50),
         }),
       ]
     );
@@ -214,8 +171,8 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
         bot_intensity: Math.min(Math.max(intensity, 1), 10),
         risk_profile: parsedRiskProfile,
         max_loss_percent: Math.min(Math.max(maxLoss, 0), 100),
-        max_gain_percent: Math.min(Math.max(maxGain, 0), 500),
-        max_open_trades: Math.min(Math.max(maxOpenTrades, 0), 100),
+        max_gain_percent: Math.min(Math.max(maxGain, 0), 1000),
+        max_open_trades: Math.min(Math.max(maxOpenTrades, 0), 50),
       },
       timestamp: new Date(),
     });
@@ -255,10 +212,10 @@ async function checkExecutorHealth(executorUrl: string, retries: number = 3): Pr
 // Processar sinais ativos imediatamente quando o bot é iniciado
 async function processActiveSignalsForUser(userId: string): Promise<void> {
   const EXECUTOR_SERVICE_URL = process.env.EXECUTOR_SERVICE_URL || 'http://localhost:4003';
-  
+
   try {
     console.log(`[Bot Router] 🔍 Starting signal processing for user ${userId}...`);
-    
+
     // Verificar saúde do Executor Service antes de processar
     const executorHealthy = await checkExecutorHealth(EXECUTOR_SERVICE_URL);
     if (!executorHealthy) {
@@ -274,7 +231,7 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
       );
       return;
     }
-    
+
     // Buscar sinais BUY E SELL ativos recentes (últimas 24h)
     // IMPORTANTE: Processar SELL também para fechar posições rapidamente
     console.log(`[Bot Router] 📊 Searching for active BUY and SELL signals...`);
@@ -288,12 +245,12 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
        ORDER BY s.signal_type DESC, s.created_at DESC
        LIMIT 20`
     );
-    
+
     const signals = signalsResult.rows;
     const buySignals = signals.filter((s: any) => s.signal_type === 'BUY');
     const sellSignals = signals.filter((s: any) => s.signal_type === 'SELL');
     console.log(`[Bot Router] 📊 Found ${signals.length} active signals (${buySignals.length} BUY, ${sellSignals.length} SELL) to process for user ${userId}`);
-    
+
     if (signals.length === 0) {
       // Criar notificação informando que não há sinais ativos
       console.log(`[Bot Router] ℹ️ No active signals found for user ${userId}`);
@@ -308,25 +265,25 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
       );
       return;
     }
-    
+
     // IMPORTANTE: Não criar notificação para cada processamento de sinais
     // Isso cria muitas notificações e lota o banco
     // Apenas logar no console
     console.log(`[Bot Router] 📤 Processing ${signals.length} active signals (${buySignals.length} BUY, ${sellSignals.length} SELL) for user ${userId}...`);
-    
+
     // Processar cada sinal com retry
     let processed = 0;
     let failed = 0;
-    
+
     for (let i = 0; i < signals.length; i++) {
       const signal = signals[i];
       let success = false;
-      
+
       // Retry até 3 vezes para cada sinal
       for (let retry = 0; retry < 3; retry++) {
         try {
           console.log(`[Bot Router] 📤 Processing signal ${signal.id} (${signal.symbol}) - attempt ${retry + 1}/3...`);
-          
+
           const response = await axios.post(
             `${EXECUTOR_SERVICE_URL}/signals/process`,
             {
@@ -334,12 +291,12 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
               symbol: signal.symbol,
               name: signal.name,
             },
-            { 
+            {
               timeout: 15000, // Aumentar timeout para 15s
               validateStatus: (status) => status >= 200 && status < 500
             }
           );
-          
+
           if (response.status === 200 && response.data?.success !== false) {
             processed++;
             success = true;
@@ -351,13 +308,13 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
         } catch (error: any) {
           const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
           const errorCode = error.response?.status || error.code || 'UNKNOWN';
-          
+
           console.error(`[Bot Router] ❌ Error processing signal ${signal.id} (attempt ${retry + 1}/3):`, {
             message: errorMessage,
             code: errorCode,
             stack: error.stack
           });
-          
+
           if (retry < 2) {
             // Backoff exponencial: 1s, 2s
             await new Promise(resolve => setTimeout(resolve, Math.pow(2, retry) * 1000));
@@ -365,7 +322,7 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
             // Última tentativa falhou
             failed++;
             console.error(`[Bot Router] ❌ Failed to process signal ${signal.id} after 3 attempts`);
-            
+
             // Criar notificação de erro para este sinal
             try {
               await pool.query(
@@ -374,10 +331,10 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
                 [
                   userId,
                   `🤖 ⚠️ Não consegui processar sinal ${signal.signal_type} para ${signal.symbol}: ${errorMessage}`,
-                  JSON.stringify({ 
-                    signal_id: signal.id, 
+                  JSON.stringify({
+                    signal_id: signal.id,
                     signal_type: signal.signal_type,
-                    symbol: signal.symbol, 
+                    symbol: signal.symbol,
                     error: errorMessage,
                     error_code: errorCode
                   })
@@ -389,16 +346,16 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
           }
         }
       }
-      
+
       // Delay entre sinais para não sobrecarregar
       if (i < signals.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
-    
+
     // Notificação de conclusão
     console.log(`[Bot Router] 📊 Processing complete: ${processed} succeeded, ${failed} failed`);
-    
+
     if (processed > 0) {
       await pool.query(
         `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)
@@ -406,13 +363,13 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
         [
           userId,
           `🤖 ✅ Processei ${processed} de ${signals.length} sinal(is) (${buySignals.length} BUY, ${sellSignals.length} SELL) com sucesso! ${failed > 0 ? `(${failed} falharam)` : ''} Verificando oportunidades de trading...`,
-          JSON.stringify({ 
-            signals_processed: processed, 
+          JSON.stringify({
+            signals_processed: processed,
             signals_total: signals.length,
             buy_signals: buySignals.length,
             sell_signals: sellSignals.length,
             signals_failed: failed,
-            status: 'completed' 
+            status: 'completed'
           })
         ]
       );
@@ -423,7 +380,7 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
       stack: error.stack,
       userId
     });
-    
+
     try {
       await pool.query(
         `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)
@@ -431,11 +388,11 @@ async function processActiveSignalsForUser(userId: string): Promise<void> {
         [
           userId,
           `🤖 ⚠️ Erro crítico ao processar sinais ativos: ${error.message}. Continuando monitoramento...`,
-          JSON.stringify({ 
-            error: error.message, 
+          JSON.stringify({
+            error: error.message,
             error_stack: error.stack,
             executor_url: EXECUTOR_SERVICE_URL,
-            status: 'error' 
+            status: 'error'
           })
         ]
       );
@@ -569,7 +526,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
 
   try {
     const EXECUTOR_SERVICE_URL = process.env.EXECUTOR_SERVICE_URL || 'http://localhost:4003';
-    
+
     // Buscar status do bot no banco
     const profileResult = await pool.query(
       `SELECT bot_enabled, bot_intensity, risk_profile, max_open_trades
@@ -577,10 +534,10 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
        WHERE user_id = $1`,
       [userId]
     );
-    
+
     const profile = profileResult.rows[0] ?? null;
     const botEnabled = profile ? toBoolean(profile.bot_enabled) : false;
-    
+
     // Contar sinais BUY ativos
     const signalsResult = await pool.query(
       `SELECT COUNT(*) as count
@@ -590,7 +547,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
        AND created_at > NOW() - INTERVAL '24 hours'`
     );
     const activeSignalsCount = Number(signalsResult.rows[0]?.count ?? 0);
-    
+
     // Verificar saldo do usuário
     const balanceResult = await pool.query(
       `SELECT 
@@ -603,7 +560,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
     const credits = Number(balanceResult.rows[0]?.credits ?? 0);
     const debits = Number(balanceResult.rows[0]?.debits ?? 0);
     const balance = Math.max(0, credits - debits);
-    
+
     // Verificar notificações recentes
     const notificationsResult = await pool.query(
       `SELECT COUNT(*) as count
@@ -612,7 +569,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
        AND created_at > NOW() - INTERVAL '1 hour'`
     );
     const recentNotificationsCount = Number(notificationsResult.rows[0]?.count ?? 0);
-    
+
     // Verificar saúde do Executor Service
     let executorHealthy = false;
     let executorError = null;
@@ -622,7 +579,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
     } catch (error: any) {
       executorError = error.message;
     }
-    
+
     // Verificar posições abertas
     const positionsResult = await pool.query(
       `SELECT COUNT(*) as count

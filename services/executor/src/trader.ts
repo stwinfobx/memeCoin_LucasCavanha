@@ -9,6 +9,11 @@ import {
   SignalType,
   Token,
 } from '@shared/types';
+import { TradingStrategyManager } from './strategies/trading-strategy';
+import { calculateRSI, interpretRSI } from '../../signal/src/technical-analysis/rsi';
+import { detectPeak } from '../../signal/src/technical-analysis/peak-detection';
+import { PriceCollector } from '../../signal/src/workers/price-collector';
+import { RealTradingService } from './real-trading-service';
 
 const DEFAULT_POSITION_FACTOR = {
   conservative: 0.01,
@@ -20,12 +25,16 @@ export class TradeExecutor {
   private pool: Pool;
   private executionMode: 'simulation';
   private defaultUserId: string = 'f58986be-9f49-4a63-9c44-937bfed78362'; // ID fixo para paper trading
+  private strategyManager: TradingStrategyManager;
+  private realTradingService: RealTradingService; // NOVO
 
   constructor(pool: Pool) {
     this.pool = pool;
     this.executionMode = 'simulation';
     // Usar ID fixo para garantir consistência
     this.defaultUserId = process.env.EXECUTOR_DEFAULT_USER_ID || 'f58986be-9f49-4a63-9c44-937bfed78362';
+    this.strategyManager = new TradingStrategyManager(pool);
+    this.realTradingService = new RealTradingService(pool); // NOVO
   }
 
   private async ensureDefaultUser(): Promise<string> {
@@ -64,7 +73,7 @@ export class TradeExecutor {
     const credits = Number(balanceResult.rows[0]?.credits ?? 0);
     const debits = Number(balanceResult.rows[0]?.debits ?? 0);
     const currentBalance = Math.max(0, credits - debits);
-    
+
     if (currentBalance < 100) {
       // Criar depósito inicial de $100 USD
       const depositAmount = 100 - currentBalance;
@@ -74,7 +83,7 @@ export class TradeExecutor {
         [userId, depositAmount, currentBalance, currentBalance + depositAmount]
       );
       console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for paper trading user | Balance before: $${currentBalance.toFixed(2)} | Balance after: $${(currentBalance + depositAmount).toFixed(2)}`);
-      
+
       // Criar notificação de saldo inicial
       await this.createNotification(
         userId,
@@ -120,7 +129,7 @@ export class TradeExecutor {
       [userId]
     );
     const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
-    
+
     // Buscar lucros/perdas realizados das orders SELL
     const realizedPLResult = await this.pool.query(
       `SELECT 
@@ -132,7 +141,7 @@ export class TradeExecutor {
     );
     const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
     const realizedLoss = Number(realizedPLResult.rows[0]?.realized_loss ?? 0);
-    
+
     // Saldo total = depósitos + lucros realizados - perdas realizadas
     const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
 
@@ -144,10 +153,10 @@ export class TradeExecutor {
       [userId]
     );
     const investedInPositions = Number(openPositionsResult.rows[0]?.total_invested ?? 0);
-    
+
     // Saldo disponível = saldo total - investido em posições abertas
     const availableBalance = Math.max(0, totalBalance - investedInPositions);
-    
+
     console.log(`[Executor] 💰 Balance calculation for user ${userId}:`, {
       total_balance: totalBalance,
       invested_in_positions: investedInPositions,
@@ -230,7 +239,7 @@ export class TradeExecutor {
       [order.user_id]
     );
     const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
-    
+
     // Buscar lucros/perdas realizados das orders SELL
     const realizedPLResult = await this.pool.query(
       `SELECT 
@@ -242,7 +251,7 @@ export class TradeExecutor {
     );
     const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
     const realizedLoss = Number(realizedPLResult.rows[0]?.realized_loss ?? 0);
-    
+
     // Buscar investido em posições abertas
     const openPositionsResult = await this.pool.query(
       `SELECT COALESCE(SUM(invested_amount_usd), 0) AS total_invested
@@ -251,7 +260,7 @@ export class TradeExecutor {
       [order.user_id]
     );
     const investedInPositions = Number(openPositionsResult.rows[0]?.total_invested ?? 0);
-    
+
     // Saldo total = depósitos + lucros realizados - perdas realizadas
     const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
     // Saldo disponível = saldo total - investido em posições abertas
@@ -276,7 +285,7 @@ export class TradeExecutor {
     // O saldo disponível diminui porque o dinheiro está investido em tokens.
     // Quando vender, aí sim vamos calcular se houve lucro ou perda.
     // Registramos apenas para histórico/auditoria, mas não como trade_loss
-    
+
     console.log(`[Executor] 💸 Simulated BUY: Invested $${investedAmount.toFixed(2)} in ${token.symbol} | Available balance: $${balanceBefore.toFixed(2)} → $${balanceAfter.toFixed(2)} | Total invested in positions: $${(investedInPositions + investedAmount).toFixed(2)}`);
   }
 
@@ -324,7 +333,7 @@ export class TradeExecutor {
            ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7, $8, 'open')`,
           [order.user_id, order.token_id, order.id, order.signal_id, investedAmount, price, price, amountToken]
         );
-        
+
         // Criar notificação de posição aberta
         await this.createNotification(
           order.user_id,
@@ -372,7 +381,7 @@ export class TradeExecutor {
             : 0;
           const holdTimeHours = (Date.now() - buyTime.getTime()) / (1000 * 60 * 60);
           const isProfit = profitLoss >= 0;
-          
+
           // Garantir que os valores são números válidos
           if (isNaN(profitLoss) || !isFinite(profitLoss)) {
             console.warn(`[Executor] Invalid profitLoss calculated: ${profitLoss}, setting to 0`);
@@ -396,11 +405,11 @@ export class TradeExecutor {
              WHERE id = $5`,
             [price, profitLoss, profitLossPercent, holdTimeHours, pos.id]
           );
-          
+
           // Buscar símbolo do token para notificação
           const tokenResult = await this.pool.query('SELECT symbol FROM tokens WHERE id = $1', [order.token_id]);
           const tokenSymbol = tokenResult.rows[0]?.symbol || 'unknown';
-          
+
           // Criar notificação de posição fechada
           await this.createNotification(
             order.user_id,
@@ -448,7 +457,7 @@ export class TradeExecutor {
     // Usar amount_usd da ordem (já calculado corretamente) ao invés de recalcular
     // Isso garante consistência mesmo se o preço mudar entre a criação da ordem e a simulação
     let amountUsd = Number(order.amount_usd ?? (amountToken * price));
-    
+
     // Validação: se amountUsd não foi salvo na ordem ou está inválido, recalcular
     if (!amountUsd || amountUsd <= 0 || isNaN(amountUsd) || !isFinite(amountUsd)) {
       console.warn(`[Executor] ⚠️ amountUsd inválido na ordem ${order.id}, recalculando: ${amountUsd}`);
@@ -500,7 +509,7 @@ export class TradeExecutor {
       profitLossPercent = investedForSold > 0 && !isNaN(investedForSold) && isFinite(investedForSold)
         ? (profitLossUsd / investedForSold) * 100
         : 0;
-      
+
       // Garantir que os valores são números válidos
       if (isNaN(profitLossUsd) || !isFinite(profitLossUsd)) {
         console.warn(`[Executor] Invalid profitLossUsd calculated: ${profitLossUsd}, setting to 0`);
@@ -511,7 +520,7 @@ export class TradeExecutor {
         profitLossPercent = 0;
       }
       holdTimeHours = (Date.now() - buyTime.getTime()) / (1000 * 60 * 60);
-      
+
       console.log(`[Executor] 📊 SELL calculation: amountUsd=$${amountUsd.toFixed(2)}, investedForSold=$${investedForSold.toFixed(2)}, profitLoss=$${profitLossUsd.toFixed(2)} (${profitLossPercent.toFixed(2)}%)`);
     } else {
       console.warn(`[Executor] ⚠️ No position found for order ${order.id}, profit/loss will be 0`);
@@ -542,7 +551,7 @@ export class TradeExecutor {
     );
     const credits = Number(balanceBeforeResult.rows[0]?.credits ?? 0);
     const debits = Number(balanceBeforeResult.rows[0]?.debits ?? 0);
-    
+
     // Buscar investido em posições abertas (excluindo a posição que estamos vendendo)
     const openPositionsResult = await this.pool.query(
       `SELECT COALESCE(SUM(invested_amount_usd), 0) AS total_invested
@@ -551,32 +560,32 @@ export class TradeExecutor {
       [order.user_id, order.token_id]
     );
     const investedInOtherPositions = Number(openPositionsResult.rows[0]?.total_invested ?? 0);
-    
+
     // Saldo disponível antes = créditos - débitos - investido em outras posições
     const balanceBefore = Math.max(0, credits - debits - investedInOtherPositions);
-    
+
     // IMPORTANTE: Ao vender, o saldo aumenta pelo valor total recebido
     // O lucro/perda já foi calculado e está em profitLossUsd
     // Para o saldo: adicionar o valor total recebido (amountUsd)
     // Para as métricas: usar profitLossUsd das orders (mais preciso)
-    
+
     const balanceAfter = balanceBefore + amountUsd;
-    
+
     // Registrar o valor total recebido como trade_profit (aumenta saldo)
     // Isso representa o dinheiro que volta ao saldo disponível
     await this.pool.query(
       `INSERT INTO ledger_entries (user_id, order_id, entry_type, amount_usd, description, balance_before, balance_after)
        VALUES ($1, $2, 'trade_profit', $3, $4, $5, $6)`,
       [
-        order.user_id, 
-        order.id, 
+        order.user_id,
+        order.id,
         amountUsd, // Valor total recebido da venda
         `Paper sell execution - Venda simulada: recebido $${amountUsd.toFixed(2)} | ${profitLossUsd > 0 ? `Lucro: $${profitLossUsd.toFixed(2)} (${profitLossPercent.toFixed(2)}%)` : profitLossUsd < 0 ? `Perda: $${Math.abs(profitLossUsd).toFixed(2)} (${Math.abs(profitLossPercent).toFixed(2)}%)` : 'Sem lucro/perda'}`,
         balanceBefore,
         balanceAfter
       ]
     );
-    
+
     // NOTA: As métricas de lucro/perda são calculadas a partir da tabela orders
     // onde profit_loss_usd já está armazenado corretamente
     // O ledger registra o valor recebido para controle de saldo
@@ -620,16 +629,55 @@ export class TradeExecutor {
     if (tokenResult.rowCount === 0) throw new Error('Token not found');
     const token = tokenResult.rows[0] as Token;
 
+    // Verificar estratégia antes de comprar
+    if (request.signal_id) {
+      const signalResult = await this.pool.query('SELECT * FROM signals WHERE id = $1', [request.signal_id]);
+      const signal = signalResult.rows[0];
+
+      const riskResult = await this.pool.query(
+        'SELECT memecoin_score, risk_score, scam_probability FROM token_risk_assessments WHERE token_id = $1',
+        [request.token_id]
+      );
+      const validation = riskResult.rows[0];
+
+      if (validation) {
+        const decision = await this.strategyManager.shouldBuy(userId, signal, {
+          memecoinScore: Number(validation.memecoin_score ?? 0),
+          riskScore: Number(validation.risk_score ?? 0),
+          scamProbability: Number(validation.scam_probability ?? 0)
+        });
+        if (!decision.shouldBuy) {
+          throw new Error(`Strategy blocked: ${decision.reason}`);
+        }
+        console.log(`[Strategy] ${decision.reason}`);
+      }
+    }
+
+    // NOVO: Verificar se é real trading
+    const isRealTrading = await this.realTradingService.isRealTradingEnabled(userId);
+
+    if (isRealTrading) {
+      console.log(`[Executor] 🔥 REAL TRADING MODE for user ${userId}`);
+      return await this.executeRealBuy(request, userId, token);
+    }
+
+    // Paper trading (simulação)
+    console.log(`[Executor] 📝 PAPER TRADING MODE for user ${userId}`);
+    return await this.executePaperBuy(request, userId, token);
+  }
+
+  /**
+   * Executa BUY em modo paper trading (simulação)
+   */
+  private async executePaperBuy(request: ExecuteOrderRequest, userId: string, token: Token): Promise<Order> {
     // Calcular investimento baseado em confiança se signal_id fornecido
     let amountUsd: number;
     let investedAmount: number;
 
     if (request.amount_usd) {
-      // Valor explícito fornecido
       amountUsd = request.amount_usd;
       investedAmount = amountUsd;
     } else {
-      // Calcular dinamicamente baseado em confiança
       const investment = await this.calculateIntendedInvestment(userId, request.token_id, request.signal_id);
       amountUsd = investment.amountUsd;
       investedAmount = amountUsd;
@@ -646,6 +694,55 @@ export class TradeExecutor {
 
     await this.simulateBuy(order, token);
     await this.createOrUpdatePosition(order, token, 'buy');
+    return order;
+  }
+
+  /**
+   * Executa BUY REAL usando blockchain
+   */
+  private async executeRealBuy(request: ExecuteOrderRequest, userId: string, token: Token): Promise<Order> {
+    const investment = await this.calculateIntendedInvestment(userId, request.token_id, request.signal_id);
+    const amountUsd = investment.amountUsd;
+
+    if (amountUsd < 5) {
+      throw new Error('Insufficient balance for real trading (minimum $5)');
+    }
+
+    // Executar trade real on-chain
+    const result = await this.realTradingService.executeRealBuy(
+      userId,
+      token.contract_address,
+      token.symbol,
+      amountUsd
+    );
+
+    if (!result.success) {
+      throw new Error(`Real trade failed: ${result.error}`);
+    }
+
+    // Criar ordem com tx_hash real
+    const order = await this.createOrder({
+      userId,
+      tokenId: request.token_id,
+      signalId: request.signal_id,
+      orderType: 'BUY',
+      amountUsd,
+      investedAmountUsd: amountUsd,
+    });
+
+    // Atualizar ordem com dados da blockchain
+    await this.pool.query(
+      `UPDATE orders SET
+         status = 'completed',
+         transaction_hash = $1,
+         executed_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [result.txHash, order.id]
+    );
+
+    await this.createOrUpdatePosition(order, token, 'buy');
+
+    console.log(`[Executor] ✅ REAL BUY completed! TX: ${result.txHash}`);
     return order;
   }
 
@@ -715,7 +812,41 @@ export class TradeExecutor {
     holdTimeMinutes: number,
     potentialMultiplier: number
   ): Promise<{ shouldSell: boolean; reason: string }> {
-    // Critério 1: Sinal SELL - sempre vende
+
+    // PRIORIDADE 0: ANÁLISE TÉCNICA (se disponível)
+    try {
+      const collector = new PriceCollector(this.pool);
+      const candles = await collector.getRecentCandles(tokenId, '1m', 50);
+
+      if (candles.length >= 20) {
+        const prices = candles.map(c => Number(c.close_price));
+        const volumes = candles.map(c => Number(c.volume_usd));
+
+        // RSI Analysis
+        const rsi = calculateRSI(prices, 14);
+        if (rsi.signal === 'OVERBOUGHT' && rsi.confidence > 70) {
+          console.log(`[TA] 🔴 RSI OVERBOUGHT: ${rsi.rsi} (${rsi.confidence}%)`);
+          return {
+            shouldSell: true,
+            reason: `📊 RSI sobrecomprado (${rsi.rsi}) - venda técnica recomendada`
+          };
+        }
+
+        // Peak Detection
+        const peak = detectPeak(prices, volumes);
+        if (peak.shouldSell && peak.confidence > 60) {
+          console.log(`[TA] 🔴 PEAK DETECTED: ${peak.reason}`);
+          return { shouldSell: true, reason: `🎯 ${peak.reason}` };
+        }
+
+        console.log(`[TA] RSI: ${rsi.rsi}, Peak: ${peak.isPeak ? 'YES' : 'NO'}, Momentum: ${peak.momentum}`);
+      }
+    } catch (error) {
+      console.error('[TA] Technical analysis failed:', error);
+      // Continuar com lógica tradicional
+    }
+
+    // PRIORIDADE 1: SINAL SELL
     if (signal.signal_type === 'SELL') {
       return { shouldSell: true, reason: 'Sinal SELL emitido' };
     }
@@ -764,11 +895,11 @@ export class TradeExecutor {
       }
       return { shouldSell: false, reason: `Preço atual inválido: ${currentPrice}` };
     }
-    
+
     const gainPercent = ((currentPrice / buyPrice - 1) * 100);
     const lossPercent = ((buyPrice - currentPrice) / buyPrice) * 100;
     const holdTimeHours = holdTimeMinutes / 60;
-    
+
     // Validação: garantir que os percentuais são números válidos
     if (isNaN(gainPercent) || !isFinite(gainPercent)) {
       console.error(`[Executor] Invalid gainPercent calculated: ${gainPercent}`);
@@ -786,7 +917,7 @@ export class TradeExecutor {
       }
       return { shouldSell: false, reason: `Erro no cálculo de perda: ${lossPercent}` };
     }
-    
+
     // ============================================================================
     // PRIORIDADE 1: STOP-LOSS ABSOLUTO (configuração do usuário)
     // ============================================================================
@@ -796,7 +927,7 @@ export class TradeExecutor {
       console.error(`[Executor] 🚨🚨🚨 STOP-LOSS ABSOLUTO (PRIORIDADE 1): ${lossPercent.toFixed(2)}% >= ${maxLossPercent}% - VENDENDO IMEDIATAMENTE 🚨🚨🚨`);
       return { shouldSell: true, reason: `🛑 Stop-loss absoluto: ${lossPercent.toFixed(2)}% (limite: ${maxLossPercent}%)` };
     }
-    
+
     // VENDA FORÇADA após 7 minutos se não houver lucro significativo (>1%) OU se houver perda > 0.5%
     // Ajustado: Aumentado tempo de 5 para 7 minutos e threshold de lucro de 0.5% para 1%
     // Isso dá mais tempo para posições lucrarem antes de forçar venda
@@ -804,30 +935,30 @@ export class TradeExecutor {
       console.log(`[Executor] ⏰ VENDA FORÇADA POR TEMPO: ${holdTimeMinutes.toFixed(0)} minutos sem lucro significativo (>1%) ou com perda >0.5% (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%, loss: ${lossPercent.toFixed(2)}%)`);
       return { shouldSell: true, reason: `⏰ VENDA FORÇADA: ${holdTimeMinutes.toFixed(0)} minutos sem lucro significativo (>1%) ou com perda >0.5% (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)` };
     }
-    
+
     // VENDA FORÇADA após 5 minutos APENAS se houver perda significativa (>1%)
     // Isso protege contra perdas maiores enquanto dá mais tempo para posições neutras lucrarem
     if (holdTimeMinutes >= 5 && lossPercent > 1.0) {
       console.log(`[Executor] ⏰ VENDA FORÇADA POR PERDA: ${holdTimeMinutes.toFixed(0)} minutos com perda significativa (${lossPercent.toFixed(2)}%)`);
       return { shouldSell: true, reason: `⏰ VENDA FORÇADA: ${holdTimeMinutes.toFixed(0)} minutos com perda significativa (${lossPercent.toFixed(2)}%)` };
     }
-    
+
     // ============================================================================
     // PRIORIDADE 3: STOP-LOSS AGRESSIVO (proteger capital rapidamente)
     // ============================================================================
-    
+
     // STOP-LOSS CRÍTICO: 2% de perda após 3 minutos → VENDE IMEDIATAMENTE
     if (holdTimeMinutes >= 3 && lossPercent >= 2.0) {
       console.error(`[Executor] 🚨 STOP-LOSS CRÍTICO: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos`);
       return { shouldSell: true, reason: `🛑 STOP-LOSS: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos` };
     }
-    
+
     // STOP-LOSS PREVENTIVO: 1% de perda após 5 minutos → VENDE
     if (holdTimeMinutes >= 5 && lossPercent >= 1.0) {
       console.warn(`[Executor] ⚠️ STOP-LOSS PREVENTIVO: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos`);
       return { shouldSell: true, reason: `⚠️ Stop-loss preventivo: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos` };
     }
-    
+
     // STOP-LOSS ULTRA-PREVENTIVO: 0.5% de perda após 10 minutos → VENDE
     if (holdTimeMinutes >= 10 && lossPercent >= 0.5) {
       console.warn(`[Executor] ⚠️ STOP-LOSS ULTRA-PREVENTIVO: ${lossPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos`);
@@ -837,19 +968,19 @@ export class TradeExecutor {
     // ============================================================================
     // PRIORIDADE 4: VENDA RÁPIDA DE LUCROS (realização rápida)
     // ============================================================================
-    
+
     // VENDA ULTRA-RÁPIDA (2-5 min): Qualquer lucro > 0.5% → vende imediatamente
     if (holdTimeMinutes >= 2 && holdTimeMinutes < 5 && gainPercent > 0.5) {
       console.log(`[Executor] 🎯 VENDA ULTRA-RÁPIDA: ${gainPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos`);
       return { shouldSell: true, reason: `🎯 Venda ultra-rápida: ${gainPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos` };
     }
-    
+
     // VENDA RÁPIDA (5-10 min): Lucro > 0.3% → vende
     if (holdTimeMinutes >= 5 && holdTimeMinutes < 10 && gainPercent > 0.3) {
       console.log(`[Executor] ⚡ VENDA RÁPIDA: ${gainPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos`);
       return { shouldSell: true, reason: `⚡ Venda rápida: ${gainPercent.toFixed(2)}% após ${holdTimeMinutes.toFixed(0)} minutos` };
     }
-    
+
     // VENDA MODERADA (10-30 min): Se lucro > 0.2% e não está subindo muito → vende
     if (holdTimeMinutes >= 10 && holdTimeMinutes < 30 && gainPercent > 0.2) {
       // Se lucro > 1% e ainda subindo, pode segurar mais um pouco
@@ -862,14 +993,14 @@ export class TradeExecutor {
     // ============================================================================
     // PRIORIDADE 5: TAKE-PROFIT E GANHO MÁXIMO
     // ============================================================================
-    
+
     // TAKE-PROFIT: 30% do alvo → vende rápido
     const targetPrice = buyPrice * potentialMultiplier;
     if (currentPrice >= targetPrice * 0.3) {
       console.log(`[Executor] 🎉 TAKE-PROFIT: ${gainPercent.toFixed(2)}% (30% do alvo)`);
       return { shouldSell: true, reason: `🎉 Take-profit: ${gainPercent.toFixed(2)}% (30% do alvo)` };
     }
-    
+
     // Ganho máximo atingido
     if (gainPercent >= maxGainPercent) {
       console.log(`[Executor] 🎊 GANHO MÁXIMO: ${gainPercent.toFixed(2)}%`);
@@ -879,7 +1010,7 @@ export class TradeExecutor {
     // ============================================================================
     // PRIORIDADE 6: HOLD PERSISTENTE SEM MOVIMENTO
     // ============================================================================
-    
+
     // Se sinal HOLD e sem movimento significativo após 5 minutos → vende
     if (signal.signal_type === 'HOLD' && holdTimeMinutes >= 5) {
       const priceChange = Math.abs((currentPrice - buyPrice) / buyPrice) * 100;
@@ -899,20 +1030,20 @@ export class TradeExecutor {
   async monitorPositions(): Promise<void> {
     const startTime = Date.now();
     const timestamp = new Date().toISOString();
-    
+
     // Logs críticos no início - sempre usar console.error para garantir visibilidade
     console.error(`[Executor] 🔍🔍🔍 ========== STARTING POSITION MONITORING (${timestamp}) ==========`);
     console.error(`[Executor] 🔍 Monitoring started at ${timestamp}`);
-    
+
     try {
-      
+
       // Criar notificação de verificação de monitoramento (apenas para usuários com posições)
       const allPositionsResult = await this.pool.query(
         `SELECT DISTINCT user_id FROM positions WHERE status = 'open'`
       );
-      
+
       console.error(`[Executor] 📊 Found ${allPositionsResult.rows.length} user(s) with open positions`);
-      
+
       // Log crítico se não encontrar posições mas deveria ter
       if (allPositionsResult.rows.length === 0) {
         const totalPositionsCheck = await this.pool.query(
@@ -925,7 +1056,7 @@ export class TradeExecutor {
           console.error(`[Executor] ℹ️ No open positions found`);
         }
       }
-      
+
       // NOVO: Primeiro, processar todos os sinais SELL ativos para posições abertas
       // Isso garante que sinais SELL sejam processados imediatamente
       // IMPORTANTE: Buscar TODOS os sinais SELL recentes e depois verificar se há posições correspondentes
@@ -947,7 +1078,7 @@ export class TradeExecutor {
       );
 
       console.log(`[Executor] 🔍 Found ${sellSignalsResult.rows.length} active SELL signals for open positions`);
-      
+
       // Log detalhado para debug
       if (sellSignalsResult.rows.length > 0) {
         console.log(`[Executor] 📊 SELL signals details:`, sellSignalsResult.rows.map((r: any) => ({
@@ -969,14 +1100,14 @@ export class TradeExecutor {
         );
         const allSellSignalsCount = Number(allSellSignalsCheck.rows[0]?.count ?? 0);
         console.log(`[Executor] ⚠️ No SELL signals matched with open positions, but found ${allSellSignalsCount} total SELL signals in DB`);
-        
+
         // Verificar se há posições abertas
         const openPositionsCheck = await this.pool.query(
           `SELECT COUNT(*) as count FROM positions WHERE status = 'open'`
         );
         const openPositionsCount = Number(openPositionsCheck.rows[0]?.count ?? 0);
         console.log(`[Executor] 📊 Total open positions: ${openPositionsCount}`);
-        
+
         // Verificar mismatch de token_id entre sinais SELL e posições
         if (allSellSignalsCount > 0 && openPositionsCount > 0) {
           const mismatchCheck = await this.pool.query(
@@ -994,19 +1125,19 @@ export class TradeExecutor {
              LIMIT 5`
           );
           if (mismatchCheck.rows.length > 0) {
-            console.log(`[Executor] ⚠️ Found ${mismatchCheck.rows.length} SELL signals without matching open positions:`, 
+            console.log(`[Executor] ⚠️ Found ${mismatchCheck.rows.length} SELL signals without matching open positions:`,
               mismatchCheck.rows.map((r: any) => ({ signal_id: r.signal_id, token_id: r.token_id, symbol: r.symbol }))
             );
           }
         }
       }
-      
+
       // Processar cada sinal SELL
       for (const sellSignal of sellSignalsResult.rows) {
         const userId = sellSignal.user_id;
         const tokenId = sellSignal.token_id;
         const tokenBalance = Number(sellSignal.token_balance ?? 0);
-        
+
         console.log(`[Executor] 🔍 Processing SELL signal for ${sellSignal.symbol}:`, {
           signal_id: sellSignal.id,
           user_id: userId,
@@ -1014,14 +1145,14 @@ export class TradeExecutor {
           token_balance: tokenBalance,
           position_id: sellSignal.position_id
         });
-        
+
         // Verificar se o bot está habilitado
         const botEnabled = await this.isBotEnabled(userId);
         if (!botEnabled) {
           console.log(`[Executor] ⚠️ Bot disabled for user ${userId}, skipping SELL signal`);
           continue;
         }
-        
+
         if (tokenBalance <= 0) {
           console.log(`[Executor] ⚠️ Zero token balance for position ${sellSignal.position_id}, skipping SELL signal`);
           continue;
@@ -1030,7 +1161,7 @@ export class TradeExecutor {
         try {
           console.log(`[Executor] 🔴 Processing SELL signal for ${sellSignal.symbol} (user: ${userId}, balance: ${tokenBalance})`);
           const order = await this.executeSell({ token_id: tokenId, signal_id: sellSignal.id, amount_token: tokenBalance }, userId);
-          
+
           // Buscar profit/loss da ordem
           const orderResult = await this.pool.query(
             'SELECT profit_loss_usd, profit_loss_percent FROM orders WHERE id = $1',
@@ -1040,9 +1171,9 @@ export class TradeExecutor {
           const profitLoss = Number(orderData?.profit_loss_usd ?? 0);
           const profitLossPercent = Number(orderData?.profit_loss_percent ?? 0);
           const isProfit = profitLoss >= 0;
-          
+
           console.log(`[Executor] ✅ SELL executed: ${isProfit ? 'PROFIT' : 'LOSS'} of $${Math.abs(profitLoss).toFixed(2)} (${Math.abs(profitLossPercent).toFixed(2)}%)`);
-          
+
           await this.createNotification(
             userId,
             isProfit ? 'profit_realized' : 'loss_realized',
@@ -1078,9 +1209,9 @@ export class TradeExecutor {
          WHERE p.status = 'open'
          ORDER BY p.buy_time ASC`
       );
-      
+
       console.error(`[Executor] 🔍🔍🔍 Found ${positionsResult.rows.length} open positions to monitor 🔍🔍🔍`);
-      
+
       // Log detalhado de cada posição encontrada
       if (positionsResult.rows.length > 0) {
         console.error(`[Executor] 📊📊📊 Positions details:`, positionsResult.rows.map((p: any) => ({
@@ -1094,7 +1225,7 @@ export class TradeExecutor {
           token_balance: p.token_balance,
           invested: p.invested_amount_usd
         })));
-        
+
         // Verificar quantas posições estão há mais de 10 minutos
         const oldPositions = positionsResult.rows.filter((p: any) => Number(p.hold_time_minutes ?? 0) >= 10);
         if (oldPositions.length > 0) {
@@ -1107,48 +1238,48 @@ export class TradeExecutor {
         console.error(`[Executor] ⚠️ No open positions found to monitor`);
       }
 
-        // Notificação de verificação para cada usuário com posições
-        // Criar apenas uma notificação consolidada por usuário para não spam
-        const userPositionsMap = new Map<string, number>();
-        positionsResult.rows.forEach((p: any) => {
-          const count = userPositionsMap.get(p.user_id) || 0;
-          userPositionsMap.set(p.user_id, count + 1);
-        });
+      // Notificação de verificação para cada usuário com posições
+      // Criar apenas uma notificação consolidada por usuário para não spam
+      const userPositionsMap = new Map<string, number>();
+      positionsResult.rows.forEach((p: any) => {
+        const count = userPositionsMap.get(p.user_id) || 0;
+        userPositionsMap.set(p.user_id, count + 1);
+      });
 
-        // IMPORTANTE: Não criar notificação para cada verificação de monitoramento
-        // Isso cria MUITAS notificações e lota o banco
-        // Apenas criar notificação se houver mudanças importantes (vendidas, novos sinais)
-        // Removido: criação automática de notificação de verificação
-        
-        // Se não houver posições, criar notificação informativa apenas uma vez
-        if (userPositionsMap.size === 0) {
-          const defaultUserId = await this.ensureDefaultUser();
-          const recentNotification = await this.pool.query(
-            `SELECT id FROM bot_notifications 
+      // IMPORTANTE: Não criar notificação para cada verificação de monitoramento
+      // Isso cria MUITAS notificações e lota o banco
+      // Apenas criar notificação se houver mudanças importantes (vendidas, novos sinais)
+      // Removido: criação automática de notificação de verificação
+
+      // Se não houver posições, criar notificação informativa apenas uma vez
+      if (userPositionsMap.size === 0) {
+        const defaultUserId = await this.ensureDefaultUser();
+        const recentNotification = await this.pool.query(
+          `SELECT id FROM bot_notifications 
              WHERE user_id = $1 
              AND notification_type = 'monitoring_check'
              AND title = 'Monitoramento ativo'
              AND created_at > NOW() - INTERVAL '30 minutes'
              LIMIT 1`,
-            [defaultUserId]
-          );
+          [defaultUserId]
+        );
 
-          if (recentNotification.rows.length === 0) {
-            await this.createNotification(
-              defaultUserId,
-              'monitoring_check',
-              'info',
-              'Monitoramento ativo',
-              `🤖 Bot está ativo e monitorando! Nenhuma posição aberta no momento. Aguardando sinais BUY para abrir novas posições...`,
-              { status: 'active', positions: 0 }
-            );
-          }
+        if (recentNotification.rows.length === 0) {
+          await this.createNotification(
+            defaultUserId,
+            'monitoring_check',
+            'info',
+            'Monitoramento ativo',
+            `🤖 Bot está ativo e monitorando! Nenhuma posição aberta no momento. Aguardando sinais BUY para abrir novas posições...`,
+            { status: 'active', positions: 0 }
+          );
         }
+      }
 
       for (const pos of positionsResult.rows) {
         const userId = pos.user_id;
         const tokenId = pos.token_id;
-        
+
         // Verificar se o bot está habilitado para este usuário
         const botEnabled = await this.isBotEnabled(userId);
         if (!botEnabled) {
@@ -1164,7 +1295,7 @@ export class TradeExecutor {
         const currentPrice = tokenPriceUsd || positionCurrentPrice || buyPrice;
         const potentialMultiplier = Number(pos.potential_multiplier ?? 1.0);
         const tokenBalance = Number(pos.token_balance ?? 0);
-        
+
         // VALIDAÇÃO CRÍTICA: Se hold_time_minutes >= 10, forçar venda ANTES de qualquer outra verificação
         if (holdTimeMinutes >= 10) {
           console.error(`[Executor] 🚨🚨🚨 FORÇANDO VENDA IMEDIATA: Posição ${pos.symbol} há ${holdTimeMinutes.toFixed(2)} minutos (>= 10 minutos) 🚨🚨🚨`);
@@ -1175,14 +1306,14 @@ export class TradeExecutor {
             hold_time_minutes: holdTimeMinutes.toFixed(2),
             token_balance: tokenBalance
           });
-          
+
           // Executar venda imediatamente sem chamar shouldSellPosition
           if (tokenBalance > 0) {
             try {
               console.error(`[Executor] 🚀🚀🚀 Executing FORCED SELL order for ${pos.symbol}: ${tokenBalance} tokens 🚀🚀🚀`);
               const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance }, userId);
               console.error(`[Executor] ✅✅✅ VENDA FORÇADA EXECUTADA COM SUCESSO: Order ${order.id} para ${pos.symbol} ✅✅✅`);
-              
+
               await this.createNotification(
                 userId,
                 'position_closed',
@@ -1218,7 +1349,7 @@ export class TradeExecutor {
             continue; // Pular para próxima posição
           }
         }
-        
+
         // Log detalhado do preço usado
         if (tokenPriceUsd && tokenPriceUsd !== buyPrice) {
           console.log(`[Executor] 💰 Using token price for ${pos.symbol}: $${tokenPriceUsd.toFixed(8)} (buy: $${buyPrice.toFixed(8)})`);
@@ -1230,7 +1361,7 @@ export class TradeExecutor {
 
         // Buscar sinal atual - priorizar SELL se existir, senão buscar o mais recente
         let signal: Signal;
-        
+
         // Primeiro, tentar buscar sinal SELL ativo para este token
         const sellSignalResult = await this.pool.query(
           `SELECT * FROM signals 
@@ -1242,7 +1373,7 @@ export class TradeExecutor {
            LIMIT 1`,
           [tokenId]
         );
-        
+
         if (sellSignalResult.rows.length > 0) {
           // Usar sinal SELL se encontrado
           signal = sellSignalResult.rows[0] as Signal;
@@ -1288,7 +1419,7 @@ export class TradeExecutor {
         const gainPercent = ((currentPrice / buyPrice - 1) * 100);
         const lossPercent = ((buyPrice - currentPrice) / buyPrice) * 100;
         const holdTimeHours = holdTimeMinutes / 60;
-        
+
         console.log(`[Executor] 🔍 Position monitoring for ${pos.symbol}:`, {
           user_id: userId,
           position_id: pos.id,
@@ -1316,7 +1447,7 @@ export class TradeExecutor {
             reason: decision.reason
           });
         }
-        
+
         if (decision.shouldSell && tokenBalance > 0) {
           console.error(`[Executor] ⚡⚡⚡ AUTO-SELLING POSITION: ${pos.symbol} - ${decision.reason} ⚡⚡⚡`);
           console.error(`[Executor] 📊 Position details:`, {
@@ -1332,18 +1463,18 @@ export class TradeExecutor {
             should_sell: decision.shouldSell,
             reason: decision.reason
           });
-          
+
           try {
             console.error(`[Executor] 🚀🚀🚀 Executing SELL order for ${pos.symbol}: ${tokenBalance} tokens 🚀🚀🚀`);
             console.error(`[Executor] Request params:`, { token_id: tokenId, amount_token: tokenBalance, user_id: userId });
             const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance }, userId);
             console.error(`[Executor] ✅✅✅ VENDA EXECUTADA COM SUCESSO: Order ${order.id} para ${pos.symbol} ✅✅✅`);
-            
+
             // Criar notificação baseada no motivo
             let notificationType = 'position_closed';
             let notificationTitle = 'Posição fechada automaticamente';
             let notificationMessage = `🤖 Fechei a posição em ${pos.symbol} automaticamente: ${decision.reason}`;
-            
+
             if (decision.reason.includes('Take-profit')) {
               notificationType = 'take_profit_hit';
               notificationTitle = 'Take-profit atingido!';
@@ -1353,7 +1484,7 @@ export class TradeExecutor {
               notificationTitle = 'Stop-loss atingido';
               notificationMessage = `🤖 ⚠️ Stop-loss atingido em ${pos.symbol}. Perda limitada. Fechando posição para proteger capital...`;
             }
-            
+
             await this.createNotification(
               userId,
               notificationType,
@@ -1385,7 +1516,7 @@ export class TradeExecutor {
           }
         }
       }
-      
+
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(2);
       console.error(`[Executor] ✅✅✅ ========== POSITION MONITORING COMPLETED (${duration}s) ========== ✅✅✅`);
@@ -1393,7 +1524,7 @@ export class TradeExecutor {
       console.error('[Executor] ❌❌❌ CRITICAL ERROR monitoring positions:', error);
       console.error('[Executor] ❌ Error message:', error.message);
       console.error('[Executor] ❌ Error stack:', error.stack);
-      
+
       // Se houver erro crítico, criar notificação
       try {
         const defaultUserId = await this.ensureDefaultUser();
@@ -1421,28 +1552,28 @@ export class TradeExecutor {
         'SELECT bot_enabled FROM user_profiles WHERE user_id = $1',
         [userId]
       );
-      
+
       if (result.rows.length === 0) {
         console.log(`[Executor] ⚠️ No profile found for user ${userId}`);
         return false;
       }
-      
+
       const botEnabledValue = result.rows[0].bot_enabled;
-      
+
       // Lidar com diferentes tipos
       if (typeof botEnabledValue === 'boolean') {
         return botEnabledValue;
       }
-      
+
       if (typeof botEnabledValue === 'string') {
         return botEnabledValue.toLowerCase() === 'true' || botEnabledValue === '1';
       }
-      
+
       // Para valores numéricos (0/1)
       if (typeof botEnabledValue === 'number') {
         return botEnabledValue !== 0;
       }
-      
+
       // Default: tentar converter para boolean
       return Boolean(botEnabledValue);
     } catch (error: any) {
@@ -1478,7 +1609,7 @@ export class TradeExecutor {
            LIMIT 1`,
           [userId, type, title]
         );
-        
+
         if (recentNotification.rows.length > 0) {
           console.log(`[Executor] ⏭️ Skipping duplicate notification: ${type} - ${title}`);
           return; // Não criar notificação duplicada
@@ -1491,7 +1622,7 @@ export class TradeExecutor {
         [userId]
       );
       const totalCount = Number(countResult.rows[0]?.count ?? 0);
-      
+
       if (totalCount > 1000) {
         // Deletar notificações lidas mais antigas
         await this.pool.query(
@@ -1542,9 +1673,9 @@ export class TradeExecutor {
          FROM user_profiles 
          WHERE bot_enabled = true OR bot_enabled = 'true' OR bot_enabled = '1'`
       );
-      
+
       console.log(`[Executor] 🔍 Found ${usersResult.rows.length} user(s) with bot potentially enabled`);
-      
+
       // Filtrar apenas usuários realmente habilitados (double-check)
       const activeUsers: string[] = [];
       for (const row of usersResult.rows) {
@@ -1555,7 +1686,7 @@ export class TradeExecutor {
           console.log(`[Executor] ⚠️ User ${row.user_id} marked as enabled but verification failed`);
         }
       }
-      
+
       if (activeUsers.length === 0) {
         console.log(`[Executor] ⚠️ No users with bot enabled. Ensuring default user...`);
         // Garantir usuário padrão pelo menos
@@ -1569,7 +1700,7 @@ export class TradeExecutor {
       // Processar sinal para cada usuário com bot habilitado
       let processedCount = 0;
       let errorCount = 0;
-      
+
       for (const userId of activeUsers) {
         try {
           console.log(`[Executor] 🔄 Processing ${signalType} signal for user ${userId}...`);
@@ -1587,9 +1718,9 @@ export class TradeExecutor {
           // Continuar para próximo usuário
         }
       }
-      
+
       console.log(`[Executor] 📊 Signal processing complete: ${processedCount} succeeded, ${errorCount} failed`);
-      
+
     } catch (error: any) {
       console.error(`[Executor] ❌ Critical error processing signal for ${tokenSymbol}:`, {
         message: error.message,
@@ -1605,7 +1736,7 @@ export class TradeExecutor {
   private async processSignalForUser(signal: Signal, userId: string, tokenSymbol: string): Promise<void> {
     const signalType = signal.signal_type;
     const tokenId = signal.token_id;
-    
+
     console.log(`[Executor] 🔄 Processing ${signalType} signal for user ${userId}, token ${tokenSymbol} (${tokenId})`);
 
     try {
@@ -1627,7 +1758,7 @@ export class TradeExecutor {
       }
 
       console.log(`[Executor] ✅ Bot enabled for user ${userId}! Processing ${signalType} signal for ${tokenSymbol}...`);
-      
+
       // Criar notificação de recebimento do sinal
       await this.createNotification(
         userId,
@@ -1635,312 +1766,312 @@ export class TradeExecutor {
         'info',
         'Sinal recebido',
         `🤖 Recebi um sinal ${signalType} para ${tokenSymbol} (confiança: ${signal.confidence_score}%, multiplicador: ${signal.potential_multiplier}x). Processando...`,
-        { 
+        {
           signal_id: signal.id,
-          signal_type: signalType, 
+          signal_type: signalType,
           symbol: tokenSymbol,
           confidence_score: signal.confidence_score,
           potential_multiplier: signal.potential_multiplier
         }
       );
 
-    // Garantir que o usuário tenha perfil e saldo inicial
-    const userProfileResult = await this.pool.query(
-      'SELECT user_id FROM user_profiles WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (userProfileResult.rows.length === 0) {
-      // Criar perfil básico se não existir
-      await this.pool.query(
-        `INSERT INTO user_profiles (user_id, risk_profile, bot_enabled, bot_intensity, max_loss_percent, max_gain_percent, max_open_trades)
-         VALUES ($1, 'moderate', true, 5, 10, 25, 3)
-         ON CONFLICT (user_id) DO NOTHING`,
+      // Garantir que o usuário tenha perfil e saldo inicial
+      const userProfileResult = await this.pool.query(
+        'SELECT user_id FROM user_profiles WHERE user_id = $1',
         [userId]
       );
-      console.log(`[Executor] ✅ Created profile for user ${userId}`);
-    }
-    
-    // Garantir saldo inicial para este usuário (apenas uma vez)
-    const existingDeposit = await this.pool.query(
-      `SELECT COUNT(*) as count FROM ledger_entries 
+
+      if (userProfileResult.rows.length === 0) {
+        // Criar perfil básico se não existir
+        await this.pool.query(
+          `INSERT INTO user_profiles (user_id, risk_profile, bot_enabled, bot_intensity, max_loss_percent, max_gain_percent, max_open_trades)
+         VALUES ($1, 'moderate', true, 5, 10, 25, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+          [userId]
+        );
+        console.log(`[Executor] ✅ Created profile for user ${userId}`);
+      }
+
+      // Garantir saldo inicial para este usuário (apenas uma vez)
+      const existingDeposit = await this.pool.query(
+        `SELECT COUNT(*) as count FROM ledger_entries 
        WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
-      [userId]
-    );
-    
-    // Se já existe depósito inicial, não criar outro
-    if (Number(existingDeposit.rows[0]?.count ?? 0) === 0) {
-      const balanceResult = await this.pool.query(
-        `SELECT 
+        [userId]
+      );
+
+      // Se já existe depósito inicial, não criar outro
+      if (Number(existingDeposit.rows[0]?.count ?? 0) === 0) {
+        const balanceResult = await this.pool.query(
+          `SELECT 
            COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
            COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
          FROM ledger_entries
          WHERE user_id = $1`,
-        [userId]
-      );
-      const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-      const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-      const currentBalance = Math.max(0, credits - debits);
-      
-      if (currentBalance < 100) {
-        const depositAmount = 100 - currentBalance;
-        await this.pool.query(
-          `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
-           VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
-          [userId, depositAmount, currentBalance, currentBalance + depositAmount]
+          [userId]
         );
-        console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for user ${userId}`);
-        
-        // Criar notificação de saldo inicial
-        await this.createNotification(
-          userId,
-          'order_executed',
-          'success',
-          'Sistema iniciado',
-          `🤖 Sistema de trading iniciado! Saldo inicial de $${depositAmount} USD foi creditado. Aguardando oportunidades de trading...`,
-          { amount: depositAmount, type: 'initial_deposit' }
-        );
-      }
-    }
+        const credits = Number(balanceResult.rows[0]?.credits ?? 0);
+        const debits = Number(balanceResult.rows[0]?.debits ?? 0);
+        const currentBalance = Math.max(0, credits - debits);
 
-    if (signal.signal_type === 'BUY') {
-      try {
-        // Verificar se já existe posição aberta para este token (evitar múltiplas compras)
-        const existingPosition = await this.pool.query(
-          `SELECT id, created_at FROM positions 
-           WHERE user_id = $1 AND token_id = $2 AND status = 'open'`,
-          [userId, tokenId]
-        );
-        
-        if (existingPosition.rows.length > 0) {
-          const positionAge = Date.now() - new Date(existingPosition.rows[0].created_at).getTime();
-          const positionAgeMinutes = positionAge / (1000 * 60);
-          
-          // Se a posição foi criada há menos de 5 minutos, não comprar novamente
-          if (positionAgeMinutes < 5) {
-            console.log(`[Executor] ⚠️ Position for ${tokenSymbol} was created ${positionAgeMinutes.toFixed(1)} minutes ago, skipping duplicate BUY`);
-            return;
-          }
+        if (currentBalance < 100) {
+          const depositAmount = 100 - currentBalance;
+          await this.pool.query(
+            `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
+           VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
+            [userId, depositAmount, currentBalance, currentBalance + depositAmount]
+          );
+          console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for user ${userId}`);
+
+          // Criar notificação de saldo inicial
+          await this.createNotification(
+            userId,
+            'order_executed',
+            'success',
+            'Sistema iniciado',
+            `🤖 Sistema de trading iniciado! Saldo inicial de $${depositAmount} USD foi creditado. Aguardando oportunidades de trading...`,
+            { amount: depositAmount, type: 'initial_deposit' }
+          );
         }
-        
-        // Verificar se já foi processado um sinal BUY para este token recentemente (últimos 2 minutos)
-        const recentOrder = await this.pool.query(
-          `SELECT id, created_at FROM orders 
+      }
+
+      if (signal.signal_type === 'BUY') {
+        try {
+          // Verificar se já existe posição aberta para este token (evitar múltiplas compras)
+          const existingPosition = await this.pool.query(
+            `SELECT id, created_at FROM positions 
+           WHERE user_id = $1 AND token_id = $2 AND status = 'open'`,
+            [userId, tokenId]
+          );
+
+          if (existingPosition.rows.length > 0) {
+            const positionAge = Date.now() - new Date(existingPosition.rows[0].created_at).getTime();
+            const positionAgeMinutes = positionAge / (1000 * 60);
+
+            // Se a posição foi criada há menos de 5 minutos, não comprar novamente
+            if (positionAgeMinutes < 5) {
+              console.log(`[Executor] ⚠️ Position for ${tokenSymbol} was created ${positionAgeMinutes.toFixed(1)} minutes ago, skipping duplicate BUY`);
+              return;
+            }
+          }
+
+          // Verificar se já foi processado um sinal BUY para este token recentemente (últimos 2 minutos)
+          const recentOrder = await this.pool.query(
+            `SELECT id, created_at FROM orders 
            WHERE user_id = $1 AND token_id = $2 AND order_type = 'BUY' 
            AND created_at > NOW() - INTERVAL '2 minutes'
            ORDER BY created_at DESC LIMIT 1`,
-          [userId, tokenId]
-        );
-        
-        if (recentOrder.rows.length > 0) {
-          const orderAge = Date.now() - new Date(recentOrder.rows[0].created_at).getTime();
-          const orderAgeSeconds = orderAge / 1000;
-          
-          if (orderAgeSeconds < 120) {
-            console.log(`[Executor] ⚠️ BUY order for ${tokenSymbol} was created ${orderAgeSeconds.toFixed(0)} seconds ago, skipping duplicate signal`);
+            [userId, tokenId]
+          );
+
+          if (recentOrder.rows.length > 0) {
+            const orderAge = Date.now() - new Date(recentOrder.rows[0].created_at).getTime();
+            const orderAgeSeconds = orderAge / 1000;
+
+            if (orderAgeSeconds < 120) {
+              console.log(`[Executor] ⚠️ BUY order for ${tokenSymbol} was created ${orderAgeSeconds.toFixed(0)} seconds ago, skipping duplicate signal`);
+              return;
+            }
+          }
+
+          // Verificar limite de trades paralelos
+          const profileResult = await this.pool.query(
+            'SELECT max_open_trades FROM user_profiles WHERE user_id = $1',
+            [userId]
+          );
+          const maxOpenTrades = Number(profileResult.rows[0]?.max_open_trades ?? 3);
+
+          const openPositionsResult = await this.pool.query(
+            'SELECT COUNT(*) as count FROM positions WHERE user_id = $1 AND status = $2',
+            [userId, 'open']
+          );
+          const openPositionsCount = Number(openPositionsResult.rows[0]?.count ?? 0);
+
+          if (openPositionsCount >= maxOpenTrades) {
+            console.log(`[Executor] ⚠️ Max open trades (${maxOpenTrades}) reached, skipping BUY for ${tokenSymbol}`);
+            await this.createNotification(
+              userId,
+              'error_occurred',
+              'info',
+              'Limite de trades atingido',
+              `🤖 Tentei comprar ${tokenSymbol}, mas já tenho ${openPositionsCount} posições abertas (máximo: ${maxOpenTrades}). Vou aguardar...`,
+              { symbol: tokenSymbol, open_positions: openPositionsCount, max_open_trades: maxOpenTrades }
+            );
             return;
           }
-        }
-        
-        // Verificar limite de trades paralelos
-        const profileResult = await this.pool.query(
-          'SELECT max_open_trades FROM user_profiles WHERE user_id = $1',
-          [userId]
-        );
-        const maxOpenTrades = Number(profileResult.rows[0]?.max_open_trades ?? 3);
-        
-        const openPositionsResult = await this.pool.query(
-          'SELECT COUNT(*) as count FROM positions WHERE user_id = $1 AND status = $2',
-          [userId, 'open']
-        );
-        const openPositionsCount = Number(openPositionsResult.rows[0]?.count ?? 0);
 
-        if (openPositionsCount >= maxOpenTrades) {
-          console.log(`[Executor] ⚠️ Max open trades (${maxOpenTrades}) reached, skipping BUY for ${tokenSymbol}`);
-          await this.createNotification(
-            userId,
-            'error_occurred',
-            'info',
-            'Limite de trades atingido',
-            `🤖 Tentei comprar ${tokenSymbol}, mas já tenho ${openPositionsCount} posições abertas (máximo: ${maxOpenTrades}). Vou aguardar...`,
-            { symbol: tokenSymbol, open_positions: openPositionsCount, max_open_trades: maxOpenTrades }
-          );
-          return;
-        }
-
-        // Verificar saldo disponível antes de comprar (considerando posições abertas)
-        const balanceCheck = await this.pool.query(
-          `SELECT 
+          // Verificar saldo disponível antes de comprar (considerando posições abertas)
+          const balanceCheck = await this.pool.query(
+            `SELECT 
              COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
              COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
            FROM ledger_entries
            WHERE user_id = $1`,
-          [userId]
-        );
-        const credits = Number(balanceCheck.rows[0]?.credits ?? 0);
-        const debits = Number(balanceCheck.rows[0]?.debits ?? 0);
-        const totalBalance = Math.max(0, credits - debits);
-        
-        // Buscar investido em posições abertas
-        const openPositionsCheck = await this.pool.query(
-          `SELECT COALESCE(SUM(invested_amount_usd), 0) AS total_invested
+            [userId]
+          );
+          const credits = Number(balanceCheck.rows[0]?.credits ?? 0);
+          const debits = Number(balanceCheck.rows[0]?.debits ?? 0);
+          const totalBalance = Math.max(0, credits - debits);
+
+          // Buscar investido em posições abertas
+          const openPositionsCheck = await this.pool.query(
+            `SELECT COALESCE(SUM(invested_amount_usd), 0) AS total_invested
            FROM positions
            WHERE user_id = $1 AND status = 'open'`,
-          [userId]
-        );
-        const investedInPositions = Number(openPositionsCheck.rows[0]?.total_invested ?? 0);
-        
-        // Saldo disponível = total - investido em posições abertas
-        const availableBalance = Math.max(0, totalBalance - investedInPositions);
+            [userId]
+          );
+          const investedInPositions = Number(openPositionsCheck.rows[0]?.total_invested ?? 0);
 
-        console.log(`[Executor] 💰 Balance check before BUY for ${tokenSymbol}:`, {
-          total_balance: totalBalance,
-          invested_in_positions: investedInPositions,
-          available_balance: availableBalance
-        });
+          // Saldo disponível = total - investido em posições abertas
+          const availableBalance = Math.max(0, totalBalance - investedInPositions);
 
-        if (availableBalance < 5) {
-          console.log(`[Executor] ⚠️ Insufficient available balance ($${availableBalance.toFixed(2)}), skipping BUY for ${tokenSymbol}`);
+          console.log(`[Executor] 💰 Balance check before BUY for ${tokenSymbol}:`, {
+            total_balance: totalBalance,
+            invested_in_positions: investedInPositions,
+            available_balance: availableBalance
+          });
+
+          if (availableBalance < 5) {
+            console.log(`[Executor] ⚠️ Insufficient available balance ($${availableBalance.toFixed(2)}), skipping BUY for ${tokenSymbol}`);
+            await this.createNotification(
+              userId,
+              'error_occurred',
+              'warning',
+              'Saldo insuficiente',
+              `🤖 Tentei comprar ${tokenSymbol}, mas meu saldo disponível é de apenas $${availableBalance.toFixed(2)} (total: $${totalBalance.toFixed(2)}, investido: $${investedInPositions.toFixed(2)}). Mínimo necessário: $5.00. Aguardando mais capital...`,
+              { symbol: tokenSymbol, total_balance: totalBalance, invested: investedInPositions, available_balance: availableBalance }
+            );
+            return;
+          }
+
+          console.log(`[Executor] 💰 Available balance: $${availableBalance.toFixed(2)} | Processing BUY for ${tokenSymbol}...`);
+          const order = await this.executeBuy({ token_id: tokenId, signal_id: signal.id }, userId);
+          console.log(`[Executor] ✅ BUY order executed: ${order.id} for ${tokenSymbol} | Amount: $${Number(order.amount_usd ?? 0).toFixed(2)}`);
+
+          await this.createNotification(
+            userId,
+            'order_executed',
+            'success',
+            'Ordem BUY executada',
+            `🤖 Executei uma ordem BUY de $${Number(order.amount_usd ?? 0).toFixed(2)} em ${tokenSymbol}! Simulando execução...`,
+            { order_id: order.id, symbol: tokenSymbol, amount: order.amount_usd, type: 'BUY' }
+          );
+        } catch (error: any) {
+          console.error(`[Executor] ❌ Failed to execute BUY for ${tokenSymbol}:`, error.message);
           await this.createNotification(
             userId,
             'error_occurred',
-            'warning',
-            'Saldo insuficiente',
-            `🤖 Tentei comprar ${tokenSymbol}, mas meu saldo disponível é de apenas $${availableBalance.toFixed(2)} (total: $${totalBalance.toFixed(2)}, investido: $${investedInPositions.toFixed(2)}). Mínimo necessário: $5.00. Aguardando mais capital...`,
-            { symbol: tokenSymbol, total_balance: totalBalance, invested: investedInPositions, available_balance: availableBalance }
+            'error',
+            'Erro ao executar BUY',
+            `🤖 ⚠️ Ops! Erro ao executar BUY em ${tokenSymbol}: ${error.message}. Continuando operação...`,
+            { symbol: tokenSymbol, error: error.message }
           );
-          return;
+          throw error;
         }
+      } else if (signal.signal_type === 'SELL') {
+        try {
+          console.log(`[Executor] 🔴 Processing SELL signal for ${tokenSymbol} (tokenId: ${tokenId}, userId: ${userId})`);
 
-        console.log(`[Executor] 💰 Available balance: $${availableBalance.toFixed(2)} | Processing BUY for ${tokenSymbol}...`);
-        const order = await this.executeBuy({ token_id: tokenId, signal_id: signal.id }, userId);
-        console.log(`[Executor] ✅ BUY order executed: ${order.id} for ${tokenSymbol} | Amount: $${Number(order.amount_usd ?? 0).toFixed(2)}`);
-        
-        await this.createNotification(
-          userId,
-          'order_executed',
-          'success',
-          'Ordem BUY executada',
-          `🤖 Executei uma ordem BUY de $${Number(order.amount_usd ?? 0).toFixed(2)} em ${tokenSymbol}! Simulando execução...`,
-          { order_id: order.id, symbol: tokenSymbol, amount: order.amount_usd, type: 'BUY' }
-        );
-      } catch (error: any) {
-        console.error(`[Executor] ❌ Failed to execute BUY for ${tokenSymbol}:`, error.message);
-        await this.createNotification(
-          userId,
-          'error_occurred',
-          'error',
-          'Erro ao executar BUY',
-          `🤖 ⚠️ Ops! Erro ao executar BUY em ${tokenSymbol}: ${error.message}. Continuando operação...`,
-          { symbol: tokenSymbol, error: error.message }
-        );
-        throw error;
-      }
-    } else if (signal.signal_type === 'SELL') {
-      try {
-        console.log(`[Executor] 🔴 Processing SELL signal for ${tokenSymbol} (tokenId: ${tokenId}, userId: ${userId})`);
-        
-        // IMPORTANTE: Buscar posição aberta para este token e usuário
-        const positionResult = await this.pool.query(
-          `SELECT p.*, t.symbol, t.name 
+          // IMPORTANTE: Buscar posição aberta para este token e usuário
+          const positionResult = await this.pool.query(
+            `SELECT p.*, t.symbol, t.name 
            FROM positions p
            JOIN tokens t ON p.token_id = t.id
            WHERE p.user_id = $1 
            AND p.token_id = $2 
            AND p.status = 'open'`,
-          [userId, tokenId]
-        );
+            [userId, tokenId]
+          );
 
-        console.log(`[Executor] 🔍 Found ${positionResult.rows.length} open position(s) for ${tokenSymbol}`);
+          console.log(`[Executor] 🔍 Found ${positionResult.rows.length} open position(s) for ${tokenSymbol}`);
 
-        if (positionResult.rows.length > 0) {
-          for (const pos of positionResult.rows) {
-            const balance = Number(pos.token_balance ?? 0);
-            const positionId = pos.id;
-            
-            console.log(`[Executor] 🔍 Position details:`, {
-              position_id: positionId,
-              token_balance: balance,
-              invested_amount: pos.invested_amount_usd,
-              buy_price: pos.buy_price_usd
-            });
-            
-            if (balance > 0) {
-              console.log(`[Executor] 💰 Executing SELL for ${tokenSymbol}: selling ${balance} tokens`);
-              const order = await this.executeSell({ token_id: tokenId, signal_id: signal.id, amount_token: balance }, userId);
-              console.log(`[Executor] ✅ SELL order executed: ${order.id} for ${tokenSymbol}`);
-              
-              // Buscar profit/loss atualizado da ordem
-              const orderResult = await this.pool.query(
-                'SELECT profit_loss_usd, profit_loss_percent FROM orders WHERE id = $1',
-                [order.id]
-              );
-              const orderData = orderResult.rows[0];
-              
-              const profitLoss = Number(orderData?.profit_loss_usd ?? 0);
-              const profitLossPercent = Number(orderData?.profit_loss_percent ?? 0);
-              const isProfit = profitLoss >= 0;
-              
-              console.log(`[Executor] 💰 SELL completed: ${isProfit ? 'PROFIT' : 'LOSS'} of $${Math.abs(profitLoss).toFixed(2)} (${Math.abs(profitLossPercent).toFixed(2)}%)`);
-              
-              await this.createNotification(
-                userId,
-                isProfit ? 'profit_realized' : 'loss_realized',
-                isProfit ? 'success' : 'warning',
-                isProfit ? 'Lucro realizado!' : 'Perda realizada',
-                `🤖 ${isProfit ? '🎉' : '⚠️'} Fechei a posição em ${tokenSymbol}! ${isProfit ? 'Ganho' : 'Perda'} de $${Math.abs(profitLoss).toFixed(2)} (${Math.abs(profitLossPercent).toFixed(2)}%). Continuando análise...`,
-                { order_id: order.id, symbol: tokenSymbol, profit_loss: profitLoss, profit_loss_percent: profitLossPercent }
-              );
-            } else {
-              console.log(`[Executor] ⚠️ Position ${positionId} for ${tokenSymbol} has zero balance, skipping sell`);
+          if (positionResult.rows.length > 0) {
+            for (const pos of positionResult.rows) {
+              const balance = Number(pos.token_balance ?? 0);
+              const positionId = pos.id;
+
+              console.log(`[Executor] 🔍 Position details:`, {
+                position_id: positionId,
+                token_balance: balance,
+                invested_amount: pos.invested_amount_usd,
+                buy_price: pos.buy_price_usd
+              });
+
+              if (balance > 0) {
+                console.log(`[Executor] 💰 Executing SELL for ${tokenSymbol}: selling ${balance} tokens`);
+                const order = await this.executeSell({ token_id: tokenId, signal_id: signal.id, amount_token: balance }, userId);
+                console.log(`[Executor] ✅ SELL order executed: ${order.id} for ${tokenSymbol}`);
+
+                // Buscar profit/loss atualizado da ordem
+                const orderResult = await this.pool.query(
+                  'SELECT profit_loss_usd, profit_loss_percent FROM orders WHERE id = $1',
+                  [order.id]
+                );
+                const orderData = orderResult.rows[0];
+
+                const profitLoss = Number(orderData?.profit_loss_usd ?? 0);
+                const profitLossPercent = Number(orderData?.profit_loss_percent ?? 0);
+                const isProfit = profitLoss >= 0;
+
+                console.log(`[Executor] 💰 SELL completed: ${isProfit ? 'PROFIT' : 'LOSS'} of $${Math.abs(profitLoss).toFixed(2)} (${Math.abs(profitLossPercent).toFixed(2)}%)`);
+
+                await this.createNotification(
+                  userId,
+                  isProfit ? 'profit_realized' : 'loss_realized',
+                  isProfit ? 'success' : 'warning',
+                  isProfit ? 'Lucro realizado!' : 'Perda realizada',
+                  `🤖 ${isProfit ? '🎉' : '⚠️'} Fechei a posição em ${tokenSymbol}! ${isProfit ? 'Ganho' : 'Perda'} de $${Math.abs(profitLoss).toFixed(2)} (${Math.abs(profitLossPercent).toFixed(2)}%). Continuando análise...`,
+                  { order_id: order.id, symbol: tokenSymbol, profit_loss: profitLoss, profit_loss_percent: profitLossPercent }
+                );
+              } else {
+                console.log(`[Executor] ⚠️ Position ${positionId} for ${tokenSymbol} has zero balance, skipping sell`);
+              }
             }
+          } else {
+            console.log(`[Executor] ⚠️ No open position found for ${tokenSymbol} (tokenId: ${tokenId}) when processing SELL signal`);
+            await this.createNotification(
+              userId,
+              'signal_received',
+              'info',
+              'Sinal SELL recebido',
+              `🤖 Recebi um sinal SELL para ${tokenSymbol}, mas não há posição aberta para vender. Aguardando novas oportunidades...`,
+              { symbol: tokenSymbol, signal_type: 'SELL' }
+            );
           }
-        } else {
-          console.log(`[Executor] ⚠️ No open position found for ${tokenSymbol} (tokenId: ${tokenId}) when processing SELL signal`);
+        } catch (error: any) {
+          console.error(`[Executor] ❌ Error processing SELL signal for ${tokenSymbol}:`, error);
+          console.error(`[Executor] ❌ Error stack:`, error.stack);
           await this.createNotification(
             userId,
-            'signal_received',
-            'info',
-            'Sinal SELL recebido',
-            `🤖 Recebi um sinal SELL para ${tokenSymbol}, mas não há posição aberta para vender. Aguardando novas oportunidades...`,
-            { symbol: tokenSymbol, signal_type: 'SELL' }
+            'error_occurred',
+            'error',
+            'Erro ao processar sinal SELL',
+            `🤖 ⚠️ Erro ao processar sinal SELL para ${tokenSymbol}: ${error.message}. Verificando novamente...`,
+            { symbol: tokenSymbol, error: error.message }
           );
+          console.error(`[Executor] ⚠️ Error stack:`, error.stack);
+          // Não propagar erro - pode não ter posição para vender
         }
-      } catch (error: any) {
-        console.error(`[Executor] ❌ Error processing SELL signal for ${tokenSymbol}:`, error);
-        console.error(`[Executor] ❌ Error stack:`, error.stack);
+      } else if (signal.signal_type === 'HOLD') {
+        console.log(`[Executor] ⏸️ HOLD signal for ${tokenSymbol} - no action taken for user ${userId}`);
         await this.createNotification(
           userId,
-          'error_occurred',
-          'error',
-          'Erro ao processar sinal SELL',
-          `🤖 ⚠️ Erro ao processar sinal SELL para ${tokenSymbol}: ${error.message}. Verificando novamente...`,
-          { symbol: tokenSymbol, error: error.message }
+          'info',
+          'info',
+          'Sinal HOLD',
+          `🤖 Recebi um sinal HOLD para ${tokenSymbol}. Aguardando confirmação antes de agir.`,
+          { signal_type: 'HOLD', symbol: tokenSymbol, confidence_score: signal.confidence_score }
         );
-        console.error(`[Executor] ⚠️ Error stack:`, error.stack);
-        // Não propagar erro - pode não ter posição para vender
+      } else {
+        console.log(`[Executor] ⚠️ Unknown signal type: ${signal.signal_type} for ${tokenSymbol} (user: ${userId})`);
+        await this.createNotification(
+          userId,
+          'warning',
+          'warning',
+          'Tipo de sinal desconhecido',
+          `🤖 ⚠️ Recebi um tipo de sinal desconhecido: ${signal.signal_type} para ${tokenSymbol}`,
+          { signal_type: signal.signal_type, symbol: tokenSymbol }
+        );
       }
-    } else if (signal.signal_type === 'HOLD') {
-      console.log(`[Executor] ⏸️ HOLD signal for ${tokenSymbol} - no action taken for user ${userId}`);
-      await this.createNotification(
-        userId,
-        'info',
-        'info',
-        'Sinal HOLD',
-        `🤖 Recebi um sinal HOLD para ${tokenSymbol}. Aguardando confirmação antes de agir.`,
-        { signal_type: 'HOLD', symbol: tokenSymbol, confidence_score: signal.confidence_score }
-      );
-    } else {
-      console.log(`[Executor] ⚠️ Unknown signal type: ${signal.signal_type} for ${tokenSymbol} (user: ${userId})`);
-      await this.createNotification(
-        userId,
-        'warning',
-        'warning',
-        'Tipo de sinal desconhecido',
-        `🤖 ⚠️ Recebi um tipo de sinal desconhecido: ${signal.signal_type} para ${tokenSymbol}`,
-        { signal_type: signal.signal_type, symbol: tokenSymbol }
-      );
-    }
     } catch (error: any) {
       console.error(`[Executor] ❌ Error processing ${signalType} signal for user ${userId} - ${tokenSymbol}:`, {
         message: error.message,
@@ -1949,7 +2080,7 @@ export class TradeExecutor {
         token_id: tokenId,
         user_id: userId
       });
-      
+
       // Tentar criar notificação de erro
       try {
         await this.createNotification(
@@ -1958,8 +2089,8 @@ export class TradeExecutor {
           'error',
           'Erro ao processar sinal',
           `🤖 ⚠️ Erro ao processar sinal ${signalType} para ${tokenSymbol}: ${error.message}`,
-          { 
-            signal_type: signalType, 
+          {
+            signal_type: signalType,
             symbol: tokenSymbol,
             error: error.message,
             error_stack: error.stack,
@@ -1969,7 +2100,7 @@ export class TradeExecutor {
       } catch (notifError: any) {
         console.error(`[Executor] ❌ Failed to create error notification:`, notifError.message);
       }
-      
+
       // Re-throw para que o caller saiba que falhou
       throw error;
     }

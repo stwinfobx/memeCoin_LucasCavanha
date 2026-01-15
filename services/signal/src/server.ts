@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import axios from 'axios';
 import { SignalAnalyzer } from './analyzer';
 import { AutoAnalyzer } from './auto-analyzer';
+import { PriceCollector } from './workers/price-collector';
 import { SignalAnalysisRequest, Signal, Token } from '@shared/types';
 
 
@@ -20,24 +21,24 @@ const connectionString = process.env.DATABASE_URL;
 
 const pool = connectionString
   ? new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      // Configurações de retry e timeout
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
-    })
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    // Configurações de retry e timeout
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+  })
   : new Pool({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5433'),
-      database: process.env.POSTGRES_DB || 'tradingbot',
-      user: process.env.POSTGRES_USER || 'botuser',
-      password: process.env.POSTGRES_PASSWORD || 'botpass',
-      ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
-    });
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5433'),
+    database: process.env.POSTGRES_DB || 'tradingbot',
+    user: process.env.POSTGRES_USER || 'botuser',
+    password: process.env.POSTGRES_PASSWORD || 'botpass',
+    ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+  });
 
 // Tratar erros de conexão do pool
 pool.on('error', (err) => {
@@ -85,7 +86,7 @@ app.post('/analyze', async (req: Request, res: Response) => {
     }
 
     const signal = await analyzer.analyzeToken(token_id);
-    
+
     // Buscar token para resposta completa
     const tokenResult = await pool.query('SELECT * FROM tokens WHERE id = $1', [token_id]);
     const token = tokenResult.rows[0];
@@ -160,28 +161,35 @@ app.get('/signals/history', async (req: Request, res: Response) => {
   }
 });
 
+// Inicializar Price Collector
+const priceCollector = new PriceCollector(pool);
+
 app.listen(PORT, () => {
   console.log(`🧠 Signal Service running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 
+  // Iniciar Price Collector (1 minuto de intervalo)
+  const PRICE_COLLECTION_INTERVAL = parseInt(process.env.PRICE_COLLECTION_MINUTES || '1');
+  priceCollector.start(PRICE_COLLECTION_INTERVAL);
+  console.log(`📈 Price Collector started (${PRICE_COLLECTION_INTERVAL}min interval)`);
+
   // Iniciar análise automática periódica
-  // Para testes: 2 minutos. Para produção: 5 minutos
   const autoAnalyzeInterval = Number(process.env.AUTO_ANALYZE_INTERVAL_MINUTES ?? 2);
   autoAnalyzer.start(autoAnalyzeInterval);
   console.log(`🤖 Auto-analyzer started (interval: ${autoAnalyzeInterval} minutes)`);
-  
+
   // Criar notificação inicial após 10 segundos (dar tempo para banco estar pronto)
   setTimeout(async () => {
     try {
       // Testar conexão primeiro antes de criar notificação
       await pool.query('SELECT NOW()');
-      
+
       const defaultUserId = 'f58986be-9f49-4a63-9c44-937bfed78362';
       const tokenCountResult = await pool.query(
         `SELECT COUNT(*) as count FROM tokens WHERE is_validated = true`
       );
       const tokenCount = Number(tokenCountResult.rows[0]?.count ?? 0);
-      
+
       await pool.query(
         `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)
          VALUES ($1, 'bot_started', 'success', 'Bot de análise iniciado', $2, $3::jsonb)
@@ -213,7 +221,7 @@ async function dispatchSignal(signal: Signal, token: Token) {
     }
 
     console.log(`[Signal] Dispatching ${signal.signal_type} signal for ${token.symbol} to Executor...`);
-    
+
     await axios.post(
       `${EXECUTOR_BASE_URL}/signals/process`,
       {
