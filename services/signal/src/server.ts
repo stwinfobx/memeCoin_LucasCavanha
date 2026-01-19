@@ -164,7 +164,7 @@ app.get('/signals/history', async (req: Request, res: Response) => {
 // Inicializar Price Collector
 const priceCollector = new PriceCollector(pool);
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🧠 Signal Service running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 

@@ -15,17 +15,17 @@ const connectionString = process.env.DATABASE_URL;
 
 const pool = connectionString
   ? new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-    })
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  })
   : new Pool({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5433'),
-      database: process.env.POSTGRES_DB || 'tradingbot',
-      user: process.env.POSTGRES_USER || 'botuser',
-      password: process.env.POSTGRES_PASSWORD || 'botpass',
-      ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-    });
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5433'),
+    database: process.env.POSTGRES_DB || 'tradingbot',
+    user: process.env.POSTGRES_USER || 'botuser',
+    password: process.env.POSTGRES_PASSWORD || 'botpass',
+    ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  });
 
 const executor = new TradeExecutor(pool);
 
@@ -44,7 +44,7 @@ app.post('/signals/process', async (req: Request, res: Response) => {
     const signalId = signal.id || 'unknown';
     const signalType = signal.signal_type || 'unknown';
     const tokenId = signal.token_id || 'unknown';
-    
+
     console.log(`[Executor Server] 📥 Received signal processing request:`, {
       signal_id: signalId,
       signal_type: signalType,
@@ -53,7 +53,7 @@ app.post('/signals/process', async (req: Request, res: Response) => {
       confidence_score: signal.confidence_score,
       potential_multiplier: signal.potential_multiplier
     });
-    
+
     // Validação detalhada
     if (!signal) {
       console.error('[Executor Server] ❌ Invalid request: signal is null/undefined');
@@ -63,7 +63,7 @@ app.post('/signals/process', async (req: Request, res: Response) => {
         timestamp: new Date(),
       });
     }
-    
+
     if (!signal.token_id) {
       console.error('[Executor Server] ❌ Invalid signal: token_id is missing');
       return res.status(400).json({
@@ -72,7 +72,7 @@ app.post('/signals/process', async (req: Request, res: Response) => {
         timestamp: new Date(),
       });
     }
-    
+
     if (!signal.signal_type) {
       console.error('[Executor Server] ❌ Invalid signal: signal_type is missing');
       return res.status(400).json({
@@ -81,7 +81,7 @@ app.post('/signals/process', async (req: Request, res: Response) => {
         timestamp: new Date(),
       });
     }
-    
+
     if (!['BUY', 'SELL', 'HOLD'].includes(signal.signal_type)) {
       console.error(`[Executor Server] ❌ Invalid signal: unknown signal_type: ${signal.signal_type}`);
       return res.status(400).json({
@@ -93,7 +93,7 @@ app.post('/signals/process', async (req: Request, res: Response) => {
 
     console.log(`[Executor Server] ✅ Signal validation passed, processing...`);
     await executor.processSignal(signal);
-    
+
     console.log(`[Executor Server] ✅ Signal processed successfully`);
     res.json({
       success: true,
@@ -106,11 +106,11 @@ app.post('/signals/process', async (req: Request, res: Response) => {
       stack: error.stack,
       signal: req.body
     });
-    
+
     res.status(500).json({
       success: false,
-      error: { 
-        code: 'PROCESS_SIGNAL_ERROR', 
+      error: {
+        code: 'PROCESS_SIGNAL_ERROR',
         message: error.message || 'Failed to process signal',
         details: error.stack
       },
@@ -234,7 +234,7 @@ app.post('/monitor', async (req: Request, res: Response) => {
 app.get('/monitor/status', async (req: Request, res: Response) => {
   try {
     const monitorIntervalSeconds = Number(process.env.MONITOR_INTERVAL_SECONDS ?? 30);
-    
+
     // Verificar quantas posições abertas existem
     const positionsResult = await pool.query(
       `SELECT COUNT(*) as count, 
@@ -242,10 +242,10 @@ app.get('/monitor/status', async (req: Request, res: Response) => {
        FROM positions 
        WHERE status = 'open'`
     );
-    
+
     const openPositions = Number(positionsResult.rows[0]?.count ?? 0);
     const oldestMinutes = Number(positionsResult.rows[0]?.oldest_minutes ?? 0);
-    
+
     res.json({
       success: true,
       monitoring: {
@@ -267,7 +267,7 @@ app.get('/monitor/status', async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`⚙️ Executor Service running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 
@@ -276,7 +276,7 @@ app.listen(PORT, () => {
   const monitorIntervalSeconds = Number(process.env.MONITOR_INTERVAL_SECONDS ?? 30);
   const monitorInterval = monitorIntervalSeconds * 1000;
   console.log(`🔍 Position monitoring started (interval: ${monitorIntervalSeconds} seconds)`);
-  
+
   // Executar imediatamente na primeira vez
   setTimeout(async () => {
     try {

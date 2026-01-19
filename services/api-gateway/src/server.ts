@@ -224,7 +224,8 @@ try {
   console.error('[API Gateway] Stack:', error.stack);
 }
 
-server.listen(PORT, async () => {
+server.listen(PORT, '0.0.0.0', async () => {
+
   console.log(`🚀 API Gateway running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);

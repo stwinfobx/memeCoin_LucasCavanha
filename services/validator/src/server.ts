@@ -31,19 +31,19 @@ const connectionString = process.env.DATABASE_URL;
 
 const pool = connectionString
   ? new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      // Configurações de retry e timeout
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
-    })
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    // Configurações de retry e timeout
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+  })
   : new Pool({
-      ...poolConfig,
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
-    });
+    ...poolConfig,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+  });
 
 // Tratar erros de conexão do pool sem travar o serviço
 pool.on('error', (err) => {
@@ -251,7 +251,7 @@ app.get('/risk/:contractAddress', async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔍 Validator Service running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
@@ -262,7 +262,7 @@ const connectAndStartIngestion = async (retries = 5, delay = 10000) => {
     try {
       await pool.query('SELECT NOW()');
       console.log('✅ Validator connected to database');
-      
+
       if (process.env.ENABLE_INGESTION !== 'false') {
         const ingestion = new MemecoinIngestion({
           validator,
@@ -277,21 +277,21 @@ const connectAndStartIngestion = async (retries = 5, delay = 10000) => {
       return; // Sucesso - sair do loop
     } catch (err: any) {
       const isLastAttempt = i === retries - 1;
-      
+
       if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED') {
         if (isLastAttempt) {
           console.warn('⚠️ Validator Service: Database not available yet');
           console.warn('⚠️ Service will continue to run but ingestion will not start');
           console.warn('⚠️ Make sure PostgreSQL/Supabase is running and DATABASE_URL is correct');
           console.warn('⚠️ Retrying connection every 30 seconds in background...');
-          
+
           // Tentar reconectar em background a cada 30 segundos
           const retryInterval = setInterval(async () => {
             try {
               await pool.query('SELECT NOW()');
               console.log('✅ Validator connected to database (retry successful)');
               clearInterval(retryInterval);
-              
+
               if (process.env.ENABLE_INGESTION !== 'false') {
                 const ingestion = new MemecoinIngestion({
                   validator,

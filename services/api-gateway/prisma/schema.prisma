@@ -1,132 +1,164 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  directUrl         = env("DATABASE_DIRECT_URL")
-  shadowDatabaseUrl = env("DATABASE_SHADOW_URL")
-  extensions        = [uuid_ossp(), pgcrypto()]
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, uuid_ossp(map: "uuid-ossp", schema: "extensions")]
 }
 
 model User {
-  id           String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  email        String        @unique @db.VarChar(255)
-  passwordHash String        @map("password_hash") @db.VarChar(255)
-  mfaEnabled   Boolean       @map("mfa_enabled") @default(false)
-  mfaSecret    String?       @map("mfa_secret") @db.VarChar(255)
-  isActive     Boolean       @map("is_active") @default(true)
-  createdAt    DateTime?     @map("created_at") @default(now()) @db.Timestamp(6)
-  updatedAt    DateTime?     @map("updated_at") @default(now()) @db.Timestamp(6)
+  id                                         String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email                                      String              @unique @db.VarChar(255)
+  passwordHash                               String              @map("password_hash") @db.VarChar(255)
+  mfaEnabled                                 Boolean?            @default(false) @map("mfa_enabled")
+  mfaSecret                                  String?             @map("mfa_secret") @db.VarChar(255)
+  isActive                                   Boolean?            @default(true) @map("is_active")
+  createdAt                                  DateTime?           @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt                                  DateTime?           @default(now()) @map("updated_at") @db.Timestamp(6)
+  email_verification_token                   String?             @db.VarChar(255)
+  email_verification_expires                 DateTime?           @db.Timestamp(6)
+  password_reset_token                       String?             @db.VarChar(255)
+  password_reset_expires                     DateTime?           @db.Timestamp(6)
+  audits                                     AuditLog[]
+  bot_notifications                          bot_notifications[]
+  deposits                                   deposits[]
+  ledger                                     LedgerEntry[]
+  orders                                     Order[]
+  positions                                  positions[]
+  profile                                    UserProfile?
+  user_wallets                               user_wallets[]
+  withdrawals_withdrawals_approved_byTousers withdrawals[]       @relation("withdrawals_approved_byTousers")
+  withdrawals_withdrawals_user_idTousers     withdrawals[]       @relation("withdrawals_user_idTousers")
 
-  profile      UserProfile?
-  orders       Order[]
-  ledger       LedgerEntry[]
-  audits       AuditLog[]
-
+  @@index([isActive], map: "idx_users_active")
+  @@index([email], map: "idx_users_email")
+  @@index([email_verification_token], map: "idx_users_email_token")
+  @@index([password_reset_token], map: "idx_users_reset_token")
   @@map("users")
 }
 
 model UserProfile {
-  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  fullName        String?  @map("full_name") @db.VarChar(255)
-  phone           String?  @db.VarChar(50)
-  bankAccount     String?  @map("bank_account_number") @db.VarChar(100)
-  bankName        String?  @map("bank_name") @db.VarChar(100)
-  bankRouting     String?  @map("bank_routing_number") @db.VarChar(100)
-  walletAddress   String?  @map("wallet_address") @db.VarChar(255)
-  riskProfile     Risk     @map("risk_profile") @default(moderate)
-  botEnabled      Boolean  @map("bot_enabled") @default(false)
-  botIntensity    Int      @map("bot_intensity") @default(5)
-  kycStatus       Kyc      @map("kyc_status") @default(pending)
-  maxLossPercent  Decimal  @map("max_loss_percent") @default(10.0) @db.Decimal(5, 2)
-  maxGainPercent  Decimal  @map("max_gain_percent") @default(25.0) @db.Decimal(5, 2)
-  maxOpenTrades   Int      @map("max_open_trades") @default(3)
-  createdAt       DateTime? @map("created_at") @default(now()) @db.Timestamp(6)
-  updatedAt       DateTime? @map("updated_at") @default(now()) @db.Timestamp(6)
+  id                   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  fullName             String?   @map("full_name") @db.VarChar(255)
+  phone                String?   @db.VarChar(50)
+  bankAccount          String?   @map("bank_account_number") @db.VarChar(100)
+  bankName             String?   @map("bank_name") @db.VarChar(100)
+  bankRouting          String?   @map("bank_routing_number") @db.VarChar(100)
+  walletAddress        String?   @map("wallet_address") @db.VarChar(255)
+  riskProfile          String?   @default("moderate") @map("risk_profile") @db.VarChar(20)
+  botEnabled           Boolean?  @default(false) @map("bot_enabled")
+  botIntensity         Int?      @default(5) @map("bot_intensity")
+  kycStatus            String?   @default("pending") @map("kyc_status") @db.VarChar(20)
+  maxLossPercent       Decimal?  @default(10.00) @map("max_loss_percent") @db.Decimal(5, 2)
+  maxGainPercent       Decimal?  @default(25.00) @map("max_gain_percent") @db.Decimal(5, 2)
+  maxOpenTrades        Int?      @default(3) @map("max_open_trades")
+  createdAt            DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime? @default(now()) @map("updated_at") @db.Timestamp(6)
+  trading_strategy     String?   @default("scoring_based") @db.VarChar(30)
+  real_trading_enabled Boolean?  @default(false)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([riskProfile], map: "idx_user_profiles_risk")
+  @@index([userId], map: "idx_user_profiles_user_id")
   @@map("user_profiles")
 }
 
 model Token {
-  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  contract       String    @map("contract_address") @db.VarChar(255)
-  chain          String    @db.VarChar(50)
-  symbol         String    @db.VarChar(50)
-  name           String    @db.VarChar(255)
-  decimals       Int       @default(18)
-  totalSupply    Decimal?  @map("total_supply") @db.Decimal(78, 0)
-  liquidityUsd   Decimal?  @map("liquidity_usd") @db.Decimal(20, 2)
-  liquidityLocked Boolean  @map("liquidity_locked") @default(false)
-  holdersCount   Int       @map("holders_count") @default(0)
-  volume24hUsd   Decimal?  @map("volume_24h_usd") @db.Decimal(20, 2)
-  priceUsd       Decimal?  @map("price_usd") @db.Decimal(20, 10)
-  safetyScore    Int?      @map("safety_score")
-  isHoneypot     Boolean   @map("is_honeypot") @default(false)
-  isValidated    Boolean   @map("is_validated") @default(false)
-  validatedAt    DateTime? @map("validated_at") @db.Timestamp(6)
-  firstSeenAt    DateTime? @map("first_seen_at") @default(now()) @db.Timestamp(6)
-  createdAt      DateTime? @map("created_at") @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime? @map("updated_at") @default(now()) @db.Timestamp(6)
+  id                     String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  contract               String                  @unique @map("contract_address") @db.VarChar(255)
+  chain                  String                  @default("BSC") @db.VarChar(50)
+  symbol                 String                  @db.VarChar(50)
+  name                   String                  @db.VarChar(255)
+  decimals               Int?                    @default(18)
+  totalSupply            Decimal?                @map("total_supply") @db.Decimal(78, 0)
+  liquidityUsd           Decimal?                @map("liquidity_usd") @db.Decimal(20, 2)
+  liquidityLocked        Boolean?                @default(false) @map("liquidity_locked")
+  holdersCount           Int?                    @default(0) @map("holders_count")
+  volume24hUsd           Decimal?                @default(0) @map("volume_24h_usd") @db.Decimal(20, 2)
+  priceUsd               Decimal?                @map("price_usd") @db.Decimal(20, 10)
+  safetyScore            Int?                    @map("safety_score")
+  isHoneypot             Boolean?                @default(false) @map("is_honeypot")
+  isValidated            Boolean?                @default(false) @map("is_validated")
+  validatedAt            DateTime?               @map("validated_at") @db.Timestamp(6)
+  firstSeenAt            DateTime?               @default(now()) @map("first_seen_at") @db.Timestamp(6)
+  createdAt              DateTime?               @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt              DateTime?               @default(now()) @map("updated_at") @db.Timestamp(6)
+  orders                 Order[]
+  positions              positions[]
+  price_candles          price_candles[]
+  signals                Signal[]
+  token_risk_assessments token_risk_assessments?
 
-  signals        Signal[]
-  orders         Order[]
-
+  @@index([contract], map: "idx_tokens_address")
+  @@index([chain], map: "idx_tokens_chain")
+  @@index([safetyScore(sort: Desc)], map: "idx_tokens_safety_score")
+  @@index([isValidated], map: "idx_tokens_validated")
   @@map("tokens")
 }
 
 model Signal {
-  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  tokenId            String    @map("token_id") @db.Uuid
-  type               SignalType @map("signal_type")
-  confidenceScore    Decimal?  @map("confidence_score") @db.Decimal(5, 2)
-  potentialMultiplier Decimal? @map("potential_multiplier") @db.Decimal(4, 2)
-  volumeScore        Decimal?  @map("volume_score") @db.Decimal(5, 2)
-  liquidityScore     Decimal?  @map("liquidity_score") @db.Decimal(5, 2)
-  holdersScore       Decimal?  @map("holders_score") @db.Decimal(5, 2)
-  ageScore           Decimal?  @map("age_score") @db.Decimal(5, 2)
-  safetyScore        Decimal?  @map("safety_score") @db.Decimal(5, 2)
-  overallScore       Decimal?  @map("overall_score") @db.Decimal(5, 2)
-  priceAtSignal      Decimal?  @map("price_at_signal") @db.Decimal(20, 10)
-  reasoning          String?   @db.Text
-  isActive           Boolean   @map("is_active") @default(true)
-  expiresAt          DateTime? @map("expires_at") @db.Timestamp(6)
-  createdAt          DateTime? @map("created_at") @default(now()) @db.Timestamp(6)
+  id                  String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tokenId             String      @map("token_id") @db.Uuid
+  type                String      @map("signal_type") @db.VarChar(10)
+  confidenceScore     Decimal?    @map("confidence_score") @db.Decimal(5, 2)
+  potentialMultiplier Decimal?    @map("potential_multiplier") @db.Decimal(4, 2)
+  volumeScore         Decimal?    @map("volume_score") @db.Decimal(5, 2)
+  liquidityScore      Decimal?    @map("liquidity_score") @db.Decimal(5, 2)
+  holdersScore        Decimal?    @map("holders_score") @db.Decimal(5, 2)
+  ageScore            Decimal?    @map("age_score") @db.Decimal(5, 2)
+  safetyScore         Decimal?    @map("safety_score") @db.Decimal(5, 2)
+  overallScore        Decimal?    @map("overall_score") @db.Decimal(5, 2)
+  priceAtSignal       Decimal?    @map("price_at_signal") @db.Decimal(20, 10)
+  reasoning           String?
+  isActive            Boolean?    @default(true) @map("is_active")
+  expiresAt           DateTime?   @map("expires_at") @db.Timestamp(6)
+  createdAt           DateTime?   @default(now()) @map("created_at") @db.Timestamp(6)
+  orders              Order[]
+  positions           positions[]
+  token               Token       @relation(fields: [tokenId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  token              Token     @relation(fields: [tokenId], references: [id], onDelete: Cascade)
-  orders             Order[]
-
+  @@index([createdAt(sort: Desc)], map: "idx_signals_created")
+  @@index([tokenId], map: "idx_signals_token_id")
+  @@index([type], map: "idx_signals_type")
   @@map("signals")
 }
 
 model Order {
-  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  tokenId       String    @map("token_id") @db.Uuid
-  signalId      String?   @map("signal_id") @db.Uuid
-  type          OrderType @map("order_type")
-  status        OrderStatus @default(pending)
-  amountUsd     Decimal    @map("amount_usd") @db.Decimal(20, 2)
-  amountToken   Decimal?   @map("amount_token") @db.Decimal(40, 18)
-  priceUsd      Decimal?   @map("price_usd") @db.Decimal(20, 10)
-  transactionHash String?  @map("transaction_hash") @db.VarChar(255)
-  gasUsed       Decimal?   @map("gas_used") @db.Decimal(20, 0)
-  gasPrice      Decimal?   @map("gas_price") @db.Decimal(20, 0)
-  blockNumber   Decimal?   @map("block_number") @db.Decimal(20, 0)
-  executedAt    DateTime?  @map("executed_at") @db.Timestamp(6)
-  createdAt     DateTime?  @map("created_at") @default(now()) @db.Timestamp(6)
-  updatedAt     DateTime?  @map("updated_at") @default(now()) @db.Timestamp(6)
+  id                  String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId              String        @map("user_id") @db.Uuid
+  tokenId             String        @map("token_id") @db.Uuid
+  signalId            String?       @map("signal_id") @db.Uuid
+  type                String        @map("order_type") @db.VarChar(10)
+  status              String?       @default("pending") @db.VarChar(20)
+  amountUsd           Decimal       @map("amount_usd") @db.Decimal(20, 2)
+  amountToken         Decimal?      @map("amount_token") @db.Decimal(40, 18)
+  priceUsd            Decimal?      @map("price_usd") @db.Decimal(20, 10)
+  transactionHash     String?       @map("transaction_hash") @db.VarChar(255)
+  gasUsed             Decimal?      @map("gas_used") @db.Decimal(20, 0)
+  gasPrice            Decimal?      @map("gas_price") @db.Decimal(20, 0)
+  blockNumber         Decimal?      @map("block_number") @db.Decimal(20, 0)
+  executedAt          DateTime?     @map("executed_at") @db.Timestamp(6)
+  createdAt           DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime?     @default(now()) @map("updated_at") @db.Timestamp(6)
+  invested_amount_usd Decimal?      @db.Decimal(20, 2)
+  profit_loss_usd     Decimal?      @db.Decimal(20, 2)
+  profit_loss_percent Decimal?      @db.Decimal(8, 4)
+  hold_time_hours     Decimal?      @db.Decimal(10, 2)
+  ledgerEntries       LedgerEntry[]
+  signal              Signal?       @relation(fields: [signalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  token               Token         @relation(fields: [tokenId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  positions           positions[]
 
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token         Token      @relation(fields: [tokenId], references: [id], onDelete: Cascade)
-  signal        Signal?    @relation(fields: [signalId], references: [id], onDelete: SetNull)
-  ledgerEntries LedgerEntry[]
-
+  @@index([createdAt(sort: Desc)], map: "idx_orders_created")
+  @@index([status], map: "idx_orders_status")
+  @@index([tokenId], map: "idx_orders_token_id")
+  @@index([type], map: "idx_orders_type")
+  @@index([userId], map: "idx_orders_user_id")
   @@map("orders")
 }
 
@@ -134,89 +166,187 @@ model LedgerEntry {
   id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   userId        String    @map("user_id") @db.Uuid
   orderId       String?   @map("order_id") @db.Uuid
-  entryType     LedgerType @map("entry_type")
-  amountUsd     Decimal    @map("amount_usd") @db.Decimal(20, 2)
-  balanceBefore Decimal?   @map("balance_before") @db.Decimal(20, 2)
-  balanceAfter  Decimal?   @map("balance_after") @db.Decimal(20, 2)
-  description   String?    @db.Text
-  createdAt     DateTime?  @map("created_at") @default(now()) @db.Timestamp(6)
+  entryType     String    @map("entry_type") @db.VarChar(20)
+  amountUsd     Decimal   @map("amount_usd") @db.Decimal(20, 2)
+  balanceBefore Decimal?  @map("balance_before") @db.Decimal(20, 2)
+  balanceAfter  Decimal?  @map("balance_after") @db.Decimal(20, 2)
+  description   String?
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  order         Order?    @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  order         Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
-
+  @@index([createdAt(sort: Desc)], map: "idx_ledger_created")
+  @@index([orderId], map: "idx_ledger_order_id")
+  @@index([entryType], map: "idx_ledger_type")
+  @@index([userId], map: "idx_ledger_user_id")
   @@map("ledger_entries")
 }
 
 model AuditLog {
-  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  userId      String?   @map("user_id") @db.Uuid
-  action      String    @db.VarChar(100)
-  resourceType String?  @map("resource_type") @db.VarChar(50)
-  resourceId  String?   @map("resource_id") @db.Uuid
-  ipAddress   String?   @map("ip_address") @db.VarChar(45)
-  userAgent   String?   @map("user_agent")
-  requestData Json?     @map("request_data")
-  responseData Json?    @map("response_data")
-  statusCode  Int?      @map("status_code")
-  errorMessage String?  @map("error_message")
-  createdAt   DateTime? @map("created_at") @default(now()) @db.Timestamp(6)
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String?   @map("user_id") @db.Uuid
+  action       String    @db.VarChar(100)
+  resourceType String?   @map("resource_type") @db.VarChar(50)
+  resourceId   String?   @map("resource_id") @db.Uuid
+  ipAddress    String?   @map("ip_address") @db.VarChar(45)
+  userAgent    String?   @map("user_agent")
+  requestData  Json?     @map("request_data")
+  responseData Json?     @map("response_data")
+  statusCode   Int?      @map("status_code")
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  user         User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
-  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-
+  @@index([action], map: "idx_audit_action")
+  @@index([createdAt(sort: Desc)], map: "idx_audit_created")
+  @@index([resourceType, resourceId], map: "idx_audit_resource")
+  @@index([userId], map: "idx_audit_user_id")
   @@map("audit_logs")
 }
 
-enum Risk {
-  conservative
-  moderate
-  aggressive
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model bot_notifications {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id           String?   @db.Uuid
+  notification_type String    @db.VarChar(50)
+  severity          String?   @default("info") @db.VarChar(20)
+  title             String
+  message           String
+  data              Json?
+  is_read           Boolean?  @default(false)
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  users             User?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_bot_notifications_created")
+  @@index([notification_type], map: "idx_bot_notifications_type")
+  @@index([user_id], map: "idx_bot_notifications_user_id")
 }
 
-enum Kyc {
-  pending
-  approved
-  rejected
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model deposits {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id        String    @db.Uuid
+  wallet_address String    @db.VarChar(255)
+  chain          String    @db.VarChar(50)
+  tx_hash        String    @unique @db.VarChar(255)
+  amount_crypto  Decimal   @db.Decimal(40, 18)
+  amount_usd     Decimal   @db.Decimal(20, 2)
+  token_symbol   String    @db.VarChar(10)
+  status         String?   @default("pending") @db.VarChar(20)
+  confirmations  Int?      @default(0)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  confirmed_at   DateTime? @db.Timestamp(6)
+  users          User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_deposits_status")
+  @@index([tx_hash], map: "idx_deposits_tx_hash")
+  @@index([user_id], map: "idx_deposits_user")
 }
 
-enum SignalType {
-  BUY
-  SELL
-  HOLD
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model positions {
+  id                  String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id             String    @db.Uuid
+  token_id            String    @db.Uuid
+  order_id            String?   @db.Uuid
+  signal_id           String?   @db.Uuid
+  invested_amount_usd Decimal   @db.Decimal(20, 2)
+  buy_price_usd       Decimal   @db.Decimal(20, 10)
+  buy_time            DateTime  @db.Timestamp(6)
+  current_price_usd   Decimal?  @db.Decimal(20, 10)
+  token_balance       Decimal   @db.Decimal(40, 18)
+  hold_time_hours     Decimal?  @default(0) @db.Decimal(10, 2)
+  status              String?   @default("open") @db.VarChar(20)
+  closed_at           DateTime? @db.Timestamp(6)
+  profit_loss_usd     Decimal?  @db.Decimal(20, 2)
+  profit_loss_percent Decimal?  @db.Decimal(8, 4)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  orders              Order?    @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  signals             Signal?   @relation(fields: [signal_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tokens              Token     @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users               User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_positions_created")
+  @@index([status], map: "idx_positions_status")
+  @@index([token_id], map: "idx_positions_token_id")
+  @@index([user_id], map: "idx_positions_user_id")
 }
 
-enum OrderType {
-  BUY
-  SELL
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model price_candles {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  token_id    String    @db.Uuid
+  interval    String    @db.VarChar(5)
+  timestamp   DateTime  @db.Timestamp(6)
+  open_price  Decimal   @db.Decimal(20, 10)
+  high_price  Decimal   @db.Decimal(20, 10)
+  low_price   Decimal   @db.Decimal(20, 10)
+  close_price Decimal   @db.Decimal(20, 10)
+  volume_usd  Decimal   @db.Decimal(20, 2)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  tokens      Token     @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([token_id, interval, timestamp])
+  @@index([timestamp(sort: Desc)], map: "idx_candles_timestamp")
+  @@index([token_id, interval], map: "idx_candles_token_interval")
+  @@index([token_id, interval, timestamp(sort: Desc)], map: "idx_candles_token_interval_time")
 }
 
-enum OrderStatus {
-  pending
-  executing
-  completed
-  failed
-  cancelled
+model token_risk_assessments {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  token_id         String    @unique(map: "idx_token_risk_assessments_token_id") @db.Uuid
+  contract_address String    @db.VarChar(255)
+  chain            String    @db.VarChar(50)
+  memecoin_score   Decimal   @db.Decimal(5, 2)
+  risk_score       Decimal   @db.Decimal(5, 2)
+  scam_probability Decimal   @db.Decimal(5, 2)
+  risk_level       String    @db.VarChar(32)
+  indicators       Json
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  tokens           Token     @relation(fields: [token_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([contract_address, chain], map: "idx_token_risk_assessments_contract_chain")
 }
 
-enum LedgerType {
-  deposit
-  withdrawal
-  trade_profit
-  trade_loss
-  fee
-  gas
-}
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model user_wallets {
+  id                    String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id               String    @db.Uuid
+  encrypted_private_key String
+  wallet_address        String    @db.VarChar(255)
+  chain                 String    @default("BSC") @db.VarChar(50)
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  users                 User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  @@unique([user_id, chain])
+  @@index([wallet_address], map: "idx_wallets_address")
+  @@index([user_id], map: "idx_wallets_user")
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model withdrawals {
+  id                                   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id                              String    @db.Uuid
+  amount_usd                           Decimal   @db.Decimal(20, 2)
+  wallet_address                       String    @db.VarChar(255)
+  chain                                String    @default("BSC") @db.VarChar(50)
+  status                               String?   @default("pending") @db.VarChar(20)
+  tx_hash                              String?   @db.VarChar(255)
+  approved_by                          String?   @db.Uuid
+  approved_at                          DateTime? @db.Timestamp(6)
+  processed_at                         DateTime? @db.Timestamp(6)
+  rejection_reason                     String?
+  created_at                           DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                           DateTime? @default(now()) @db.Timestamp(6)
+  users_withdrawals_approved_byTousers User?     @relation("withdrawals_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_withdrawals_user_idTousers     User      @relation("withdrawals_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_withdrawals_created")
+  @@index([status], map: "idx_withdrawals_status")
+  @@index([user_id], map: "idx_withdrawals_user_id")
 }
