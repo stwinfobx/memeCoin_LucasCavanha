@@ -5,11 +5,13 @@ import fs from 'fs';
 const ROOT_ENV_FLAG = 'TRADINGBOT_ROOT_ENV_INITIALIZED';
 
 if (!process.env[ROOT_ENV_FLAG]) {
-  const rootEnvPath = path.resolve(__dirname, '../../..', '.env');
+  const rootEnvPath = path.resolve(__dirname, '../../../.env');
 
   if (fs.existsSync(rootEnvPath)) {
+    console.log('✅ [Validator] Found root .env at:', rootEnvPath);
     dotenv.config({ path: rootEnvPath });
   } else {
+    console.log('⚠️ [Validator] Root .env not found at:', rootEnvPath);
     dotenv.config();
   }
 

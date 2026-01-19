@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 
 // FORÇA carregamento do .env do root (mesmo que outro serviço já tenha carregado)
-const rootEnvPath = path.resolve(__dirname, '../../..', '.env');
+const rootEnvPath = path.resolve(__dirname, '../../../.env');
 
 console.log('[Executor ENV] Loading .env from:', rootEnvPath);
 console.log('[Executor ENV] File exists:', fs.existsSync(rootEnvPath));

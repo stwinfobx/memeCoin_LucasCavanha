@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const ENCRYPTION_KEY = '7d6435928734a6210b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a';
 
 
-const PRIVATE_KEY = 'e4d60f86224035725d45c8dc7949995e3db3c738b0b7b9d58d93a7dcf1bf4222';
+const PRIVATE_KEY = 'coloque a sua chave privada aqui da carteira';
 
 const algorithm = 'aes-256-gcm';
 const iv = crypto.randomBytes(16);
