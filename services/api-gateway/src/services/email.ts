@@ -43,12 +43,20 @@ export class EmailService {
 
     try {
       if (this.mode === 'resend' && resend) {
-        await resend.emails.send({
+        console.log(`[Email Service] Attempting to send email via Resend from ${this.from} to ${params.to}...`);
+        const result = await resend.emails.send({
           from: this.from,
           to: params.to,
           subject: params.subject,
           html: params.html,
         });
+
+        if (result.error) {
+          console.error(`[Email Service] ❌ Resend API Error:`, result.error);
+          return false;
+        }
+
+        console.log(`[Email Service] ✅ Resend Email Sent ID: ${result.data?.id}`);
       } else if (this.mode === 'sendgrid') {
         await sgMail.send({
           to: params.to,
@@ -61,7 +69,10 @@ export class EmailService {
       console.log(`[Email Service] ✅ Email sent via ${this.mode} to ${params.to}: ${params.subject}`);
       return true;
     } catch (error: any) {
-      console.error(`[Email Service] ❌ Failed to send email via ${this.mode}:`, error.message);
+      console.error(`[Email Service] ❌ Exception sending email via ${this.mode}:`, error.message);
+      if (error.response) {
+        console.error(`[Email Service] ❌ Error details:`, JSON.stringify(error.response.data || error.response.body || error.response, null, 2));
+      }
       return false;
     }
   }

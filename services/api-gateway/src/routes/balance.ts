@@ -165,6 +165,56 @@ export function initBalanceRoutes(pool: Pool): Router {
         }
     });
 
+    // GET /api/balance - Alias para /api/balance/real (usado pelo frontend)
+    router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+        try {
+            const userId = req.user?.userId;
+
+            const result = await pool.query(
+                `SELECT 
+           COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
+           COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+         FROM ledger_entries
+         WHERE user_id = $1
+           AND description NOT LIKE 'Initial paper trading%'`,
+                [userId]
+            );
+
+            const credits = Number(result.rows[0]?.credits ?? 0);
+            const debits = Number(result.rows[0]?.debits ?? 0);
+            const balance = Math.max(0, credits - debits);
+
+            const positionsResult = await pool.query(
+                `SELECT COALESCE(SUM(invested_amount_usd), 0) as total_invested
+         FROM positions
+         WHERE user_id = $1 AND status = 'open'`,
+                [userId]
+            );
+
+            const totalInvested = Number(positionsResult.rows[0]?.total_invested ?? 0);
+            const availableBalance = Math.max(0, balance - totalInvested);
+
+            res.json({
+                success: true,
+                data: {
+                    total_balance_usd: balance,
+                    available_balance_usd: availableBalance,
+                    invested_in_positions_usd: totalInvested,
+                    credits_usd: credits,
+                    debits_usd: debits,
+                },
+                timestamp: new Date(),
+            });
+        } catch (error: any) {
+            console.error('[Balance] Default route error:', error);
+            res.status(500).json({
+                success: false,
+                error: { code: 'INTERNAL_ERROR', message: error.message },
+                timestamp: new Date(),
+            });
+        }
+    });
+
     return router;
 }
 
