@@ -63,7 +63,7 @@ export class TradingStrategyManager {
 
         // Threshold de confiança
         const minConfidence = 50; // 50%
-        if (signal.confidence_score < minConfidence) {
+        if ((signal.confidence_score ?? 0) < minConfidence) {
             return {
                 shouldBuy: false,
                 reason: `Confiança muito baixa (${signal.confidence_score}% < ${minConfidence}%)`,
@@ -90,7 +90,7 @@ export class TradingStrategyManager {
 
         return {
             shouldBuy: true,
-            reason: `Sinal BUY aprovado - Confiança: ${signal.confidence_score}%, Risk: ${validation.riskScore}, Scam: ${validation.scamProbability}%`,
+            reason: `Sinal BUY aprovado - Confiança: ${signal.confidence_score ?? 0}%, Risk: ${validation.riskScore}, Scam: ${validation.scamProbability}%`,
         };
     }
 

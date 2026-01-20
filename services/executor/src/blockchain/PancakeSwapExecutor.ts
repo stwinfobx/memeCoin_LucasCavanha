@@ -74,7 +74,7 @@ export class PancakeSwapExecutor {
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
             // Executar swap
-            const tx = await routerWithSigner.swapExactETHForTokens(
+            const tx = await (routerWithSigner as any).swapExactETHForTokens(
                 amountOutMin,
                 path,
                 wallet.address,
@@ -137,7 +137,7 @@ export class PancakeSwapExecutor {
 
             if (allowance < amountIn) {
                 console.log('[PancakeSwap] 🔓 Approving token spend...');
-                const approveTx = await tokenWithSigner.approve(PANCAKESWAP_ROUTER_V2, ethers.MaxUint256);
+                const approveTx = await (tokenWithSigner as any).approve(PANCAKESWAP_ROUTER_V2, ethers.MaxUint256);
                 await approveTx.wait();
                 console.log('[PancakeSwap] ✅ Token approved');
             }
@@ -156,7 +156,7 @@ export class PancakeSwapExecutor {
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
             // Executar swap
-            const tx = await routerWithSigner.swapExactTokensForETH(
+            const tx = await (routerWithSigner as any).swapExactTokensForETH(
                 amountIn,
                 amountOutMin,
                 path,
@@ -254,7 +254,7 @@ export class PancakeSwapExecutor {
         const amountOutMin = (amounts[1] * BigInt(99)) / BigInt(100); // 1% slippage
         const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
-        const gasLimit = await routerWithSigner.swapExactETHForTokens.estimateGas(
+        const gasLimit = await (routerWithSigner as any).swapExactETHForTokens.estimateGas(
             amountOutMin,
             path,
             wallet.address,

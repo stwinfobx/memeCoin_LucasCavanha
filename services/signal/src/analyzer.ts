@@ -175,7 +175,7 @@ export class SignalAnalyzer {
         age_score: Number((ageScore * 100).toFixed(2)),
         safety_score: Number((safetyScore * 100).toFixed(2)),
         overall_score: Number((overallScore * 100).toFixed(2)),
-        price_at_signal: priceAtSignal ?? undefined,
+        price_at_signal: priceAtSignal === null ? undefined : priceAtSignal,
       } as const;
 
       const latestSignal = await this.getLatestSignal(tokenId);

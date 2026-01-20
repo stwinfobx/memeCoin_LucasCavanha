@@ -34,7 +34,7 @@ export interface SwapResult {
 }
 
 export class PancakeSwapExecutor {
-    private provider: ethers.providers.JsonRpcProvider;
+    private provider: ethers.JsonRpcProvider;
     private wallet: ethers.Wallet;
     private router: ethers.Contract;
     private config: PancakeSwapConfig;
@@ -48,7 +48,7 @@ export class PancakeSwapExecutor {
         };
 
         // Inicializar provider
-        this.provider = new ethers.providers.JsonRpcProvider(this.config.rpcUrl);
+        this.provider = new ethers.JsonRpcProvider(this.config.rpcUrl);
 
         // Descriptografar private key e criar wallet
         const decryptedKey = this.decryptPrivateKey(this.config.privateKey);
@@ -97,9 +97,8 @@ export class PancakeSwapExecutor {
      */
     private calculateMinAmountOut(expectedAmount: string, slippageTolerance: number): string {
         const slippageMultiplier = (100 - slippageTolerance) / 100;
-        const minAmount = ethers.BigNumber.from(expectedAmount)
-            .mul(Math.floor(slippageMultiplier * 1000))
-            .div(1000);
+        const expected = BigInt(expectedAmount);
+        const minAmount = (expected * BigInt(Math.floor(slippageMultiplier * 1000))) / BigInt(1000);
         return minAmount.toString();
     }
 
@@ -120,10 +119,10 @@ export class PancakeSwapExecutor {
             const path = [this.config.wbnbAddress, tokenAddress];
 
             // Converter BNB para Wei
-            const amountInWei = ethers.utils.parseEther(amountBNB);
+            const amountInWei = ethers.parseEther(amountBNB);
 
             // Obter quantidade esperada de tokens
-            const amounts = await this.router.getAmountsOut(amountInWei, path);
+            const amounts = await (this.router as any).getAmountsOut(amountInWei, path);
             const expectedTokenAmount = amounts[1];
 
             // Calcular amountOutMin com slippage
@@ -133,16 +132,16 @@ export class PancakeSwapExecutor {
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
             // Gas price
-            const gasPrice = ethers.utils.parseUnits(
+            const gasPrice = ethers.parseUnits(
                 this.config.gasPriceGwei!.toString(),
                 'gwei'
             );
 
-            console.log(`[PancakeSwap] Expected tokens: ${ethers.utils.formatUnits(expectedTokenAmount, 18)}`);
-            console.log(`[PancakeSwap] Min tokens (${slippage}% slippage): ${ethers.utils.formatUnits(amountOutMin, 18)}`);
+            console.log(`[PancakeSwap] Expected tokens: ${ethers.formatUnits(expectedTokenAmount, 18)}`);
+            console.log(`[PancakeSwap] Min tokens (${slippage}% slippage): ${ethers.formatUnits(amountOutMin, 18)}`);
 
             // Executar swap
-            const tx = await this.router.swapExactETHForTokens(
+            const tx = await (this.router as any).swapExactETHForTokens(
                 amountOutMin,
                 path,
                 this.wallet.address,
@@ -165,7 +164,7 @@ export class PancakeSwapExecutor {
 
             return {
                 success: true,
-                txHash: receipt.transactionHash,
+                txHash: receipt.hash,
                 amountOut: expectedTokenAmount.toString(),
                 gasUsed: receipt.gasUsed.toString(),
             };
@@ -195,13 +194,13 @@ export class PancakeSwapExecutor {
             const path = [tokenAddress, this.config.wbnbAddress];
 
             // Converter amount para Wei (assumindo 18 decimals)
-            const amountInWei = ethers.utils.parseUnits(amountTokens, 18);
+            const amountInWei = ethers.parseUnits(amountTokens, 18);
 
             // Verificar e aprovar tokens se necessário
             await this.approveTokenIfNeeded(tokenAddress, amountInWei.toString());
 
             // Obter quantidade esperada de BNB
-            const amounts = await this.router.getAmountsOut(amountInWei, path);
+            const amounts = await (this.router as any).getAmountsOut(amountInWei, path);
             const expectedBNBAmount = amounts[1];
 
             // Calcular amountOutMin com slippage
@@ -211,16 +210,16 @@ export class PancakeSwapExecutor {
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
             // Gas price
-            const gasPrice = ethers.utils.parseUnits(
+            const gasPrice = ethers.parseUnits(
                 this.config.gasPriceGwei!.toString(),
                 'gwei'
             );
 
-            console.log(`[PancakeSwap] Expected BNB: ${ethers.utils.formatEther(expectedBNBAmount)}`);
-            console.log(`[PancakeSwap] Min BNB (${slippage}% slippage): ${ethers.utils.formatEther(amountOutMin)}`);
+            console.log(`[PancakeSwap] Expected BNB: ${ethers.formatEther(expectedBNBAmount)}`);
+            console.log(`[PancakeSwap] Min BNB (${slippage}% slippage): ${ethers.formatEther(amountOutMin)}`);
 
             // Executar swap
-            const tx = await this.router.swapExactTokensForETH(
+            const tx = await (this.router as any).swapExactTokensForETH(
                 amountInWei,
                 amountOutMin,
                 path,
@@ -243,7 +242,7 @@ export class PancakeSwapExecutor {
 
             return {
                 success: true,
-                txHash: receipt.transactionHash,
+                txHash: receipt.hash,
                 amountOut: expectedBNBAmount.toString(),
                 gasUsed: receipt.gasUsed.toString(),
             };
@@ -268,17 +267,17 @@ export class PancakeSwapExecutor {
             this.config.routerAddress
         );
 
-        const amountBN = ethers.BigNumber.from(amount);
+        const amountBN = BigInt(amount);
 
-        if (currentAllowance.lt(amountBN)) {
+        if (currentAllowance < amountBN) {
             console.log(`[PancakeSwap] Approving tokens...`);
 
             // Aprovar máximo para evitar múltiplas aprovações
-            const maxUint256 = ethers.constants.MaxUint256;
+            const maxUint256 = ethers.MaxUint256;
 
-            const approveTx = await tokenContract.approve(this.config.routerAddress, maxUint256, {
+            const approveTx = await (tokenContract as any).approve(this.config.routerAddress, maxUint256, {
                 gasLimit: 100000,
-                gasPrice: ethers.utils.parseUnits(this.config.gasPriceGwei!.toString(), 'gwei'),
+                gasPrice: ethers.parseUnits(this.config.gasPriceGwei!.toString(), 'gwei'),
             });
 
             await approveTx.wait(1);
@@ -292,12 +291,12 @@ export class PancakeSwapExecutor {
     async estimateGasBuy(tokenAddress: string, amountBNB: string): Promise<string> {
         try {
             const path = [this.config.wbnbAddress, tokenAddress];
-            const amountInWei = ethers.utils.parseEther(amountBNB);
-            const amounts = await this.router.getAmountsOut(amountInWei, path);
+            const amountInWei = ethers.parseEther(amountBNB);
+            const amounts = await (this.router as any).getAmountsOut(amountInWei, path);
             const amountOutMin = this.calculateMinAmountOut(amounts[1].toString(), 1);
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
-            const gasEstimate = await this.router.estimateGas.swapExactETHForTokens(
+            const gasEstimate = await (this.router as any).estimateGas.swapExactETHForTokens(
                 amountOutMin,
                 path,
                 this.wallet.address,
@@ -323,7 +322,7 @@ export class PancakeSwapExecutor {
      * Retorna o saldo de BNB da wallet
      */
     async getBalance(): Promise<string> {
-        const balance = await this.wallet.getBalance();
-        return ethers.utils.formatEther(balance);
+        const balance = await this.provider.getBalance(this.wallet.address);
+        return ethers.formatEther(balance);
     }
 }

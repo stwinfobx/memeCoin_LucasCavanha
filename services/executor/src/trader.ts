@@ -1160,7 +1160,7 @@ export class TradeExecutor {
 
         try {
           console.log(`[Executor] 🔴 Processing SELL signal for ${sellSignal.symbol} (user: ${userId}, balance: ${tokenBalance})`);
-          const order = await this.executeSell({ token_id: tokenId, signal_id: sellSignal.id, amount_token: tokenBalance }, userId);
+          const order = await this.executeSell({ token_id: tokenId, signal_id: sellSignal.id, amount_token: tokenBalance, order_type: 'SELL' }, userId);
 
           // Buscar profit/loss da ordem
           const orderResult = await this.pool.query(
@@ -1311,7 +1311,7 @@ export class TradeExecutor {
           if (tokenBalance > 0) {
             try {
               console.error(`[Executor] 🚀🚀🚀 Executing FORCED SELL order for ${pos.symbol}: ${tokenBalance} tokens 🚀🚀🚀`);
-              const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance }, userId);
+              const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance, order_type: 'SELL' }, userId);
               console.error(`[Executor] ✅✅✅ VENDA FORÇADA EXECUTADA COM SUCESSO: Order ${order.id} para ${pos.symbol} ✅✅✅`);
 
               await this.createNotification(
@@ -1467,7 +1467,7 @@ export class TradeExecutor {
           try {
             console.error(`[Executor] 🚀🚀🚀 Executing SELL order for ${pos.symbol}: ${tokenBalance} tokens 🚀🚀🚀`);
             console.error(`[Executor] Request params:`, { token_id: tokenId, amount_token: tokenBalance, user_id: userId });
-            const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance }, userId);
+            const order = await this.executeSell({ token_id: tokenId, amount_token: tokenBalance, order_type: 'SELL' }, userId);
             console.error(`[Executor] ✅✅✅ VENDA EXECUTADA COM SUCESSO: Order ${order.id} para ${pos.symbol} ✅✅✅`);
 
             // Criar notificação baseada no motivo
@@ -1944,7 +1944,7 @@ export class TradeExecutor {
           }
 
           console.log(`[Executor] 💰 Available balance: $${availableBalance.toFixed(2)} | Processing BUY for ${tokenSymbol}...`);
-          const order = await this.executeBuy({ token_id: tokenId, signal_id: signal.id }, userId);
+          const order = await this.executeBuy({ token_id: tokenId, signal_id: signal.id, order_type: 'BUY' }, userId);
           console.log(`[Executor] ✅ BUY order executed: ${order.id} for ${tokenSymbol} | Amount: $${Number(order.amount_usd ?? 0).toFixed(2)}`);
 
           await this.createNotification(
@@ -1998,7 +1998,7 @@ export class TradeExecutor {
 
               if (balance > 0) {
                 console.log(`[Executor] 💰 Executing SELL for ${tokenSymbol}: selling ${balance} tokens`);
-                const order = await this.executeSell({ token_id: tokenId, signal_id: signal.id, amount_token: balance }, userId);
+                const order = await this.executeSell({ token_id: tokenId, signal_id: signal.id, amount_token: balance, order_type: 'SELL' }, userId);
                 console.log(`[Executor] ✅ SELL order executed: ${order.id} for ${tokenSymbol}`);
 
                 // Buscar profit/loss atualizado da ordem

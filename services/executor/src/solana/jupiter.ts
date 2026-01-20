@@ -22,6 +22,15 @@ export interface JupiterSwapConfig {
     slippageBps?: number; // Basis points (100 = 1%)
 }
 
+interface JupiterQuoteResponse {
+    outAmount: string;
+    error?: string;
+}
+
+interface JupiterSwapResponse {
+    swapTransaction: string;
+}
+
 export interface SwapResult {
     success: boolean;
     signature?: string;
@@ -109,7 +118,7 @@ export class JupiterExecutor {
                 throw new Error('Failed to get Jupiter quote');
             }
 
-            const quoteData = await quoteResponse.json();
+            const quoteData = await quoteResponse.json() as JupiterQuoteResponse;
 
             if (!quoteData || quoteData.error) {
                 throw new Error(`Jupiter quote error: ${quoteData.error || 'Unknown'}`);
@@ -132,7 +141,7 @@ export class JupiterExecutor {
                 throw new Error('Failed to get swap transaction');
             }
 
-            const swapData = await swapResponse.json();
+            const swapData = await swapResponse.json() as JupiterSwapResponse;
 
             // 3. Deserializar e assinar transação
             const swapTransactionBuf = Buffer.from(swapData.swapTransaction, 'base64');
@@ -189,7 +198,7 @@ export class JupiterExecutor {
                 throw new Error('Failed to get Jupiter quote');
             }
 
-            const quoteData = await quoteResponse.json();
+            const quoteData = await quoteResponse.json() as JupiterQuoteResponse;
 
             if (!quoteData || quoteData.error) {
                 throw new Error(`Jupiter quote error: ${quoteData.error || 'Unknown'}`);
@@ -213,7 +222,7 @@ export class JupiterExecutor {
                 throw new Error('Failed to get swap transaction');
             }
 
-            const swapData = await swapResponse.json();
+            const swapData = await swapResponse.json() as JupiterSwapResponse;
 
             // 3. Deserializar e assinar
             const swapTransactionBuf = Buffer.from(swapData.swapTransaction, 'base64');
