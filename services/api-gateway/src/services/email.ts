@@ -81,7 +81,7 @@ export class EmailService {
    * E-mail de verificação
    */
   async sendVerificationEmail(email: string, token: string): Promise<boolean> {
-    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${token}`;
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/verify-email/${token}`;
 
     const html = `
       <!DOCTYPE html>
