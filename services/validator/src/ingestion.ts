@@ -166,10 +166,10 @@ function buildListing(pool: GeckoPool, tokens: Map<string, GeckoToken>): TokenLi
     },
     quoteToken: quoteAddressCandidate
       ? {
-          address: String(quoteAddressCandidate).toLowerCase(),
-          name: quoteNameCandidate || 'Quote',
-          symbol: (quoteSymbolCandidate || '').toUpperCase(),
-        }
+        address: String(quoteAddressCandidate).toLowerCase(),
+        name: quoteNameCandidate || 'Quote',
+        symbol: (quoteSymbolCandidate || '').toUpperCase(),
+      }
       : undefined,
     dexId: pool.attributes.dex_identifier,
     liquidityUsd: liquidityValue,
@@ -190,7 +190,7 @@ export class MemecoinIngestion {
   private readonly pool: Pool;
   private readonly intervalMs: number;
   private readonly freshnessMinutes: number;
-  private timer?: NodeJS.Timer;
+  private timer?: NodeJS.Timeout;
   private running = false;
   private lastRun?: Date;
 
@@ -378,7 +378,7 @@ export class MemecoinIngestion {
          LIMIT 1`,
         [contract, chain.toUpperCase(), freshnessInterval]
       );
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       console.error('Failed to check token freshness:', error);
       return false;

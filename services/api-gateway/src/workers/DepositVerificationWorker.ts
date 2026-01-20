@@ -12,6 +12,7 @@ interface Deposit {
     amount_usd: string;
     confirmations: number;
     status: string;
+    created_at: string;
 }
 
 export class DepositVerificationWorker {
@@ -147,8 +148,14 @@ export class DepositVerificationWorker {
             // Buscar preço do BNB (você pode integrar com oracle depois)
             const bnbPriceUSD = 600; // TODO: Integrar com Chainlink ou CoinGecko
 
+            // Buscar a transação para obter o valor (receipt não tem .value em ethers v6)
+            const tx = await this.provider.getTransaction(deposit.tx_hash);
+            if (!tx) {
+                throw new Error('Transaction not found to retrieve value');
+            }
+
             // Calcular valores
-            const amountBNB = parseFloat(ethers.formatEther(receipt.value || '0'));
+            const amountBNB = parseFloat(ethers.formatEther(tx.value || '0'));
             const amountUSD = amountBNB * bnbPriceUSD;
 
             // Atualizar deposit

@@ -30,7 +30,7 @@ export class SignalAnalyzer {
   ): boolean {
     // Calcular relação volume/liquidez (alta = alta volatilidade)
     const volumeLiquidityRatio = liquidityUsd > 0 ? volume24h / liquidityUsd : 0;
-    
+
     // Critérios para meme coin:
     // 1. Volume alto em relação à liquidez (volatilidade alta)
     // 2. Muitos holders (comunidade grande)
@@ -40,7 +40,7 @@ export class SignalAnalyzer {
     const hasManyHolders = holdersCount > 500;
     const isNewToken = ageDays < 30;
     const hasHighVolume = volume24h > 50_000;
-    
+
     // É meme coin se atender pelo menos 3 dos 4 critérios
     const criteriaMet = [hasHighVolatility, hasManyHolders, isNewToken, hasHighVolume].filter(Boolean).length;
     return criteriaMet >= 3;
@@ -68,7 +68,7 @@ export class SignalAnalyzer {
 
       // Calcular idade do token em dias
       const firstSeen = (token as any).first_seen_at ?? (token as any).created_at ?? null;
-      const ageDays = firstSeen 
+      const ageDays = firstSeen
         ? (Date.now() - new Date(firstSeen).getTime()) / (1000 * 60 * 60 * 24)
         : 0;
 
@@ -123,7 +123,7 @@ export class SignalAnalyzer {
       // SELL threshold: 0.30 para meme coins (vs 0.25 normal) - mais conservador para evitar vendas prematuras
       const buyThreshold = isMemecoin ? 0.50 : 0.55;
       const sellThreshold = isMemecoin ? 0.30 : 0.25;
-      
+
       if (overallScore >= buyThreshold && !token.is_honeypot && liquidityUsd > 1_000) {
         signalType = 'BUY';
         // Para meme coins: multiplicadores mais agressivos (movimentos rápidos esperados)
@@ -175,7 +175,7 @@ export class SignalAnalyzer {
         age_score: Number((ageScore * 100).toFixed(2)),
         safety_score: Number((safetyScore * 100).toFixed(2)),
         overall_score: Number((overallScore * 100).toFixed(2)),
-        price_at_signal: priceAtSignal,
+        price_at_signal: priceAtSignal ?? undefined,
       } as const;
 
       const latestSignal = await this.getLatestSignal(tokenId);
@@ -184,7 +184,7 @@ export class SignalAnalyzer {
         const sameType = latestSignal.signal_type === signalType;
         const confidenceDiff = Math.abs(Number(latestSignal.confidence_score ?? 0) - metrics.confidence_score);
         const overallDiff = Math.abs(Number(latestSignal.overall_score ?? 0) - metrics.overall_score);
-        const previousPrice = Number(latestSignal.price_at_signal ?? latestSignal.price_usd ?? 0);
+        const previousPrice = Number(latestSignal.price_at_signal ?? 0);
         const currentPrice = priceAtSignal ?? previousPrice;
         const priceDiff = previousPrice > 0 ? Math.abs(previousPrice - currentPrice) / previousPrice : 0;
 

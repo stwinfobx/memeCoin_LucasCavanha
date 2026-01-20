@@ -25,7 +25,7 @@ export interface JupiterSwapConfig {
 export interface SwapResult {
     success: boolean;
     signature?: string;
-    amountOut?string;
+    amountOut?: string;
     error?: string;
 }
 

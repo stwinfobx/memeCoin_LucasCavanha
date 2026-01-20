@@ -91,6 +91,7 @@ interface ExternalPoolListing {
   volume24hUsd?: number;
   fdvUsd?: number;
   priceUsd?: number;
+  dexId?: string;
 }
 
 export interface ValidationContext {
@@ -275,7 +276,7 @@ export class TokenValidator {
         priceChange5m: resolveNumeric(rawPair?.priceUsd), // Price change is not directly available from GeckoTerminal
         priceChange1h: resolveNumeric(rawPair?.priceUsd), // Price change is not directly available from GeckoTerminal
         priceChange6h: resolveNumeric(rawPair?.priceUsd), // Price change is not directly available from GeckoTerminal
-        pairCreatedAt: rawPair?.priceUsd ? new Date(Date.now() - 24 * 60 * 60 * 1000) : undefined, // Estimate if not available
+        pairCreatedAt: rawPair?.priceUsd ? Date.now() - 24 * 60 * 60 * 1000 : undefined, // Estimate if not available
         baseTokenSymbol: rawPair?.baseToken?.symbol || symbol,
         baseTokenName: rawPair?.baseToken?.name || name,
       };

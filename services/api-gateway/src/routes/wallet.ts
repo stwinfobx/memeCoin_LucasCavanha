@@ -20,7 +20,7 @@ export function initWalletRoutes(dbPool: Pool): Router {
             const userId = (req as any).user.userId;
             const { walletAddress, chain = 'BSC' } = req.body;
 
-            if (!walletAddress || !ethers.utils.isAddress(walletAddress)) {
+            if (!walletAddress || !ethers.isAddress(walletAddress)) {
                 return res.status(400).json({
                     success: false,
                     error: { code: 'INVALID_ADDRESS', message: 'Invalid wallet address' },

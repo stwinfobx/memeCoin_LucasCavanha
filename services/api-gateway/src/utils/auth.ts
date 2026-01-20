@@ -18,14 +18,14 @@ export async function comparePassword(password: string, hash: string): Promise<b
 }
 
 export function generateAccessToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRATION,
+  return jwt.sign({ ...payload }, JWT_SECRET as string, {
+    expiresIn: JWT_EXPIRATION as any,
   });
 }
 
 export function generateRefreshToken(payload: JWTPayload): string {
-  return jwt.sign(payload, REFRESH_TOKEN_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRATION,
+  return jwt.sign({ ...payload }, REFRESH_TOKEN_SECRET as string, {
+    expiresIn: REFRESH_TOKEN_EXPIRATION as any,
   });
 }
 
