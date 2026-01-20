@@ -28,7 +28,7 @@ export class PriceUpdateService {
     this.pool = pool;
     // Não usar o parâmetro 'server' no construtor do WebSocketServer
     // Vamos criar o WebSocketServer sem servidor e usar handleUpgrade manualmente
-    this.wss = new WebSocketServer({ 
+    this.wss = new WebSocketServer({
       noServer: true, // Criar sem servidor - vamos gerenciar upgrades manualmente
     });
 
@@ -36,16 +36,16 @@ export class PriceUpdateService {
       console.log('[WebSocket] Connection event fired');
       this.handleConnection(ws, req);
     });
-    
+
     // Handler de upgrade manual - capturar upgrades do servidor HTTP
     // IMPORTANTE: Registrar ANTES do servidor começar a aceitar conexões
     server.on('upgrade', (request: any, socket: any, head: any) => {
       try {
         console.log('[WebSocket] Upgrade request received:', request.url);
         const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost:4000'}`);
-        
+
         console.log('[WebSocket] Parsed pathname:', url.pathname);
-        
+
         if (url.pathname === '/ws/prices') {
           console.log('[WebSocket] Accepting upgrade for /ws/prices');
           this.wss.handleUpgrade(request, socket, head, (ws) => {
@@ -65,8 +65,8 @@ export class PriceUpdateService {
       }
     });
 
-    // Iniciar atualização de preços (a cada 10 segundos)
-    const updateInterval = Number(process.env.PRICE_UPDATE_INTERVAL_MS ?? 10000);
+    // Iniciar atualização de preços (a cada 30 segundos por padrão para evitar 429)
+    const updateInterval = Number(process.env.PRICE_UPDATE_INTERVAL_MS ?? 30000);
     this.priceUpdateInterval = setInterval(() => {
       this.broadcastPriceUpdates();
     }, updateInterval);
@@ -76,7 +76,7 @@ export class PriceUpdateService {
 
   private handleConnection(ws: WebSocket, req: any): void {
     console.log('[WebSocket] New connection attempt...');
-    
+
     // Extrair token JWT da query string
     const url = new URL(req.url || '', `http://${req.headers.host || 'localhost:4000'}`);
     const token = url.searchParams.get('token');
@@ -169,56 +169,58 @@ export class PriceUpdateService {
         return;
       }
 
-      // Buscar preços atualizados via GeckoTerminal (em lotes)
+      // Buscar preços atualizados via GeckoTerminal (usando endpoint MULTI para evitar 429)
       const updates: PriceUpdate[] = [];
-      const network = 'bsc'; // Default, pode ser configurável
-      const batchSize = 10; // Processar em lotes de 10 para evitar sobrecarga
+      const network = 'bsc'; // Default
+      const batchSize = 30; // GeckoTerminal multi endpoint suporta até 30 endereços
 
       for (let i = 0; i < tokens.length; i += batchSize) {
         const batch = tokens.slice(i, i + batchSize);
+        const addresses = batch.map(t => t.contract_address).join(',');
 
-        await Promise.all(
-          batch.map(async (token) => {
-            try {
-              const contractAddress = token.contract_address;
-
-              // Buscar pools do token para obter preço mais atualizado
-              const poolsResponse = await axios.get(
-                `${GECKO_API_URL}/networks/${network}/tokens/${contractAddress}?include=top_pools`,
-                {
-                  headers: GECKO_HEADERS,
-                  timeout: 5000,
-                }
-              );
-
-              const tokenData = poolsResponse.data?.data;
-              if (tokenData?.attributes?.price_usd) {
-                const newPrice = Number(tokenData.attributes.price_usd);
-                const oldPrice = Number(token.price_usd ?? 0);
-                const priceChange = oldPrice > 0 ? ((newPrice - oldPrice) / oldPrice) * 100 : 0;
-
-                updates.push({
-                  tokenId: token.id,
-                  symbol: token.symbol,
-                  priceUsd: newPrice,
-                  priceChangePercent: priceChange,
-                  timestamp: Date.now(),
-                });
-
-                // Atualizar preço no banco
-                await this.pool.query('UPDATE tokens SET price_usd = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [
-                  newPrice,
-                  token.id,
-                ]);
-              }
-            } catch (error: any) {
-              // Ignorar erros individuais e continuar
-              if (error.response?.status !== 404) {
-                console.warn(`[WebSocket] Failed to update price for token ${token.symbol}:`, error.message);
-              }
+        try {
+          const response = await axios.get(
+            `${GECKO_API_URL}/networks/${network}/tokens/multi/${addresses}`,
+            {
+              headers: GECKO_HEADERS,
+              timeout: 10000,
             }
-          })
-        );
+          );
+
+          const tokenList = response.data?.data || [];
+
+          for (const tokenData of tokenList) {
+            const address = tokenData.attributes?.address?.toLowerCase();
+            const originalToken = batch.find(t => t.contract_address.toLowerCase() === address);
+
+            if (originalToken && tokenData.attributes?.price_usd) {
+              const newPrice = Number(tokenData.attributes.price_usd);
+              const oldPrice = Number(originalToken.price_usd ?? 0);
+              const priceChange = oldPrice > 0 ? ((newPrice - oldPrice) / oldPrice) * 100 : 0;
+
+              updates.push({
+                tokenId: originalToken.id,
+                symbol: originalToken.symbol,
+                priceUsd: newPrice,
+                priceChangePercent: priceChange,
+                timestamp: Date.now(),
+              });
+
+              // Atualizar preço no banco
+              await this.pool.query('UPDATE tokens SET price_usd = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [
+                newPrice,
+                originalToken.id,
+              ]);
+            }
+          }
+
+          // Pequeno delay entre batches para evitar rate limit
+          if (tokens.length > batchSize) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        } catch (error: any) {
+          console.error(`[WebSocket] Failed to update prices for batch ${i}:`, error.message);
+        }
       }
 
       // Broadcast para todos os clientes conectados

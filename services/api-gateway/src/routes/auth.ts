@@ -174,7 +174,7 @@ router.post('/login', async (req: Request, res: Response) => {
         success: false,
         error: {
           code: 'ACCOUNT_DISABLED',
-          message: 'Account is disabled',
+          message: 'Account is disabled. Please verify your email.',
         },
         timestamp: new Date(),
       });

@@ -1,10 +1,17 @@
 import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 
-// Configurar SendGrid API Key (ou Resend - código mantém compatibilidade)
-const apiKey = process.env.SENDGRID_API_KEY || process.env.RESEND_API_KEY;
-if (apiKey) {
-  sgMail.setApiKey(apiKey);
-} else {
+// Configurar API Keys
+const sendgridKey = process.env.SENDGRID_API_KEY;
+const resendKey = process.env.RESEND_API_KEY;
+
+if (sendgridKey) {
+  sgMail.setApiKey(sendgridKey);
+}
+
+const resend = resendKey ? new Resend(resendKey) : null;
+
+if (!sendgridKey && !resendKey) {
   console.warn('[Email Service] Email API key not configured (RESEND_API_KEY or SENDGRID_API_KEY) - email notifications disabled');
 }
 
@@ -17,10 +24,12 @@ export interface EmailParams {
 export class EmailService {
   private from: string;
   private enabled: boolean;
+  private mode: 'sendgrid' | 'resend' | 'none';
 
   constructor() {
-    this.from = process.env.EMAIL_FROM || 'noreply@tradingbot.ai';
-    this.enabled = !!apiKey;
+    this.from = process.env.EMAIL_FROM || 'noreply@tradingbot777.com';
+    this.mode = resendKey ? 'resend' : (sendgridKey ? 'sendgrid' : 'none');
+    this.enabled = this.mode !== 'none';
   }
 
   /**
@@ -33,17 +42,26 @@ export class EmailService {
     }
 
     try {
-      await sgMail.send({
-        to: params.to,
-        from: this.from,
-        subject: params.subject,
-        html: params.html,
-      });
+      if (this.mode === 'resend' && resend) {
+        await resend.emails.send({
+          from: this.from,
+          to: params.to,
+          subject: params.subject,
+          html: params.html,
+        });
+      } else if (this.mode === 'sendgrid') {
+        await sgMail.send({
+          to: params.to,
+          from: this.from,
+          subject: params.subject,
+          html: params.html,
+        });
+      }
 
-      console.log(`[Email Service] ✅ Email sent to ${params.to}: ${params.subject}`);
+      console.log(`[Email Service] ✅ Email sent via ${this.mode} to ${params.to}: ${params.subject}`);
       return true;
     } catch (error: any) {
-      console.error('[Email Service] ❌ Failed to send email:', error.message);
+      console.error(`[Email Service] ❌ Failed to send email via ${this.mode}:`, error.message);
       return false;
     }
   }

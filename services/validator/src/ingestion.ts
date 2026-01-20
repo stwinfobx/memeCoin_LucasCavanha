@@ -302,7 +302,7 @@ export class MemecoinIngestion {
     for (const attempt of attempts) {
       try {
         const response = await axios.get<GeckoResponse>(attempt.url, {
-          timeout: 10_000,
+          timeout: 15_000,
           headers: {
             'User-Agent': 'TradingBotValidator/1.0 (+https://github.com/tradingbot)',
             Accept: 'application/json',
@@ -315,6 +315,7 @@ export class MemecoinIngestion {
         const pools = response.data?.data ?? [];
         if (!pools.length) {
           console.warn(`[Ingestion] Endpoint ${attempt.label} respondeu sem pools`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
           continue;
         }
 
@@ -323,24 +324,6 @@ export class MemecoinIngestion {
         if (response.data?.included?.length) {
           for (const token of response.data.included) {
             tokenMap.set(token.id, token);
-          }
-        } else if (attempt.label === 'gecko-trending') {
-          try {
-            const includeResponse = await axios.get<GeckoResponse>(`${attempt.url}&${GECKO_INCLUDE}`, {
-              timeout: 10_000,
-              headers: {
-                'User-Agent': 'TradingBotValidator/1.0 (+https://github.com/tradingbot)',
-                Accept: 'application/json',
-                Origin: 'https://geckoterminal.com',
-                Referer: 'https://geckoterminal.com/',
-                'X-Requested-With': 'XMLHttpRequest',
-              },
-            });
-            for (const token of includeResponse.data?.included ?? []) {
-              tokenMap.set(token.id, token);
-            }
-          } catch (includeError: any) {
-            console.warn('[Ingestion] Não foi possível carregar tokens adicionais para trending:', includeError?.message || includeError);
           }
         }
 
@@ -357,6 +340,14 @@ export class MemecoinIngestion {
         const status = error?.response?.status;
         const detail = error?.response?.data?.message ?? error?.message ?? error;
         console.warn(`[Ingestion] Failed ${attempt.label} (${attempt.url}): ${detail}`);
+
+        if (status === 429) {
+          console.warn('[Ingestion] Rate limited (429). Waiting 10s before next attempt...');
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+
         if (status === 404) {
           continue;
         }
