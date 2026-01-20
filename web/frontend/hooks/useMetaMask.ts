@@ -18,15 +18,17 @@ export function useMetaMask() {
     const [balance, setBalance] = useState<string>('0');
     const [isConnecting, setIsConnecting] = useState(false);
     const [chainId, setChainId] = useState<number | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const connect = async () => {
         if (typeof window.ethereum === 'undefined') {
-            alert('MetaMask não está instalado! Por favor, instale a extensão.');
+            setError('MetaMask não está instalado!');
             window.open('https://metamask.io/download/', '_blank');
             return;
         }
 
         setIsConnecting(true);
+        setError(null);
         try {
             // Conectar com MetaMask
             const provider = new BrowserProvider(window.ethereum);
@@ -61,7 +63,7 @@ export function useMetaMask() {
             console.log('[MetaMask] Connected:', address);
         } catch (error: any) {
             console.error('[MetaMask] Error:', error.message);
-            alert('Erro ao conectar MetaMask: ' + error.message);
+            setError(error.message);
         } finally {
             setIsConnecting(false);
         }
@@ -71,11 +73,13 @@ export function useMetaMask() {
         setAccount(null);
         setBalance('0');
         setChainId(null);
+        setError(null);
         // Limpar do localStorage
         localStorage.removeItem('metamask_account');
     };
 
     const switchToBSC = async () => {
+        setError(null);
         try {
             await window.ethereum.request({
                 method: 'wallet_switchEthereumChain',
@@ -101,9 +105,12 @@ export function useMetaMask() {
                             },
                         ],
                     });
-                } catch (addError) {
+                } catch (addError: any) {
                     console.error('[MetaMask] Failed to add BSC:', addError);
+                    setError(addError.message);
                 }
+            } else {
+                setError(switchError.message);
             }
         }
     };
@@ -124,6 +131,7 @@ export function useMetaMask() {
                     console.error('[MetaMask] Auto-reconnect failed:', error);
                     localStorage.removeItem('metamask_account');
                     setAccount(null);
+                    setError('Falha ao reconectar automaticamente.');
                 }
             };
             reconnect();
@@ -132,6 +140,7 @@ export function useMetaMask() {
         if (window.ethereum) {
             // Detectar mudanças de conta
             window.ethereum.on('accountsChanged', (accounts: string[]) => {
+                setError(null);
                 if (accounts.length === 0) {
                     disconnect();
                 } else {
@@ -142,6 +151,7 @@ export function useMetaMask() {
 
             // Detectar mudanças de rede
             window.ethereum.on('chainChanged', (chainIdHex: string) => {
+                setError(null);
                 setChainId(parseInt(chainIdHex, 16));
             });
         }
@@ -160,8 +170,10 @@ export function useMetaMask() {
         balance,
         chainId,
         isConnecting,
+        error,
         connect,
         disconnect,
         switchToBSC,
+        isMetaMaskInstalled: typeof window !== 'undefined' && !!window.ethereum,
     };
 }

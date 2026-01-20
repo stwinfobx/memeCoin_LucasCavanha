@@ -45,6 +45,7 @@ type BotPerformance = {
     total_invested: number
     current_value: number
     unrealized_pnl: number
+    unrealized_pnl_percent?: number
     unrealized_profit?: number
     unrealized_loss?: number
     avg_hold_time_hours?: number
@@ -473,11 +474,10 @@ export default function BotPerformancePage() {
                             {date.toLocaleString('pt-BR')}
                           </td>
                           <td className="py-3 px-4">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                              order.order_type === 'BUY' 
-                                ? 'bg-emerald-500/20 text-emerald-400' 
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${order.order_type === 'BUY'
+                                ? 'bg-emerald-500/20 text-emerald-400'
                                 : 'bg-rose-500/20 text-rose-400'
-                            }`}>
+                              }`}>
                               {order.order_type}
                             </span>
                           </td>
@@ -512,13 +512,12 @@ export default function BotPerformancePage() {
                             )}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              order.status === 'completed' 
-                                ? 'bg-emerald-500/20 text-emerald-400' 
+                            <span className={`px-2 py-1 rounded text-xs ${order.status === 'completed'
+                                ? 'bg-emerald-500/20 text-emerald-400'
                                 : order.status === 'pending'
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-neutral-500/20 text-neutral-400'
-                            }`}>
+                                  ? 'bg-amber-500/20 text-amber-400'
+                                  : 'bg-neutral-500/20 text-neutral-400'
+                              }`}>
                               {order.status}
                             </span>
                           </td>
