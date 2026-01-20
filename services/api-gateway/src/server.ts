@@ -37,6 +37,9 @@ import withdrawalsRoutes from './routes/withdrawals';
 const app: Express = express();
 const PORT = Number(process.env.API_GATEWAY_PORT ?? process.env.PORT ?? 4000);
 
+// Trust proxy for Nginx
+app.set('trust proxy', 1);
+
 // Criar servidor HTTP para WebSocket
 const server = http.createServer(app);
 

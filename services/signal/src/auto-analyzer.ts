@@ -85,13 +85,13 @@ export class AutoAnalyzer {
       );
 
       const tokens = tokensResult.rows;
-      
+
       // Verificar se há tokens validados no total
       const totalValidatedResult = await this.pool.query(
         `SELECT COUNT(*) as count FROM tokens WHERE is_validated = true`
       );
       const totalValidated = Number(totalValidatedResult.rows[0]?.count ?? 0);
-      
+
       console.log(`[AutoAnalyzer] 📊 Found ${tokens.length} tokens to analyze (total validated: ${totalValidated})`);
 
       if (tokens.length === 0) {
@@ -116,15 +116,15 @@ export class AutoAnalyzer {
       for (const token of tokens) {
         try {
           console.log(`[AutoAnalyzer] 🔍 Analyzing ${token.symbol} (${token.name})...`);
-          
+
           const signal = await this.analyzer.analyzeToken(token.id);
           analyzed++;
-          
+
           // Contar tipos de sinais
           if (signal.signal_type === 'BUY') buySignals++;
           else if (signal.signal_type === 'SELL') sellSignals++;
           else holdSignals++;
-          
+
           // Buscar token completo para dispatch
           const tokenResult = await this.pool.query('SELECT * FROM tokens WHERE id = $1', [token.id]);
           const fullToken = tokenResult.rows[0];
@@ -168,7 +168,7 @@ export class AutoAnalyzer {
       console.log(`   🟢 BUY signals: ${buySignals}`);
       console.log(`   🔴 SELL signals: ${sellSignals}`);
       console.log(`   ⏸️ HOLD signals: ${holdSignals}`);
-      
+
       // Criar notificação de status a cada ciclo
       await this.createStatusNotification(
         await this.getTotalValidatedCount(),
@@ -205,12 +205,21 @@ export class AutoAnalyzer {
     holdSignals: number = 0
   ): Promise<void> {
     try {
-      // Buscar userId padrão do Executor (mesmo ID usado pelo paper trading)
-      const defaultUserId = 'f58986be-9f49-4a63-9c44-937bfed78362';
-      
+      // Buscar um usuário real para as notificações de monitoramento
+      // Priorizar o que estiver usando o bot (ou o primeiro da tabela)
+      const userResult = await this.pool.query(
+        'SELECT u.id FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id ORDER BY p.bot_enabled DESC, u.created_at ASC LIMIT 1'
+      );
+
+      const defaultUserId = userResult.rows[0]?.id;
+      if (!defaultUserId) {
+        console.warn('[AutoAnalyzer] No user found for status notifications');
+        return;
+      }
+
       let message = '';
       let title = '';
-      
+
       if (totalValidated === 0) {
         title = 'Aguardando tokens';
         message = `🤖 Estou aguardando tokens serem validados... O validator está buscando novos memecoins a cada minuto. Assim que encontrar tokens válidos, começarei a analisá-los!`;
@@ -221,12 +230,12 @@ export class AutoAnalyzer {
         title = 'Análise completa';
         message = `🤖 Completei uma análise de ${analyzed} token(s)! 📊 Total validados: ${totalValidated} | 🟢 BUY: ${buySignals} | 🔴 SELL: ${sellSignals} | ⏸️ HOLD: ${holdSignals}`;
       }
-      
+
       // IMPORTANTE: Não criar notificação para cada ciclo de análise
       // Isso cria MUITAS notificações e lota o banco
       // Apenas criar notificação se houver BUY/SELL signals ou mudanças importantes
       // Notificações de status são muito frequentes e não são essenciais
-      
+
       // Apenas criar notificação se houver sinais BUY ou SELL (ações importantes)
       if (buySignals > 0 || sellSignals > 0) {
         const recentNotification = await this.pool.query(
@@ -238,7 +247,7 @@ export class AutoAnalyzer {
            LIMIT 1`,
           [defaultUserId, title]
         );
-        
+
         if (recentNotification.rows.length === 0) {
           await this.pool.query(
             `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)

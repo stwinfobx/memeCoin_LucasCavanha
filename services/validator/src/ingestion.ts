@@ -286,15 +286,15 @@ export class MemecoinIngestion {
         label: 'gecko-pools',
       },
       {
-        url: `${GECKO_BASE_URL}/networks/${GECKO_NETWORK}/pools?page=${GECKO_PAGE}&sort=volume_usd_desc&${GECKO_INCLUDE}`,
+        url: `${GECKO_BASE_URL}/networks/${GECKO_NETWORK}/pools?page=${GECKO_PAGE}&sort=h24_volume_usd_desc&${GECKO_INCLUDE}`,
         label: 'gecko-volume',
       },
       {
-        url: `${GECKO_BASE_URL}/networks/${GECKO_NETWORK}/pools?page=${GECKO_PAGE}&sort=created_at_desc&${GECKO_INCLUDE}`,
+        url: `${GECKO_BASE_URL}/networks/${GECKO_NETWORK}/pools?page=${GECKO_PAGE}&sort=pool_created_at_desc&${GECKO_INCLUDE}`,
         label: 'gecko-recent',
       },
       {
-        url: `${GECKO_BASE_URL}/networks/${GECKO_NETWORK}/pools?page=${GECKO_PAGE}&sort=price_change_percentage_h24_desc&${GECKO_INCLUDE}`,
+        url: `${GECKO_BASE_URL}/networks/${GECKO_NETWORK}/pools?page=${GECKO_PAGE}&sort=h24_volume_usd_desc&${GECKO_INCLUDE}`, // Fallback ou preço alterado
         label: 'gecko-price-change',
       },
     ];
@@ -342,10 +342,10 @@ export class MemecoinIngestion {
         console.warn(`[Ingestion] Failed ${attempt.label} (${attempt.url}): ${detail}`);
 
         if (status === 429) {
-          console.warn('[Ingestion] Rate limited (429). Waiting 10s before next attempt...');
-          await new Promise(resolve => setTimeout(resolve, 10000));
+          console.warn('[Ingestion] Rate limited (429). Waiting 30s before next attempt...');
+          await new Promise(resolve => setTimeout(resolve, 30000));
         } else {
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
         if (status === 404) {
