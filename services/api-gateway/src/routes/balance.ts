@@ -11,11 +11,16 @@ const getAdminEmail = () => process.env.ADMIN_EMAIL || 'mulack.zuguenberg@gmail.
  * Saldo Residual = Saldo Real (BNB) na Carteira - Soma dos Saldos Reais dos outros usuários
  */
 async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
-    // 1. Verificar se é o administrador
     const adminEmail = getAdminEmail();
+    console.log(`[Balance] Checking admin status for: ${userEmail} (Admin is: ${adminEmail})`);
+
+    // 1. Verificar se é o administrador
     if (userEmail.toLowerCase() !== adminEmail.toLowerCase()) {
+        console.log(`[Balance] User ${userEmail} is NOT admin. Skipping residual calculation.`);
         return null;
     }
+
+    console.log(`[Balance] Admin detected! Starting residual calculation for ${botAddress}...`);
 
     try {
         const botAddress = process.env.BOT_DEPOSIT_ADDRESS;
@@ -23,15 +28,18 @@ async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
         const bnbPrice = Number(process.env.BNB_PRICE || 600);
 
         if (!botAddress || !rpcUrl) {
-            console.warn('[Balance] Missing BOT_DEPOSIT_ADDRESS or BSC_RPC_URL for admin balance calculation');
+            console.error('[Balance] FALHA: BOT_DEPOSIT_ADDRESS ou BSC_RPC_URL não definidos no .env');
+            console.log('[Balance] Env check:', { botAddress: !!botAddress, rpcUrl: !!rpcUrl });
             return null;
         }
 
         // 2. Buscar saldo real na blockchain (BNB)
+        console.log(`[Balance] Fetching on-chain balance for ${botAddress} via ${rpcUrl}`);
         const provider = new ethers.JsonRpcProvider(rpcUrl);
         const bnbBalanceBigInt = await provider.getBalance(botAddress);
         const bnbBalance = Number(ethers.formatEther(bnbBalanceBigInt));
         const totalWalletValueUSD = bnbBalance * bnbPrice;
+        console.log(`[Balance] On-chain result: ${bnbBalance} BNB (~$${totalWalletValueUSD.toFixed(2)})`);
 
         // 3. Somar saldo virtual de todos os OUTROS usuários
         const otherUsersResult = await pool.query(
@@ -45,9 +53,11 @@ async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
         );
 
         const otherUsersBalanceUSD = Number(otherUsersResult.rows[0]?.total_other_balances ?? 0);
+        console.log(`[Balance] Other users total virtual balance: $${otherUsersBalanceUSD.toFixed(2)}`);
 
         // 4. Saldo residual (tudo que está na carteira e não pertence aos outros)
         const residualBalance = Math.max(0, totalWalletValueUSD - otherUsersBalanceUSD);
+        console.log(`[Balance] FINAL Residual Balance for Admin: $${residualBalance.toFixed(2)}`);
 
         return {
             total_balance_usd: residualBalance,
@@ -56,7 +66,7 @@ async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
             wallet_real_usd: totalWalletValueUSD
         };
     } catch (error: any) {
-        console.error('[Balance] Error calculating admin residual balance:', error.message);
+        console.error('[Balance] ERRO CRÍTICO no cálculo de saldo admin:', error.message);
         return null;
     }
 }
