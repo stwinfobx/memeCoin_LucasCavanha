@@ -19,9 +19,9 @@ if (!process.env[ROOT_ENV_FLAG]) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+    NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS: process.env.NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS,
   },
 }
 
