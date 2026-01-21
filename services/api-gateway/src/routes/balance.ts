@@ -20,10 +20,10 @@ async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
         return null;
     }
 
+    const botAddress = process.env.BOT_DEPOSIT_ADDRESS;
     console.log(`[Balance] Admin detected! Starting residual calculation for ${botAddress}...`);
 
     try {
-        const botAddress = process.env.BOT_DEPOSIT_ADDRESS;
         const rpcUrl = process.env.BSC_RPC_URL;
         const bnbPrice = Number(process.env.BNB_PRICE || 600);
 
