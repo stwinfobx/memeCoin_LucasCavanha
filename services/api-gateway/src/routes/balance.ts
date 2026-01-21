@@ -4,7 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { ethers } from 'ethers';
 
 // E-mail do administrador para o cálculo residual de saldo
-const ADMIN_EMAIL = 'mulack.zuguenberg@gmail.com';
+const getAdminEmail = () => process.env.ADMIN_EMAIL || 'mulack.zuguenberg@gmail.com';
 
 /**
  * Calcula o saldo residual para o administrador
@@ -12,7 +12,8 @@ const ADMIN_EMAIL = 'mulack.zuguenberg@gmail.com';
  */
 async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
     // 1. Verificar se é o administrador
-    if (userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    const adminEmail = getAdminEmail();
+    if (userEmail.toLowerCase() !== adminEmail.toLowerCase()) {
         return null;
     }
 
