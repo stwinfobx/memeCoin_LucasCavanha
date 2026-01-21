@@ -1,6 +1,64 @@
 import { Router, Response } from 'express';
 import { Pool } from 'pg';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { ethers } from 'ethers';
+
+// E-mail do administrador para o cálculo residual de saldo
+const ADMIN_EMAIL = 'mulack.zuguenberg@gmail.com';
+
+/**
+ * Calcula o saldo residual para o administrador
+ * Saldo Residual = Saldo Real (BNB) na Carteira - Soma dos Saldos Reais dos outros usuários
+ */
+async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
+    // 1. Verificar se é o administrador
+    if (userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        return null;
+    }
+
+    try {
+        const botAddress = process.env.BOT_DEPOSIT_ADDRESS;
+        const rpcUrl = process.env.BSC_RPC_URL;
+        const bnbPrice = Number(process.env.BNB_PRICE || 600);
+
+        if (!botAddress || !rpcUrl) {
+            console.warn('[Balance] Missing BOT_DEPOSIT_ADDRESS or BSC_RPC_URL for admin balance calculation');
+            return null;
+        }
+
+        // 2. Buscar saldo real na blockchain (BNB)
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const bnbBalanceBigInt = await provider.getBalance(botAddress);
+        const bnbBalance = Number(ethers.formatEther(bnbBalanceBigInt));
+        const totalWalletValueUSD = bnbBalance * bnbPrice;
+
+        // 3. Somar saldo virtual de todos os OUTROS usuários
+        const otherUsersResult = await pool.query(
+            `SELECT 
+                COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS total_other_balances
+            FROM ledger_entries
+            WHERE user_id != $1
+              AND description NOT LIKE 'Initial paper trading%'`,
+            [userId]
+        );
+
+        const otherUsersBalanceUSD = Number(otherUsersResult.rows[0]?.total_other_balances ?? 0);
+
+        // 4. Saldo residual (tudo que está na carteira e não pertence aos outros)
+        const residualBalance = Math.max(0, totalWalletValueUSD - otherUsersBalanceUSD);
+
+        return {
+            total_balance_usd: residualBalance,
+            other_users_total_usd: otherUsersBalanceUSD,
+            wallet_real_bnb: bnbBalance,
+            wallet_real_usd: totalWalletValueUSD
+        };
+    } catch (error: any) {
+        console.error('[Balance] Error calculating admin residual balance:', error.message);
+        return null;
+    }
+}
 
 export function initBalanceRoutes(pool: Pool): Router {
     const router = Router();
@@ -9,21 +67,36 @@ export function initBalanceRoutes(pool: Pool): Router {
     router.get('/real', authenticate, async (req: AuthRequest, res: Response) => {
         try {
             const userId = req.user?.userId;
+            const userEmail = req.user?.email || '';
 
-            // Calcular saldo considerando APENAS ledger entries reais (excluindo paper trading)
-            const result = await pool.query(
-                `SELECT 
-           COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-           COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-         FROM ledger_entries
-         WHERE user_id = $1
-           AND description NOT LIKE 'Initial paper trading%'`, // Ignorar depósitos de paper trading
-                [userId]
-            );
+            // Verificar se é Admin e calcular residual
+            const adminData = await getAdminBalance(pool, userId!, userEmail);
 
-            const credits = Number(result.rows[0]?.credits ?? 0);
-            const debits = Number(result.rows[0]?.debits ?? 0);
-            const balance = Math.max(0, credits - debits);
+            let balance: number;
+            let credits: number = 0;
+            let debits: number = 0;
+
+            if (adminData) {
+                balance = adminData.total_balance_usd;
+                // Para o admin, o "credits" é o saldo residual e debits é 0 para simplificar no dash
+                credits = balance;
+                debits = 0;
+            } else {
+                // Lógica normal para usuários comuns
+                const result = await pool.query(
+                    `SELECT 
+               COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
+               COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+             FROM ledger_entries
+             WHERE user_id = $1
+               AND description NOT LIKE 'Initial paper trading%'`,
+                    [userId]
+                );
+
+                credits = Number(result.rows[0]?.credits ?? 0);
+                debits = Number(result.rows[0]?.debits ?? 0);
+                balance = Math.max(0, credits - debits);
+            }
 
             // Buscar total investido em posições abertas
             const positionsResult = await pool.query(
@@ -44,6 +117,7 @@ export function initBalanceRoutes(pool: Pool): Router {
                     invested_in_positions_usd: totalInvested,
                     credits_usd: credits,
                     debits_usd: debits,
+                    is_admin_residual: !!adminData
                 },
                 timestamp: new Date(),
             });
@@ -62,7 +136,7 @@ export function initBalanceRoutes(pool: Pool): Router {
         try {
             const userId = req.user?.userId;
 
-            // Calcular saldo de paper trading (apenas entradas com descrição "Initial paper trading")
+            // Calcular saldo de paper trading
             const result = await pool.query(
                 `SELECT 
            COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
@@ -100,21 +174,30 @@ export function initBalanceRoutes(pool: Pool): Router {
     router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => {
         try {
             const userId = req.user?.userId;
+            const userEmail = req.user?.email || '';
 
-            // 1. Saldo real
-            const realBalance = await pool.query(
-                `SELECT 
-           COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-           COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-         FROM ledger_entries
-         WHERE user_id = $1
-           AND description NOT LIKE 'Initial paper trading%'`,
-                [userId]
-            );
+            // Verificar se é Admin e calcular residual
+            const adminData = await getAdminBalance(pool, userId!, userEmail);
 
-            const realCredits = Number(realBalance.rows[0]?.credits ?? 0);
-            const realDebits = Number(realBalance.rows[0]?.debits ?? 0);
-            const realBalanceUSD = Math.max(0, realCredits - realDebits);
+            let realBalanceUSD: number;
+
+            if (adminData) {
+                realBalanceUSD = adminData.total_balance_usd;
+            } else {
+                const realBalance = await pool.query(
+                    `SELECT 
+               COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
+               COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+             FROM ledger_entries
+             WHERE user_id = $1
+               AND description NOT LIKE 'Initial paper trading%'`,
+                    [userId]
+                );
+
+                const realCredits = Number(realBalance.rows[0]?.credits ?? 0);
+                const realDebits = Number(realBalance.rows[0]?.debits ?? 0);
+                realBalanceUSD = Math.max(0, realCredits - realDebits);
+            }
 
             // 2. Total de depósitos confirmados
             const deposits = await pool.query(
@@ -143,6 +226,7 @@ export function initBalanceRoutes(pool: Pool): Router {
                         total_usd: realBalanceUSD,
                         available_usd: Math.max(0, realBalanceUSD - Number(positions.rows[0].invested_usd)),
                         locked_in_positions_usd: Number(positions.rows[0].invested_usd),
+                        is_admin_residual: !!adminData
                     },
                     deposits: {
                         count: Number(deposits.rows[0].count),
@@ -169,20 +253,34 @@ export function initBalanceRoutes(pool: Pool): Router {
     router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         try {
             const userId = req.user?.userId;
+            const userEmail = req.user?.email || '';
 
-            const result = await pool.query(
-                `SELECT 
-           COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-           COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-         FROM ledger_entries
-         WHERE user_id = $1
-           AND description NOT LIKE 'Initial paper trading%'`,
-                [userId]
-            );
+            // Verificar se é Admin e calcular residual
+            const adminData = await getAdminBalance(pool, userId!, userEmail);
 
-            const credits = Number(result.rows[0]?.credits ?? 0);
-            const debits = Number(result.rows[0]?.debits ?? 0);
-            const balance = Math.max(0, credits - debits);
+            let balance: number;
+            let credits: number = 0;
+            let debits: number = 0;
+
+            if (adminData) {
+                balance = adminData.total_balance_usd;
+                credits = balance;
+                debits = 0;
+            } else {
+                const result = await pool.query(
+                    `SELECT 
+               COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
+               COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+             FROM ledger_entries
+             WHERE user_id = $1
+               AND description NOT LIKE 'Initial paper trading%'`,
+                    [userId]
+                );
+
+                credits = Number(result.rows[0]?.credits ?? 0);
+                debits = Number(result.rows[0]?.debits ?? 0);
+                balance = Math.max(0, credits - debits);
+            }
 
             const positionsResult = await pool.query(
                 `SELECT COALESCE(SUM(invested_amount_usd), 0) as total_invested
@@ -202,6 +300,7 @@ export function initBalanceRoutes(pool: Pool): Router {
                     invested_in_positions_usd: totalInvested,
                     credits_usd: credits,
                     debits_usd: debits,
+                    is_admin_residual: !!adminData
                 },
                 timestamp: new Date(),
             });

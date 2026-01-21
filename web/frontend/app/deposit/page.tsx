@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMetaMask } from '../../hooks/useMetaMask';
 import Link from 'next/link';
+import { ethers } from 'ethers';
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -104,9 +105,10 @@ export default function DepositWithdrawPage() {
         setStatus('sending');
 
         try {
-            const { ethers } = await import('ethers');
             const provider = new ethers.BrowserProvider((window as any).ethereum);
             const signer = await provider.getSigner();
+
+            console.log('[Deposit] Sending to:', botAddress);
 
             const tx = await signer.sendTransaction({
                 to: botAddress,
@@ -228,8 +230,8 @@ export default function DepositWithdrawPage() {
                     <button
                         onClick={() => setActiveTab('deposit')}
                         className={`pb-3 px-4 text-sm font-semibold transition-colors ${activeTab === 'deposit'
-                                ? 'border-b-2 border-purple-500 text-purple-400'
-                                : 'text-neutral-500 hover:text-neutral-300'
+                            ? 'border-b-2 border-purple-500 text-purple-400'
+                            : 'text-neutral-500 hover:text-neutral-300'
                             }`}
                     >
                         Depositar
@@ -237,8 +239,8 @@ export default function DepositWithdrawPage() {
                     <button
                         onClick={() => setActiveTab('withdraw')}
                         className={`pb-3 px-4 text-sm font-semibold transition-colors ${activeTab === 'withdraw'
-                                ? 'border-b-2 border-purple-500 text-purple-400'
-                                : 'text-neutral-500 hover:text-neutral-300'
+                            ? 'border-b-2 border-purple-500 text-purple-400'
+                            : 'text-neutral-500 hover:text-neutral-300'
                             }`}
                     >
                         Sacar
@@ -439,12 +441,12 @@ export default function DepositWithdrawPage() {
                                                 <div className="text-right">
                                                     <span
                                                         className={`inline-block text-xs px-3 py-1 rounded-full ${w.status === 'completed'
-                                                                ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-300'
-                                                                : w.status === 'pending'
-                                                                    ? 'bg-amber-500/10 border border-amber-500/40 text-amber-300'
-                                                                    : w.status === 'rejected'
-                                                                        ? 'bg-rose-500/10 border border-rose-500/40 text-rose-300'
-                                                                        : 'bg-neutral-500/10 border border-neutral-500/40 text-neutral-300'
+                                                            ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-300'
+                                                            : w.status === 'pending'
+                                                                ? 'bg-amber-500/10 border border-amber-500/40 text-amber-300'
+                                                                : w.status === 'rejected'
+                                                                    ? 'bg-rose-500/10 border border-rose-500/40 text-rose-300'
+                                                                    : 'bg-neutral-500/10 border border-neutral-500/40 text-neutral-300'
                                                             }`}
                                                     >
                                                         {w.status}
