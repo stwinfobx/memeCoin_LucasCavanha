@@ -2,6 +2,8 @@ import { Router, Response } from 'express';
 import { Pool } from 'pg';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { ethers } from 'ethers';
+// Node 18+ includes global fetch; if using older Node, ensure node-fetch is installed.
+
 
 // E-mail do administrador para o cálculo residual de saldo
 const getAdminEmail = () => process.env.ADMIN_EMAIL || 'mulack.zuguenberg@gmail.com';
@@ -25,8 +27,21 @@ async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
 
     try {
         const rpcUrl = process.env.BSC_RPC_URL;
-        const bnbPrice = Number(process.env.BNB_PRICE || 600);
-
+        // Fetch live BNB price from CoinGecko (fallback to env/static price)
+        const bnbPrice = await (async () => {
+            try {
+                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
+                const data: any = await response.json();
+                if (data && data.binancecoin && typeof data.binancecoin.usd === 'number') {
+                    return data.binancecoin.usd;
+                }
+            } catch (e) {
+                console.error('[Balance] Failed to fetch BNB price from CoinGecko:', e);
+            }
+            // Fallback to env variable or default
+            return Number(process.env.BNB_PRICE || 882.30);
+        })();
+        console.log(`[Balance] Current BNB price USD: $${bnbPrice}`);
         if (!botAddress || !rpcUrl) {
             console.error('[Balance] FALHA: BOT_DEPOSIT_ADDRESS ou BSC_RPC_URL não definidos no .env');
             console.log('[Balance] Env check:', { botAddress: !!botAddress, rpcUrl: !!rpcUrl });
