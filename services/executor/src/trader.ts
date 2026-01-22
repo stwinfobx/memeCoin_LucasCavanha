@@ -23,15 +23,17 @@ const DEFAULT_POSITION_FACTOR = {
 
 export class TradeExecutor {
   private pool: Pool;
-  private executionMode: 'simulation';
-  private defaultUserId: string = 'f58986be-9f49-4a63-9c44-937bfed78362'; // ID fixo para paper trading
+  private executionMode: 'simulation' | 'live';
+  private defaultUserId: string = 'f58986be-9f49-4a63-9c44-937bfed78362'; // fallback ID for paper trading
   private strategyManager: TradingStrategyManager;
   private realTradingService: RealTradingService; // NOVO
 
   constructor(pool: Pool) {
     this.pool = pool;
-    this.executionMode = 'simulation';
-    // Usar ID fixo para garantir consistência
+    // Determine mode from env (default to simulation)
+    const mode = process.env.BOT_EXECUTION_MODE?.toLowerCase();
+    this.executionMode = mode === 'live' ? 'live' : 'simulation';
+    // Use provided paper user ID only when in simulation mode
     this.defaultUserId = process.env.EXECUTOR_DEFAULT_USER_ID || 'f58986be-9f49-4a63-9c44-937bfed78362';
     this.strategyManager = new TradingStrategyManager(pool);
     this.realTradingService = new RealTradingService(pool); // NOVO
