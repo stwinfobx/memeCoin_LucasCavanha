@@ -313,4 +313,13 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📊 Monitor positions every ${monitorIntervalSeconds} seconds for fast sell execution`);
 });
 
+app.get('/mode', (req: Request, res: Response) => {
+  const mode = process.env.BOT_EXECUTION_MODE?.toLowerCase() === 'live' ? 'live' : 'simulation';
+  res.json({
+    mode,
+    node_env: process.env.NODE_ENV,
+    timestamp: new Date()
+  });
+});
+
 export default app;

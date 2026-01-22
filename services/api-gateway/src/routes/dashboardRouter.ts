@@ -100,9 +100,10 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
              COUNT(*) AS total_trades,
              COUNT(*) FILTER (WHERE order_type = 'SELL' AND status = 'completed') AS completed_sells,
              COALESCE(SUM(profit_loss_usd) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd > 0), 0) AS total_profit_realized,
-             COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS total_loss_realized
+            COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS total_loss_realized
            FROM orders
-           WHERE user_id = $1`,
+           WHERE user_id = $1
+             ${process.env.BOT_EXECUTION_MODE === 'live' ? "AND transaction_hash IS NOT NULL" : ""}`,
           [userId]
         ),
         pool.query(
@@ -182,21 +183,23 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     // Buscar investido em posições abertas e lucros/perdas não realizados
     const openPositionsBalance = await pool.query(
       `SELECT 
-         COALESCE(SUM(invested_amount_usd), 0) AS total_invested,
-         COALESCE(SUM(p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) - p.invested_amount_usd), 0) AS unrealized_pnl,
+         COALESCE(SUM(pos.invested_amount_usd), 0) AS total_invested,
+         COALESCE(SUM(pos.token_balance * COALESCE(t.price_usd, pos.buy_price_usd) - pos.invested_amount_usd), 0) AS unrealized_pnl,
          COALESCE(SUM(CASE 
-           WHEN p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) > p.invested_amount_usd 
-           THEN p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) - p.invested_amount_usd 
+           WHEN pos.token_balance * COALESCE(t.price_usd, pos.buy_price_usd) > pos.invested_amount_usd 
+           THEN pos.token_balance * COALESCE(t.price_usd, pos.buy_price_usd) - pos.invested_amount_usd 
            ELSE 0 
          END), 0) AS unrealized_profit,
          COALESCE(SUM(CASE 
-           WHEN p.token_balance * COALESCE(t.price_usd, p.buy_price_usd) < p.invested_amount_usd 
-           THEN p.invested_amount_usd - p.token_balance * COALESCE(t.price_usd, p.buy_price_usd)
+           WHEN pos.token_balance * COALESCE(t.price_usd, pos.buy_price_usd) < pos.invested_amount_usd 
+           THEN pos.invested_amount_usd - pos.token_balance * COALESCE(t.price_usd, pos.buy_price_usd)
            ELSE 0 
          END), 0) AS unrealized_loss
-       FROM positions p
-       JOIN tokens t ON p.token_id = t.id
-       WHERE p.user_id = $1 AND p.status = 'open'`,
+       FROM positions pos
+       JOIN tokens t ON pos.token_id = t.id
+       LEFT JOIN orders o ON pos.order_id = o.id
+       WHERE pos.user_id = $1 AND pos.status = 'open'
+         ${process.env.BOT_EXECUTION_MODE === 'live' ? "AND o.transaction_hash IS NOT NULL" : ""}`,
       [userId]
     );
     const investedInPositions = Number(openPositionsBalance.rows[0]?.total_invested ?? 0);

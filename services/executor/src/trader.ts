@@ -33,6 +33,9 @@ export class TradeExecutor {
     // Determine mode from env (default to simulation)
     const mode = process.env.BOT_EXECUTION_MODE?.toLowerCase();
     this.executionMode = mode === 'live' ? 'live' : 'simulation';
+    console.log(`[Executor] 🤖 Node Env: ${process.env.NODE_ENV}`);
+    console.log(`[Executor] 💰 Execution mode: ${this.executionMode === 'live' ? '🔥 LIVE' : '📝 SIMULATION'}`);
+
     // Use provided paper user ID only when in simulation mode
     this.defaultUserId = process.env.EXECUTOR_DEFAULT_USER_ID || 'f58986be-9f49-4a63-9c44-937bfed78362';
     this.strategyManager = new TradingStrategyManager(pool);
@@ -129,24 +132,30 @@ export class TradeExecutor {
     userId: string,
     tokenId: string,
     signalId?: string
-  ): Promise<{ amountUsd: number; baseAmount: number; confidenceFactor: number; multiplierFactor: number }> {
+  ): Promise<{ amountUsd: number; baseAmount: number; confidenceFactor: number; multiplierFactor: number; available_balance: number }> {
     // CORRIGIDO: Calcular saldo usando depósitos + lucros/perdas realizados das orders
     // trade_profit do ledger representa valor total recebido, não lucro
+    // IMPORTANTE: Filtrar depósitos falsos se estivermos em modo LIVE
+    const paperDepositFilter = this.executionMode === 'live' ? "AND description NOT ILIKE '%paper trading%'" : "";
+
     const depositsResult = await this.pool.query(
       `SELECT COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
        FROM ledger_entries
-       WHERE user_id = $1`,
+       WHERE user_id = $1 ${paperDepositFilter}`,
       [userId]
     );
     const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
 
     // Buscar lucros/perdas realizados das orders SELL
+    // IMPORTANTE: Filtrar ordens sem transaction_hash (simulações) se estivermos em modo LIVE
+    const realOrderFilter = this.executionMode === 'live' ? "AND transaction_hash IS NOT NULL" : "";
+
     const realizedPLResult = await this.pool.query(
       `SELECT 
          COALESCE(SUM(profit_loss_usd) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd > 0), 0) AS realized_profit,
          COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS realized_loss
        FROM orders
-       WHERE user_id = $1`,
+       WHERE user_id = $1 ${realOrderFilter}`,
       [userId]
     );
     const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
@@ -181,6 +190,7 @@ export class TradeExecutor {
         baseAmount: 0,
         confidenceFactor: 0,
         multiplierFactor: 0,
+        available_balance: availableBalance
       };
     }
 
@@ -209,7 +219,7 @@ export class TradeExecutor {
     let investAmount = baseAmount * confidenceFactor * multiplierFactor;
 
     // Se o valor calculado for zero ou menor, abortar
-    if (investAmount <= 0) return { amountUsd: 0, baseAmount: 0, confidenceFactor: 0, multiplierFactor: 0 };
+    if (investAmount <= 0) return { amountUsd: 0, baseAmount: 0, confidenceFactor: 0, multiplierFactor: 0, available_balance: availableBalance };
 
     // Limites: mínimo $5, máximo 20% do saldo disponível
     // IMPORTANTE: Não pode exceder o saldo disponível!
@@ -231,6 +241,7 @@ export class TradeExecutor {
       baseAmount: Number(baseAmount.toFixed(2)),
       confidenceFactor: Number(confidenceFactor.toFixed(2)),
       multiplierFactor: Number(multiplierFactor.toFixed(2)),
+      available_balance: availableBalance
     };
   }
 
@@ -244,22 +255,24 @@ export class TradeExecutor {
     const amountToken = investedAmount / price;
 
     // CORRIGIDO: Calcular saldo disponível antes da compra
-    // Usar depósitos + lucros realizados - perdas realizadas
+    // IMPORTANTE: Filtrar depósitos falsos/simulações se estivermos em modo LIVE
+    const paperDepositFilter = this.executionMode === 'live' ? "AND description NOT ILIKE '%paper trading%'" : "";
+    const realOrderFilter = this.executionMode === 'live' ? "AND transaction_hash IS NOT NULL" : "";
+
     const depositsResult = await this.pool.query(
       `SELECT COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
        FROM ledger_entries
-       WHERE user_id = $1`,
+       WHERE user_id = $1 ${paperDepositFilter}`,
       [order.user_id]
     );
     const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
 
-    // Buscar lucros/perdas realizados das orders SELL
     const realizedPLResult = await this.pool.query(
       `SELECT 
          COALESCE(SUM(profit_loss_usd) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd > 0), 0) AS realized_profit,
          COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS realized_loss
        FROM orders
-       WHERE user_id = $1`,
+       WHERE user_id = $1 ${realOrderFilter}`,
       [order.user_id]
     );
     const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
@@ -669,12 +682,23 @@ export class TradeExecutor {
     // NOVO: Verificar se é real trading
     const isRealTrading = await this.realTradingService.isRealTradingEnabled(userId);
 
-    if (isRealTrading) {
-      console.log(`[Executor] 🔥 REAL TRADING MODE for user ${userId}`);
-      return await this.executeRealBuy(request, userId, token);
+    // Verificação absoluta de modo Live
+    if (this.executionMode === 'live') {
+      if (isRealTrading) {
+        console.log(`[Executor] 🔥🔥🔥 REAL TRADING MODE for user ${userId}`);
+        return await this.executeRealBuy(request, userId, token);
+      } else {
+        console.error(`[Executor] 🛑🛑🛑 TRADE BLOCKED: Bot is in LIVE mode, but real trading is disabled for user ${userId}.`);
+        throw new Error('Real trading not enabled for this user while in global LIVE mode');
+      }
     }
 
-    // Paper trading (simulação)
+    // Paper trading (simulação) - Só chega aqui se global mode FOR 'simulation'
+    if (this.executionMode !== 'simulation') {
+      console.error(`[Executor] 🚨 CRITICAL INCONSISTENCY: Execution mode is ${this.executionMode} but reached paper buy path. Blocking.`);
+      throw new Error(`Inconsistent execution mode: ${this.executionMode}`);
+    }
+
     console.log(`[Executor] 📝 PAPER TRADING MODE for user ${userId}`);
     return await this.executePaperBuy(request, userId, token);
   }
@@ -683,15 +707,24 @@ export class TradeExecutor {
    * Executa BUY em modo paper trading (simulação)
    */
   private async executePaperBuy(request: ExecuteOrderRequest, userId: string, token: Token): Promise<Order> {
-    // Calcular investimento baseado em confiança se signal_id fornecido
+    // CALCULAR E VERIFICAR SALDO SEMPRE
+    const investment = await this.calculateIntendedInvestment(userId, request.token_id, request.signal_id);
+    const availableBalance = investment.available_balance || 0; // Vou expor isso no calculateIntendedInvestment
+
     let amountUsd: number;
     let investedAmount: number;
 
     if (request.amount_usd) {
       amountUsd = request.amount_usd;
       investedAmount = amountUsd;
+
+      // Mesmo se amount_usd for solicitado, não pode exceder o saldo disponível
+      if (amountUsd > availableBalance) {
+        console.warn(`[Executor] 🛑 Paper buy adjusted: Requested $${amountUsd} but only $${availableBalance} available.`);
+        amountUsd = availableBalance;
+        investedAmount = availableBalance;
+      }
     } else {
-      const investment = await this.calculateIntendedInvestment(userId, request.token_id, request.signal_id);
       amountUsd = investment.amountUsd;
       investedAmount = amountUsd;
     }
@@ -798,6 +831,40 @@ export class TradeExecutor {
 
     // Log para debug
     console.log(`[Executor] 💰 Creating SELL order: ${amountToken} tokens @ $${price.toFixed(8)} = $${amountUsd.toFixed(2)}`);
+
+    // Verificação absoluta de modo Live para Venda
+    if (this.executionMode === 'live') {
+      const isRealTrading = await this.realTradingService.isRealTradingEnabled(userId);
+      if (isRealTrading) {
+        console.log(`[Executor] 🔥 REAL SELL MODE for user ${userId}`);
+        // Chamar venda real via blockchain
+        const result = await this.realTradingService.executeRealSell(
+          userId,
+          token.contract_address,
+          token.symbol,
+          amountToken.toString()
+        );
+        if (!result.success) throw new Error(`Real sell failed: ${result.error}`);
+
+        const order = await this.createOrder({
+          userId,
+          tokenId: request.token_id,
+          signalId: request.signal_id,
+          orderType: 'SELL',
+          amountUsd,
+          amountToken,
+        });
+
+        await this.pool.query(
+          `UPDATE orders SET status = 'completed', transaction_hash = $1 WHERE id = $2`,
+          [result.txHash, order.id]
+        );
+        await this.createOrUpdatePosition(order, token, 'sell');
+        return order;
+      } else {
+        throw new Error('Real trading not enabled for this user while in global LIVE mode');
+      }
+    }
 
     const order = await this.createOrder({
       userId,
@@ -1810,45 +1877,47 @@ export class TradeExecutor {
         console.log(`[Executor] ✅ Created profile for user ${userId}`);
       }
 
-      // Garantir saldo inicial para este usuário (apenas uma vez)
-      const existingDeposit = await this.pool.query(
-        `SELECT COUNT(*) as count FROM ledger_entries 
-       WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
-        [userId]
-      );
-
-      // Se já existe depósito inicial, não criar outro
-      if (Number(existingDeposit.rows[0]?.count ?? 0) === 0) {
-        const balanceResult = await this.pool.query(
-          `SELECT 
-           COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-           COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-         FROM ledger_entries
-         WHERE user_id = $1`,
+      // Garantir saldo inicial para este usuário (apenas se em modo SIMULATION)
+      if (this.executionMode === 'simulation') {
+        const existingDeposit = await this.pool.query(
+          `SELECT COUNT(*) as count FROM ledger_entries 
+         WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
           [userId]
         );
-        const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-        const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-        const currentBalance = Math.max(0, credits - debits);
 
-        if (currentBalance < 100) {
-          const depositAmount = 100 - currentBalance;
-          await this.pool.query(
-            `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
-           VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
-            [userId, depositAmount, currentBalance, currentBalance + depositAmount]
+        // Se já existe depósito inicial, não criar outro
+        if (Number(existingDeposit.rows[0]?.count ?? 0) === 0) {
+          const balanceResult = await this.pool.query(
+            `SELECT 
+             COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
+             COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
+           FROM ledger_entries
+           WHERE user_id = $1`,
+            [userId]
           );
-          console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for user ${userId}`);
+          const credits = Number(balanceResult.rows[0]?.credits ?? 0);
+          const debits = Number(balanceResult.rows[0]?.debits ?? 0);
+          const currentBalance = Math.max(0, credits - debits);
 
-          // Criar notificação de saldo inicial
-          await this.createNotification(
-            userId,
-            'order_executed',
-            'success',
-            'Sistema iniciado',
-            `🤖 Sistema de trading iniciado! Saldo inicial de $${depositAmount} USD foi creditado. Aguardando oportunidades de trading...`,
-            { amount: depositAmount, type: 'initial_deposit' }
-          );
+          if (currentBalance < 100) {
+            const depositAmount = 100 - currentBalance;
+            await this.pool.query(
+              `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
+             VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
+              [userId, depositAmount, currentBalance, currentBalance + depositAmount]
+            );
+            console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for user ${userId}`);
+
+            // Criar notificação de saldo inicial
+            await this.createNotification(
+              userId,
+              'order_executed',
+              'success',
+              'Sistema iniciado',
+              `🤖 Sistema de trading iniciado! Saldo inicial de $${depositAmount} USD foi creditado. Aguardando oportunidades de trading...`,
+              { amount: depositAmount, type: 'initial_deposit' }
+            );
+          }
         }
       }
 

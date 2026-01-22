@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../contexts/AuthContext'
+import InsufficientBalanceModal from '../../components/InsufficientBalanceModal'
 
 type BotStatus = {
   bot_enabled: boolean
@@ -24,6 +25,8 @@ export default function BotPage() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showExtremeModal, setShowExtremeModal] = useState(false)
+  const [showBalanceModal, setShowBalanceModal] = useState(false)
+  const [availableBalance, setAvailableBalance] = useState(0)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -33,9 +36,23 @@ export default function BotPage() {
 
   useEffect(() => {
     if (!token) return
-
     fetchBotStatus()
+    fetchBalance()
   }, [token])
+
+  const fetchBalance = async () => {
+    try {
+      const response = await fetch(`${apiBase}/api/balance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const json = await response.json()
+        setAvailableBalance(json.data.available_balance_usd)
+      }
+    } catch (err) {
+      console.error('[Bot] fetch balance error:', err)
+    }
+  }
 
   const fetchBotStatus = async () => {
     if (!token) return
@@ -127,6 +144,14 @@ export default function BotPage() {
 
   const toggleBot = async () => {
     if (!token || !botStatus) return
+
+    // Bloquear se for iniciar e não tiver saldo
+    if (!botStatus.bot_enabled) {
+      if (availableBalance <= 0) {
+        setShowBalanceModal(true)
+        return
+      }
+    }
 
     try {
       setSaving(true)
@@ -548,6 +573,12 @@ export default function BotPage() {
           </div>
         )}
       </div>
+
+      <InsufficientBalanceModal
+        isOpen={showBalanceModal}
+        onClose={() => setShowBalanceModal(false)}
+        balance={availableBalance}
+      />
     </div>
   )
 }

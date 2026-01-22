@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../contexts/AuthContext'
 import BalanceDisplay from '../../components/BalanceDisplay'
+import InsufficientBalanceModal from '../../components/InsufficientBalanceModal'
 
 type DashboardSummary = {
   balance: number
@@ -129,6 +130,7 @@ export default function DashboardPage() {
   const [botActionLoading, setBotActionLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
+  const [showBalanceModal, setShowBalanceModal] = useState(false)
 
   const userFirstLetter = useMemo(() => user?.email?.[0]?.toUpperCase() ?? 'U', [user?.email])
 
@@ -307,6 +309,16 @@ export default function DashboardPage() {
 
   const toggleBot = async () => {
     if (!token || !botStatus) return
+
+    // Bloquear se for iniciar e não tiver saldo
+    if (!botStatus.bot_enabled) {
+      const currentBalance = data?.summary.balance || 0;
+      if (currentBalance <= 0) {
+        setShowBalanceModal(true);
+        return;
+      }
+    }
+
     setBotActionLoading(true)
     try {
       const endpoint = botStatus.bot_enabled ? 'stop' : 'start'
@@ -765,6 +777,12 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+      <InsufficientBalanceModal
+        isOpen={showBalanceModal}
+        onClose={() => setShowBalanceModal(false)}
+        balance={data?.summary.balance || 0}
+      />
     </div>
   )
 }
