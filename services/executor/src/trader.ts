@@ -117,8 +117,9 @@ export class TradeExecutor {
     const profileResult = await this.pool.query('SELECT risk_profile FROM user_profiles WHERE user_id = $1', [userId]);
     const profile = (profileResult.rows[0] as UserProfile | undefined)?.risk_profile ?? 'moderate';
     const riskFactor = DEFAULT_POSITION_FACTOR[profile as keyof typeof DEFAULT_POSITION_FACTOR] ?? 0.03;
-    // Para saldo de $100, 3% = $3, mas vamos usar mínimo de $10 para testes visíveis
-    return Math.max(totalBalance * riskFactor, 10); // mínimo $10 para simulação (visível no teste)
+    // Se não houver saldo, o investimento deve ser zero.
+    if (totalBalance <= 0) return 0;
+    return totalBalance * riskFactor;
   }
 
   /**
@@ -206,6 +207,9 @@ export class TradeExecutor {
 
     // Calcular investimento final
     let investAmount = baseAmount * confidenceFactor * multiplierFactor;
+
+    // Se o valor calculado for zero ou menor, abortar
+    if (investAmount <= 0) return { amountUsd: 0, baseAmount: 0, confidenceFactor: 0, multiplierFactor: 0 };
 
     // Limites: mínimo $5, máximo 20% do saldo disponível
     // IMPORTANTE: Não pode exceder o saldo disponível!
@@ -690,6 +694,11 @@ export class TradeExecutor {
       const investment = await this.calculateIntendedInvestment(userId, request.token_id, request.signal_id);
       amountUsd = investment.amountUsd;
       investedAmount = amountUsd;
+    }
+
+    if (amountUsd <= 0) {
+      console.log(`[Executor] 🛑 Aborting paper buy: Insufficient calculated investment amount ($${amountUsd})`);
+      throw new Error('Insufficient balance for simulation trading');
     }
 
     const order = await this.createOrder({
