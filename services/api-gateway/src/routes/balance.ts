@@ -48,7 +48,7 @@ async function getAdminBalance(pool: Pool, userId: string, userEmail: string) {
                 COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS total_other_balances
             FROM ledger_entries
             WHERE user_id != $1
-              AND description NOT LIKE 'Initial paper trading%'`,
+              AND description NOT ILIKE '%paper%'`,
             [userId]
         );
 
@@ -100,7 +100,7 @@ export function initBalanceRoutes(pool: Pool): Router {
                COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
              FROM ledger_entries
              WHERE user_id = $1
-               AND description NOT LIKE 'Initial paper trading%'`,
+               AND description NOT ILIKE '%paper%'`,
                     [userId]
                 );
 
@@ -201,7 +201,7 @@ export function initBalanceRoutes(pool: Pool): Router {
                COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
              FROM ledger_entries
              WHERE user_id = $1
-               AND description NOT LIKE 'Initial paper trading%'`,
+               AND description NOT ILIKE '%paper%'`,
                     [userId]
                 );
 
@@ -284,7 +284,7 @@ export function initBalanceRoutes(pool: Pool): Router {
                COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
              FROM ledger_entries
              WHERE user_id = $1
-               AND description NOT LIKE 'Initial paper trading%'`,
+               AND description NOT ILIKE '%paper%'`,
                     [userId]
                 );
 
