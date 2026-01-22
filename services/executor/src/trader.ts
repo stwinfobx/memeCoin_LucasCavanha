@@ -41,6 +41,13 @@ export class TradeExecutor {
 
   private async ensureDefaultUser(): Promise<string> {
     const userId = this.defaultUserId;
+
+    // Se estivermos em modo LIVE, não criamos usuário fake nem depositamos saldo de mentira
+    if (this.executionMode === 'live') {
+      console.log(`[Executor] 🚨 LIVE MODE: Skipping paper trading user creation and initial deposit.`);
+      return userId;
+    }
+
     const userResult = await this.pool.query('SELECT id FROM users WHERE id = $1', [userId]);
     if (userResult.rowCount === 0) {
       await this.pool.query(
@@ -75,6 +82,11 @@ export class TradeExecutor {
     const credits = Number(balanceResult.rows[0]?.credits ?? 0);
     const debits = Number(balanceResult.rows[0]?.debits ?? 0);
     const currentBalance = Math.max(0, credits - debits);
+
+    // Se estivermos em LIVE, nunca damos saldo de mentira mesmo que o saldo seja < 100
+    if (this.executionMode === 'live') {
+      return userId;
+    }
 
     if (currentBalance < 100) {
       // Criar depósito inicial de $100 USD

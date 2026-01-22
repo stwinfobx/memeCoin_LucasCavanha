@@ -18,25 +18,30 @@ interface Summary {
 
 // Helper para garantir saldo inicial
 async function ensureUserInitialBalance(pool: any, userId: string): Promise<void> {
+  // Se estivermos em modo LIVE, não criamos saldo fake
+  if (process.env.BOT_EXECUTION_MODE === 'live') {
+    return;
+  }
+
   // IMPORTANTE: Verificar se o usuário existe na tabela users
   const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
   if (userCheck.rows.length === 0) {
     console.warn(`[Dashboard] ⚠️ User ${userId} does not exist in users table, skipping initial balance creation`);
     return;
   }
-  
+
   // Verificar se já existe um depósito inicial para evitar duplicação
   const existingDeposit = await pool.query(
     `SELECT COUNT(*) as count FROM ledger_entries 
      WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
     [userId]
   );
-  
+
   // Se já existe depósito inicial, não criar outro
   if (Number(existingDeposit.rows[0]?.count ?? 0) > 0) {
     return;
   }
-  
+
   // Calcular saldo correto (créditos - débitos)
   const balanceResult = await pool.query(
     `SELECT 
@@ -85,7 +90,8 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
           `SELECT
              COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
            FROM ledger_entries
-           WHERE user_id = $1`,
+           WHERE user_id = $1
+             ${process.env.BOT_EXECUTION_MODE === 'live' ? "AND description NOT ILIKE '%paper%'" : ""}`,
           [userId]
         ),
         pool.query(
@@ -157,7 +163,7 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     // trade_profit do ledger representa valor total recebido, não lucro
     // O saldo correto = depósitos + lucros realizados - perdas realizadas
     const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
-    
+
     // Declarar trades antes de usar
     const trades = tradesResult.rows[0] ?? {
       completed_trades: 0,
@@ -166,13 +172,13 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
       total_profit_realized: 0,
       total_loss_realized: 0,
     };
-    
+
     const realizedProfit = Number(trades.total_profit_realized ?? 0);
     const realizedLoss = Number(trades.total_loss_realized ?? 0);
-    
+
     // Saldo total = depósitos + lucros realizados - perdas realizadas
     const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
-    
+
     // Buscar investido em posições abertas e lucros/perdas não realizados
     const openPositionsBalance = await pool.query(
       `SELECT 
@@ -196,24 +202,24 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     const investedInPositions = Number(openPositionsBalance.rows[0]?.total_invested ?? 0);
     const unrealizedProfit = Number(openPositionsBalance.rows[0]?.unrealized_profit ?? 0);
     const unrealizedLoss = Number(openPositionsBalance.rows[0]?.unrealized_loss ?? 0);
-    
+
     // Saldo disponível = saldo total - investido em posições abertas
     const availableBalance = Math.max(0, totalBalance - investedInPositions);
     const balance = availableBalance; // Mostrar saldo disponível
-    
+
     const deposits = depositsResult.rows[0] ?? {
       total_deposits: 0,
     };
-    
+
     // IMPORTANTE: Lucro/perda real vem das orders, não do ledger
     // O ledger registra valores recebidos de vendas, não lucros
     const totalProfitRealized = Number(trades.total_profit_realized ?? 0);
     const totalLossRealized = Number(trades.total_loss_realized ?? 0);
-    
+
     // Combinar lucros/perdas realizados (de vendas) com não realizados (de posições abertas)
     const totalProfit = totalProfitRealized + unrealizedProfit;
     const totalLoss = totalLossRealized + unrealizedLoss;
-    
+
     // totalDeposits já foi declarado acima (linha 152)
     const riskStats = riskResult.rows[0] ?? {
       total_tokens: 0,
@@ -223,13 +229,13 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
 
     // Calcular lucro líquido total (realizado + não realizado)
     const netProfit = totalProfit - totalLoss;
-    
+
     // ROI baseado no lucro total vs. total depositado
     const roi =
       totalDeposits > 0
         ? (netProfit / totalDeposits) * 100
         : 0;
-    
+
     console.log('[Dashboard] 💰 Profit/Loss calculation:', {
       user_id: userId,
       total_profit_realized: totalProfitRealized,

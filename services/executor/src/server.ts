@@ -33,7 +33,7 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     environment: process.env.NODE_ENV || 'development',
-    execution_mode: 'simulation',
+    execution_mode: process.env.BOT_EXECUTION_MODE || 'simulation',
     timestamp: new Date().toISOString(),
   });
 });
@@ -308,8 +308,8 @@ app.listen(PORT, '0.0.0.0', () => {
   }, monitorInterval);
 
   console.log(`🔍 Position monitoring started (interval: ${monitorIntervalSeconds} seconds)`);
-  console.log(`💰 Paper trading mode: ENABLED`);
-  console.log(`🤖 Bot will automatically execute trades when signals are received`);
+  console.log(`💰 Execution mode: ${process.env.BOT_EXECUTION_MODE === 'live' ? '🔥 LIVE' : '📝 SIMULATION'}`);
+  console.log(`🤖 Bot implementation respects execution mode for trade execution`);
   console.log(`📊 Monitor positions every ${monitorIntervalSeconds} seconds for fast sell execution`);
 });
 
