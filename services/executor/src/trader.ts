@@ -83,11 +83,6 @@ export class TradeExecutor {
     const debits = Number(balanceResult.rows[0]?.debits ?? 0);
     const currentBalance = Math.max(0, credits - debits);
 
-    // Se estivermos em LIVE, nunca damos saldo de mentira mesmo que o saldo seja < 100
-    if (this.executionMode === 'live') {
-      return userId;
-    }
-
     if (currentBalance < 100) {
       // Criar depósito inicial de $100 USD
       const depositAmount = 100 - currentBalance;
