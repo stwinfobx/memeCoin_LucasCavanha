@@ -2,6 +2,7 @@
 import { Pool } from 'pg';
 import { PancakeSwapExecutor } from './blockchain/PancakeSwapExecutor';
 import { WalletManager } from './blockchain/wallet-manager';
+import { ethers } from 'ethers';
 
 export class RealTradingService {
     private pool: Pool;
@@ -10,6 +11,22 @@ export class RealTradingService {
     constructor(pool: Pool) {
         this.pool = pool;
         this.walletManager = new WalletManager(pool);
+    }
+
+    /**
+     * Busca o preço atual do BNB via CoinGecko ou fallback do env
+     */
+    private async getBNBPrice(): Promise<number> {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
+            const data: any = await response.json();
+            if (data && data.binancecoin && typeof data.binancecoin.usd === 'number') {
+                return data.binancecoin.usd;
+            }
+        } catch (e) {
+            console.error('[RealTradingService] Failed to fetch BNB price from CoinGecko:', e);
+        }
+        return Number(process.env.BNB_PRICE || 600);
     }
 
     /**
@@ -48,9 +65,8 @@ export class RealTradingService {
             const rpcUrl = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
             const pancake = new PancakeSwapExecutor(rpcUrl, this.pool);
 
-            // 4. Converter USD para BNB
-            // TODO: Buscar preço real via API (CoinGecko, etc)
-            const bnbPrice = Number(process.env.BNB_PRICE) || 600;
+            // 4. Converter USD para BNB usando preço real
+            const bnbPrice = await this.getBNBPrice();
             const amountBNB = (amountUSD / bnbPrice).toFixed(6);
 
             console.log(`[RealTrading] 💱 Converting: $${amountUSD} = ${amountBNB} BNB @ $${bnbPrice}/BNB`);
@@ -145,5 +161,59 @@ export class RealTradingService {
         const credits = Number(result.rows[0]?.credits ?? 0);
         const debits = Number(result.rows[0]?.debits ?? 0);
         return Math.max(0, credits - debits);
+    }
+
+    /**
+     * Calcula o saldo residual para o administrador
+     * Saldo Residual = Saldo Real (BNB) na Carteira - Soma dos Saldos Reais dos outros usuários
+     */
+    async getAdminResidualBalance(userId: string): Promise<number | null> {
+        const adminEmail = process.env.ADMIN_EMAIL || 'mulack.zuguenberg@gmail.com';
+
+        // Buscar email do usuário para confirmar se é admin
+        const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+        const userEmail = userResult.rows[0]?.email || '';
+
+        if (userEmail.toLowerCase() !== adminEmail.toLowerCase()) {
+            return null;
+        }
+
+        const botAddress = process.env.BOT_DEPOSIT_ADDRESS;
+        const rpcUrl = process.env.BSC_RPC_URL;
+
+        if (!botAddress || !rpcUrl) {
+            console.error('[RealTradingService] [Balance] BOT_DEPOSIT_ADDRESS or BSC_RPC_URL not defined');
+            return null;
+        }
+
+        try {
+            // Fetch live BNB price
+            const bnbPrice = await this.getBNBPrice();
+
+            const provider = new ethers.JsonRpcProvider(rpcUrl);
+            const bnbBalanceBigInt = await provider.getBalance(botAddress);
+            const bnbBalance = Number(ethers.formatEther(bnbBalanceBigInt));
+            const totalWalletValueUSD = bnbBalance * bnbPrice;
+
+            // Somar saldo virtual de todos os OUTROS usuários (excluindo paper trading)
+            const otherUsersResult = await this.pool.query(
+                `SELECT 
+                    COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) -
+                    COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS total_other_balances
+                 FROM ledger_entries
+                 WHERE user_id != $1
+                   AND description NOT ILIKE '%paper%'`,
+                [userId]
+            );
+
+            const otherUsersBalanceUSD = Number(otherUsersResult.rows[0]?.total_other_balances ?? 0);
+            const residualBalance = Math.max(0, totalWalletValueUSD - otherUsersBalanceUSD);
+
+            console.log(`[RealTradingService] [Balance] Admin Residual Balance: $${residualBalance.toFixed(2)} (Wallet: $${totalWalletValueUSD.toFixed(2)}, Others: $${otherUsersBalanceUSD.toFixed(2)})`);
+            return residualBalance;
+        } catch (error: any) {
+            console.error('[RealTradingService] [Balance] Error calculating residual balance:', error.message);
+            return null;
+        }
     }
 }

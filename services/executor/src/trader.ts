@@ -112,6 +112,7 @@ export class TradeExecutor {
     return userId;
   }
 
+
   public async getDefaultUserId(): Promise<string> {
     return this.ensureDefaultUser();
   }
@@ -174,12 +175,23 @@ export class TradeExecutor {
     const investedInPositions = Number(openPositionsResult.rows[0]?.total_invested ?? 0);
 
     // Saldo disponível = saldo total - investido em posições abertas
-    const availableBalance = Math.max(0, totalBalance - investedInPositions);
+    let availableBalance = Math.max(0, totalBalance - investedInPositions);
 
-    console.log(`[Executor] 💰 Balance calculation for user ${userId}:`, {
+    // Se estivermos em modo LIVE e for o admin, usar o saldo residual da blockchain
+    const residualBalance = await this.realTradingService.getAdminResidualBalance(userId);
+    if (this.executionMode === 'live' && residualBalance !== null) {
+      // O residual balance já subtrai o saldo de outros usuários. 
+      // Agora subtraímos o que o admin já tem investido para ter o "disponível" para novas compras.
+      const realAvailableBalance = Math.max(0, residualBalance - investedInPositions);
+      console.log(`[Executor] 💰 LIVE MODE: Admin detected. Using residual available balance: $${realAvailableBalance.toFixed(2)} (On-chain residual: $${residualBalance.toFixed(2)}, Invested: $${investedInPositions.toFixed(2)})`);
+      availableBalance = realAvailableBalance;
+    }
+
+    console.log(`[Executor] 💰 Final balance for user ${userId}:`, {
       total_balance: totalBalance,
       invested_in_positions: investedInPositions,
-      available_balance: availableBalance
+      available_balance: availableBalance,
+      is_live_admin: this.executionMode === 'live' && residualBalance !== null
     });
 
     // Verificar se há saldo disponível mínimo
@@ -1683,8 +1695,29 @@ export class TradeExecutor {
   ): Promise<void> {
     try {
       // IMPORTANTE: Limitar criação de notificações para evitar lotar o banco
-      // Não criar notificação se já existe uma similar recente (últimos 5 minutos)
-      if (severity === 'info' && type !== 'error' && type !== 'trade_executed' && type !== 'position_opened' && type !== 'position_closed') {
+      // Throttling: Não criar notificação se já existe uma similar recente
+
+      // 1. Throttling para Warnings Críticos (Saldo Insuficiente, Limites de Trade) - 1 HORA
+      if (severity === 'warning' || type === 'insufficient_balance_warning') {
+        const throttleInterval = '1 hour';
+        const recentNotification = await this.pool.query(
+          `SELECT id FROM bot_notifications 
+           WHERE user_id = $1 
+           AND notification_type = $2 
+           AND title = $3
+           AND created_at > NOW() - INTERVAL '${throttleInterval}'
+           LIMIT 1`,
+          [userId, type, title]
+        );
+
+        if (recentNotification.rows.length > 0) {
+          console.log(`[Executor] ⏭️ Throttling warning notification (1h): ${type} - ${title}`);
+          return;
+        }
+      }
+
+      // 2. Throttling para Info Geral - 5 MINUTOS
+      if (severity === 'info' && type !== 'trade_executed' && type !== 'position_opened' && type !== 'position_closed') {
         const recentNotification = await this.pool.query(
           `SELECT id FROM bot_notifications 
            WHERE user_id = $1 
@@ -1696,8 +1729,8 @@ export class TradeExecutor {
         );
 
         if (recentNotification.rows.length > 0) {
-          console.log(`[Executor] ⏭️ Skipping duplicate notification: ${type} - ${title}`);
-          return; // Não criar notificação duplicada
+          console.log(`[Executor] ⏭️ Skipping duplicate info notification (5m): ${type} - ${title}`);
+          return;
         }
       }
 
@@ -1977,11 +2010,11 @@ export class TradeExecutor {
             console.log(`[Executor] ⚠️ Max open trades (${maxOpenTrades}) reached, skipping BUY for ${tokenSymbol}`);
             await this.createNotification(
               userId,
-              'error_occurred',
-              'info',
+              'trade_limit_reached',
+              'warning',
               'Limite de trades atingido',
               `🤖 Tentei comprar ${tokenSymbol}, mas já tenho ${openPositionsCount} posições abertas (máximo: ${maxOpenTrades}). Vou aguardar...`,
-              { symbol: tokenSymbol, open_positions: openPositionsCount, max_open_trades: maxOpenTrades }
+              { symbol: tokenSymbol, open_positions: openPositionsCount, max_open_trades: maxOpenTrades, throttled: true }
             );
             return;
           }
@@ -2009,23 +2042,33 @@ export class TradeExecutor {
           const investedInPositions = Number(openPositionsCheck.rows[0]?.total_invested ?? 0);
 
           // Saldo disponível = total - investido em posições abertas
-          const availableBalance = Math.max(0, totalBalance - investedInPositions);
+          let availableBalance = Math.max(0, totalBalance - investedInPositions);
+
+          // Se estivermos em modo LIVE e for o admin, usar o saldo residual da blockchain
+          const residualBalance = await this.realTradingService.getAdminResidualBalance(userId);
+          if (this.executionMode === 'live' && residualBalance !== null) {
+            availableBalance = Math.max(0, residualBalance - investedInPositions);
+            console.log(`[Executor] 💰 LIVE MODE: Admin balance override: $${availableBalance.toFixed(2)}`);
+          }
 
           console.log(`[Executor] 💰 Balance check before BUY for ${tokenSymbol}:`, {
             total_balance: totalBalance,
             invested_in_positions: investedInPositions,
-            available_balance: availableBalance
+            available_balance: availableBalance,
+            is_live_admin: this.executionMode === 'live' && residualBalance !== null
           });
 
           if (availableBalance < 5) {
             console.log(`[Executor] ⚠️ Insufficient available balance ($${availableBalance.toFixed(2)}), skipping BUY for ${tokenSymbol}`);
+
+            // Throttle notification for insufficient balance (once per hour)
             await this.createNotification(
               userId,
-              'error_occurred',
+              'insufficient_balance_warning',
               'warning',
               'Saldo insuficiente',
               `🤖 Tentei comprar ${tokenSymbol}, mas meu saldo disponível é de apenas $${availableBalance.toFixed(2)} (total: $${totalBalance.toFixed(2)}, investido: $${investedInPositions.toFixed(2)}). Mínimo necessário: $5.00. Aguardando mais capital...`,
-              { symbol: tokenSymbol, total_balance: totalBalance, invested: investedInPositions, available_balance: availableBalance }
+              { symbol: tokenSymbol, total_balance: totalBalance, invested: investedInPositions, available_balance: availableBalance, throttled: true }
             );
             return;
           }
