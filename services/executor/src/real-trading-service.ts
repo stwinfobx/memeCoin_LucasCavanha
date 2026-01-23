@@ -42,6 +42,17 @@ export class RealTradingService {
      * Verifica se usuário tem real trading habilitado
      */
     async isRealTradingEnabled(userId: string): Promise<boolean> {
+        // 1. Bypass automático para o Administrador
+        const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+        const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+        const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
+
+        if (adminEmail && userEmail === adminEmail) {
+            console.log(`[RealTradingService] 🛡️ Admin bypass: User ${userEmail} is allowed to trade in LIVE mode by default.`);
+            return true;
+        }
+
+        // 2. Lógica normal para outros usuários via banco de dados
         const result = await this.pool.query(
             'SELECT real_trading_enabled FROM user_profiles WHERE user_id = $1',
             [userId]
