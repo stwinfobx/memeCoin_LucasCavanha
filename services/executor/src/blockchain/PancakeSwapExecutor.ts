@@ -143,8 +143,21 @@ export class PancakeSwapExecutor {
             const balance = await tokenContract.balanceOf(wallet.address);
             console.log(`[PancakeSwap] 💰 Wallet balance: ${ethers.formatUnits(balance, decimals)} tokens`);
 
+            // FIX: Se o saldo real for menor que o solicitado, vender o que está disponível
+            // Isso acontece com tokens que têm taxa de transferência ou são deflacionários
+            let actualAmountIn = amountIn;
             if (balance < amountIn) {
-                throw new Error(`Insufficient token balance. Have: ${ethers.formatUnits(balance, decimals)}, Need: ${roundedAmount}`);
+                console.log(`[PancakeSwap] ⚠️ Balance mismatch detected!`);
+                console.log(`[PancakeSwap]    - Requested: ${roundedAmount} tokens`);
+                console.log(`[PancakeSwap]    - Available: ${ethers.formatUnits(balance, decimals)} tokens`);
+                console.log(`[PancakeSwap]    - Difference: ${ethers.formatUnits(amountIn - balance, decimals)} tokens (${(((amountIn - balance) * BigInt(100)) / amountIn).toString()}%)`);
+
+                if (balance === BigInt(0)) {
+                    throw new Error(`No tokens available in wallet. This position may have been already sold or the token has a 100% transfer tax.`);
+                }
+
+                console.log(`[PancakeSwap] 🔄 Adjusting sell amount to available balance: ${ethers.formatUnits(balance, decimals)} tokens`);
+                actualAmountIn = balance;
             }
 
             // SEMPRE aprovar antes de vender (fix para bug de allowance)
@@ -155,7 +168,7 @@ export class PancakeSwapExecutor {
 
             // Verificar se há liquidez suficiente
             console.log('[PancakeSwap] 🔍 Checking liquidity...');
-            const amounts = await this.router.getAmountsOut(amountIn, path);
+            const amounts = await this.router.getAmountsOut(actualAmountIn, path);
             const expectedAmountOut = amounts[1];
 
             if (expectedAmountOut === BigInt(0)) {
@@ -172,14 +185,14 @@ export class PancakeSwapExecutor {
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
             console.log(`[PancakeSwap] 🚀 Executing swap...`);
-            console.log(`[PancakeSwap]    - AmountIn: ${amountIn.toString()}`);
+            console.log(`[PancakeSwap]    - AmountIn: ${actualAmountIn.toString()}`);
             console.log(`[PancakeSwap]    - AmountOutMin: ${amountOutMin.toString()}`);
             console.log(`[PancakeSwap]    - Path: ${path.join(' -> ')}`);
             console.log(`[PancakeSwap]    - Deadline: ${deadline}`);
 
             // Executar swap
             const tx = await (routerWithSigner as any).swapExactTokensForETH(
-                amountIn,
+                actualAmountIn,
                 amountOutMin,
                 path,
                 wallet.address,
