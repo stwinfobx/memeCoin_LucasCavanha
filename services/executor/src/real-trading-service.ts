@@ -72,26 +72,41 @@ export class RealTradingService {
         try {
             console.log(`[RealTrading] 🔥 Executing REAL BUY for user ${userId}`);
 
-            // 1. Buscar wallet gerenciada do usuário
-            const wallet = await this.walletManager.getWallet(userId, 'BSC');
-            if (!wallet) {
-                throw new Error('User does not have a BSC wallet. Create one via /api/wallet/create');
+            // 1. Verificar se é o admin e usar carteira master diretamente
+            const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+            const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+            const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
+            const isAdmin = adminEmail && userEmail === adminEmail;
+
+            let privateKey: string;
+
+            if (isAdmin) {
+                // Admin: usar carteira master diretamente
+                privateKey = process.env.BOT_PRIVATE_KEY || '';
+                if (!privateKey) {
+                    throw new Error('BOT_PRIVATE_KEY not defined in .env');
+                }
+                console.log(`[RealTrading] 👮 Admin detected, using master wallet for real trade`);
+            } else {
+                // Outros usuários: buscar carteira individual
+                const wallet = await this.walletManager.getWallet(userId, 'BSC');
+                if (!wallet) {
+                    throw new Error('User does not have a BSC wallet. Create one via /api/wallet/create');
+                }
+                privateKey = await this.walletManager.decryptPrivateKey(wallet.encrypted_private_key);
             }
 
-            // 2. Descriptografar private key
-            const privateKey = await this.walletManager.decryptPrivateKey(wallet.encrypted_private_key);
-
-            // 3. Inicializar PancakeSwap Executor
+            // 2. Inicializar PancakeSwap Executor
             const rpcUrl = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
             const pancake = new PancakeSwapExecutor(rpcUrl, this.pool);
 
-            // 4. Converter USD para BNB usando preço real
+            // 3. Converter USD para BNB usando preço real
             const bnbPrice = await this.getBNBPrice();
             const amountBNB = (amountUSD / bnbPrice).toFixed(6);
 
             console.log(`[RealTrading] 💱 Converting: $${amountUSD} = ${amountBNB} BNB @ $${bnbPrice}/BNB`);
 
-            // 5. Executar swap BNB → Token
+            // 4. Executar swap BNB → Token
             const swapResult = await pancake.buyTokenWithBNB(
                 privateKey,
                 tokenAddress,
@@ -127,20 +142,35 @@ export class RealTradingService {
         try {
             console.log(`[RealTrading] 🔥 Executing REAL SELL for user ${userId}`);
 
-            // 1. Buscar wallet
-            const wallet = await this.walletManager.getWallet(userId, 'BSC');
-            if (!wallet) {
-                throw new Error('User does not have a BSC wallet');
+            // 1. Verificar se é o admin e usar carteira master diretamente
+            const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+            const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+            const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
+            const isAdmin = adminEmail && userEmail === adminEmail;
+
+            let privateKey: string;
+
+            if (isAdmin) {
+                // Admin: usar carteira master diretamente
+                privateKey = process.env.BOT_PRIVATE_KEY || '';
+                if (!privateKey) {
+                    throw new Error('BOT_PRIVATE_KEY not defined in .env');
+                }
+                console.log(`[RealTrading] 👮 Admin detected, using master wallet for real trade`);
+            } else {
+                // Outros usuários: buscar carteira individual
+                const wallet = await this.walletManager.getWallet(userId, 'BSC');
+                if (!wallet) {
+                    throw new Error('User does not have a BSC wallet');
+                }
+                privateKey = await this.walletManager.decryptPrivateKey(wallet.encrypted_private_key);
             }
 
-            // 2. Descriptografar private key
-            const privateKey = await this.walletManager.decryptPrivateKey(wallet.encrypted_private_key);
-
-            // 3. Inicializar PancakeSwap
+            // 2. Inicializar PancakeSwap
             const rpcUrl = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
             const pancake = new PancakeSwapExecutor(rpcUrl, this.pool);
 
-            // 4. Executar swap Token → BNB
+            // 3. Executar swap Token → BNB
             const swapResult = await pancake.sellTokenForBNB(
                 privateKey,
                 tokenAddress,
