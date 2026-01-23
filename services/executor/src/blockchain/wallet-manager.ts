@@ -46,6 +46,28 @@ export class WalletManager {
      */
     decryptPrivateKey(encryptedKey: string): string {
         try {
+            // Tentar parsear como JSON primeiro (formato do script encrypt-wallet.js)
+            if (encryptedKey.trim().startsWith('{')) {
+                const parsed = JSON.parse(encryptedKey);
+                const iv = Buffer.from(parsed.iv, 'hex');
+                const encrypted = Buffer.from(parsed.encrypted, 'hex');
+                const authTag = Buffer.from(parsed.authTag, 'hex');
+
+                const decipher = crypto.createDecipheriv(
+                    'aes-256-gcm',
+                    Buffer.from(this.encryptionKey, 'hex'),
+                    iv
+                );
+
+                decipher.setAuthTag(authTag);
+
+                let decrypted = decipher.update(encrypted);
+                decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+                return decrypted.toString('utf8');
+            }
+
+            // Formato legado: iv:encrypted
             const [ivHex, encryptedHex] = encryptedKey.split(':');
             const iv = Buffer.from(ivHex, 'hex');
             const encrypted = Buffer.from(encryptedHex, 'hex');
