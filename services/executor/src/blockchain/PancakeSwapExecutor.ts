@@ -221,10 +221,26 @@ export class PancakeSwapExecutor {
         } catch (error: any) {
             console.error('[PancakeSwap] ❌ Sell failed:', error.message);
 
+            // Detectar erro de replacement underpriced (transação pendente)
+            const isReplacementError = error.code === 'REPLACEMENT_UNDERPRICED' ||
+                error.message?.includes('replacement transaction underpriced');
+
+            if (isReplacementError) {
+                console.log(`[PancakeSwap] ⏸️ Transaction pending, waiting 10 seconds before retry...`);
+                await new Promise(resolve => setTimeout(resolve, 10000)); // Aguardar 10s
+            }
+
             // Retry com slippage maior se falhou
             if (slippagePercent < 20) {
                 const newSlippage = slippagePercent + 5;
                 console.log(`[PancakeSwap] 🔄 Retrying with ${newSlippage}% slippage...`);
+
+                // Aguardar 5 segundos antes de retry para evitar conflitos de nonce
+                if (!isReplacementError) {
+                    console.log(`[PancakeSwap] ⏸️ Waiting 5 seconds before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+
                 return this.sellTokenForBNB(privateKey, tokenAddress, amountToken, newSlippage);
             }
 
@@ -319,5 +335,145 @@ export class PancakeSwapExecutor {
             gasPrice,
             totalCost
         };
+    }
+
+    /**
+     * Detecta a taxa de transferência de um token
+     * Verifica funções comuns de taxa no contrato
+     * @param tokenAddress Endereço do token a verificar
+     * @returns Objeto com informações sobre a taxa
+     */
+    async detectTransferTax(
+        tokenAddress: string
+    ): Promise<{
+        hasTax: boolean;
+        taxPercentage: number;
+        isSafe: boolean;
+        warnings: string[];
+    }> {
+        try {
+            console.log(`[PancakeSwap] 🔍 Detecting transfer tax for token ${tokenAddress}...`);
+
+            const extendedABI = [
+                ...ERC20_ABI,
+                'function _taxFee() external view returns (uint256)',
+                'function _liquidityFee() external view returns (uint256)',
+                'function buyTax() external view returns (uint256)',
+                'function sellTax() external view returns (uint256)',
+                'function totalFees() external view returns (uint256)',
+                'function transferTax() external view returns (uint256)',
+                'function _buyTax() external view returns (uint256)',
+                'function _sellTax() external view returns (uint256)'
+            ];
+
+            const tokenContract = new Contract(tokenAddress, extendedABI, this.provider);
+            let maxTax = 0;
+            const warnings: string[] = [];
+
+            // Tentar ler taxas comuns
+            const taxFunctions = [
+                { name: '_taxFee', type: 'general' },
+                { name: '_liquidityFee', type: 'liquidity' },
+                { name: 'buyTax', type: 'buy' },
+                { name: 'sellTax', type: 'sell' },
+                { name: 'totalFees', type: 'total' },
+                { name: 'transferTax', type: 'transfer' },
+                { name: '_buyTax', type: 'buy' },
+                { name: '_sellTax', type: 'sell' }
+            ];
+
+            for (const { name, type } of taxFunctions) {
+                try {
+                    const taxValue = await (tokenContract as any)[name]();
+                    // Taxas geralmente são em base 100 ou 10000
+                    let taxNum = Number(taxValue);
+
+                    // Se o valor for muito alto, provavelmente está em base 10000
+                    if (taxNum > 100) {
+                        taxNum = taxNum / 100; // Converter de base 10000 para porcentagem
+                    }
+
+                    if (taxNum > 0) {
+                        console.log(`[PancakeSwap] 📌 Found ${name} (${type}): ${taxNum}%`);
+                        warnings.push(`${type} tax: ${taxNum}%`);
+                        maxTax = Math.max(maxTax, taxNum);
+                    }
+                } catch {
+                    // Função não existe, continuar
+                }
+            }
+
+            const hasTax = maxTax > 0;
+            const isSafe = maxTax <= 10; // Máximo 10% de taxa
+
+            if (!isSafe) {
+                warnings.push(`⚠️ HIGH TAX DETECTED: ${maxTax}% - This token may be a scam!`);
+            }
+
+            console.log(`[PancakeSwap] ${isSafe ? '✅' : '🚨'} Transfer tax detection result:`);
+            console.log(`[PancakeSwap]    - Has tax: ${hasTax}`);
+            console.log(`[PancakeSwap]    - Max tax: ${maxTax}%`);
+            console.log(`[PancakeSwap]    - Is safe: ${isSafe}`);
+            if (warnings.length > 0) {
+                console.log(`[PancakeSwap]    - Warnings: ${warnings.join(', ')}`);
+            }
+
+            return {
+                hasTax,
+                taxPercentage: maxTax,
+                isSafe,
+                warnings
+            };
+
+        } catch (error: any) {
+            console.error('[PancakeSwap] ⚠️ Could not detect transfer tax:', error.message);
+            // Em caso de erro, assumir seguro (dar benefício da dúvida)
+            return {
+                hasTax: false,
+                taxPercentage: 0,
+                isSafe: true,
+                warnings: ['Could not detect tax - proceeding with caution']
+            };
+        }
+    }
+
+    /**
+     * Verifica o saldo real após uma compra e retorna a diferença
+     * @param tokenAddress Endereço do token
+     * @param walletAddress Endereço da carteira
+     * @param expectedAmount Quantidade esperada
+     * @returns Saldo real e porcentagem de perda
+     */
+    async verifyActualBalance(
+        tokenAddress: string,
+        walletAddress: string,
+        expectedAmount: bigint
+    ): Promise<{
+        actualBalance: bigint;
+        lossPercentage: number;
+        hasTax: boolean;
+    }> {
+        try {
+            const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
+            const decimals = await tokenContract.decimals();
+            const actualBalance = await tokenContract.balanceOf(walletAddress);
+
+            const loss = expectedAmount - actualBalance;
+            const lossPercentage = Number((loss * BigInt(100)) / expectedAmount);
+
+            console.log(`[PancakeSwap] 📊 Balance verification:`);
+            console.log(`[PancakeSwap]    - Expected: ${ethers.formatUnits(expectedAmount, decimals)}`);
+            console.log(`[PancakeSwap]    - Actual: ${ethers.formatUnits(actualBalance, decimals)}`);
+            console.log(`[PancakeSwap]    - Loss: ${lossPercentage}%`);
+
+            return {
+                actualBalance,
+                lossPercentage,
+                hasTax: lossPercentage > 1 // Mais de 1% de perda indica taxa
+            };
+        } catch (error: any) {
+            console.error('[PancakeSwap] ❌ Could not verify balance:', error.message);
+            throw error;
+        }
     }
 }
