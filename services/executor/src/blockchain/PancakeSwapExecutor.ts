@@ -128,26 +128,39 @@ export class PancakeSwapExecutor {
         try {
             // Buscar decimals do token
             const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
+            const tokenWithSigner = tokenContract.connect(wallet);
             const decimals = await tokenContract.decimals();
+
+            console.log(`[PancakeSwap] 🔍 Token decimals: ${decimals}`);
 
             // FIX: Arredondar para evitar "too many decimals"
             const roundedAmount = parseFloat(amountToken).toFixed(Number(decimals));
             const amountIn = ethers.parseUnits(roundedAmount, decimals);
 
-            // Aprovar token se necessário
-            const tokenWithSigner = tokenContract.connect(wallet);
-            const allowance = await tokenContract.allowance(wallet.address, PANCAKESWAP_ROUTER_V2);
+            console.log(`[PancakeSwap] 📊 Amount to sell: ${roundedAmount} tokens (${amountIn.toString()} wei)`);
 
-            if (allowance < amountIn) {
-                console.log('[PancakeSwap] 🔓 Approving token spend...');
-                const approveTx = await (tokenWithSigner as any).approve(PANCAKESWAP_ROUTER_V2, ethers.MaxUint256);
-                await approveTx.wait();
-                console.log('[PancakeSwap] ✅ Token approved');
+            // Verificar saldo do token
+            const balance = await tokenContract.balanceOf(wallet.address);
+            console.log(`[PancakeSwap] 💰 Wallet balance: ${ethers.formatUnits(balance, decimals)} tokens`);
+
+            if (balance < amountIn) {
+                throw new Error(`Insufficient token balance. Have: ${ethers.formatUnits(balance, decimals)}, Need: ${roundedAmount}`);
             }
 
-            // Estimar quantidade de BNB que receberá
+            // SEMPRE aprovar antes de vender (fix para bug de allowance)
+            console.log('[PancakeSwap] 🔓 Approving token spend...');
+            const approveTx = await (tokenWithSigner as any).approve(PANCAKESWAP_ROUTER_V2, ethers.MaxUint256);
+            const approveReceipt = await approveTx.wait();
+            console.log(`[PancakeSwap] ✅ Token approved (tx: ${approveReceipt.hash})`);
+
+            // Verificar se há liquidez suficiente
+            console.log('[PancakeSwap] 🔍 Checking liquidity...');
             const amounts = await this.router.getAmountsOut(amountIn, path);
             const expectedAmountOut = amounts[1];
+
+            if (expectedAmountOut === BigInt(0)) {
+                throw new Error('No liquidity available for this token pair');
+            }
 
             // Aplicar slippage
             const amountOutMin = (expectedAmountOut * BigInt(100 - slippagePercent)) / BigInt(100);
@@ -158,6 +171,12 @@ export class PancakeSwapExecutor {
             // Deadline: 20 minutos
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
+            console.log(`[PancakeSwap] 🚀 Executing swap...`);
+            console.log(`[PancakeSwap]    - AmountIn: ${amountIn.toString()}`);
+            console.log(`[PancakeSwap]    - AmountOutMin: ${amountOutMin.toString()}`);
+            console.log(`[PancakeSwap]    - Path: ${path.join(' -> ')}`);
+            console.log(`[PancakeSwap]    - Deadline: ${deadline}`);
+
             // Executar swap
             const tx = await (routerWithSigner as any).swapExactTokensForETH(
                 amountIn,
@@ -165,13 +184,17 @@ export class PancakeSwapExecutor {
                 path,
                 wallet.address,
                 deadline,
-                { gasLimit: 300000 }
+                { gasLimit: 500000 } // Aumentado de 300k para 500k
             );
 
             console.log(`[PancakeSwap] 📤 Transaction sent: ${tx.hash}`);
             console.log(`[PancakeSwap] ⏳ Waiting for confirmation...`);
 
             const receipt = await tx.wait();
+
+            if (receipt.status === 0) {
+                throw new Error(`Transaction reverted. Hash: ${receipt.hash}`);
+            }
 
             console.log(`[PancakeSwap] ✅ Transaction confirmed! Block: ${receipt.blockNumber}`);
 
