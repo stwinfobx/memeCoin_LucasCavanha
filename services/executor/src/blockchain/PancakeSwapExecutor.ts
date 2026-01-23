@@ -116,7 +116,7 @@ export class PancakeSwapExecutor {
         privateKey: string,
         tokenAddress: string,
         amountToken: string,
-        slippagePercent: number = 1
+        slippagePercent: number = 10
     ): Promise<SwapResult> {
         const wallet = new Wallet(privateKey, this.provider);
         const routerWithSigner = this.router.connect(wallet);
@@ -129,7 +129,10 @@ export class PancakeSwapExecutor {
             // Buscar decimals do token
             const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
             const decimals = await tokenContract.decimals();
-            const amountIn = ethers.parseUnits(amountToken, decimals);
+
+            // FIX: Arredondar para evitar "too many decimals"
+            const roundedAmount = parseFloat(amountToken).toFixed(Number(decimals));
+            const amountIn = ethers.parseUnits(roundedAmount, decimals);
 
             // Aprovar token se necessário
             const tokenWithSigner = tokenContract.connect(wallet);
@@ -181,6 +184,14 @@ export class PancakeSwapExecutor {
             };
         } catch (error: any) {
             console.error('[PancakeSwap] ❌ Sell failed:', error.message);
+
+            // Retry com slippage maior se falhou
+            if (slippagePercent < 20) {
+                const newSlippage = slippagePercent + 5;
+                console.log(`[PancakeSwap] 🔄 Retrying with ${newSlippage}% slippage...`);
+                return this.sellTokenForBNB(privateKey, tokenAddress, amountToken, newSlippage);
+            }
+
             throw new Error(`PancakeSwap sell failed: ${error.message}`);
         }
     }
