@@ -102,13 +102,47 @@ export class RealTradingService {
             const rpcUrl = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
             const pancake = new PancakeSwapExecutor(rpcUrl, this.pool);
 
-            // 3. Converter USD para BNB usando preço real
+            // 3. PROTEÇÃO: Verificar se é honeypot/scam
+            console.log(`[RealTrading] 🛡️ Checking if token is a honeypot...`);
+            const honeypotCheck = await this.checkHoneypot(tokenAddress);
+
+            if (!honeypotCheck.isSafe) {
+                const errorMsg = `Token ${tokenSymbol} is a HONEYPOT/SCAM! ${honeypotCheck.reason}`;
+                console.error(`[RealTrading] 🚨 ${errorMsg}`);
+                return {
+                    success: false,
+                    error: errorMsg
+                };
+            }
+            console.log(`[RealTrading] ✅ Token passed honeypot check`);
+
+            // 4. PROTEÇÃO: Detectar taxa de transferência ANTES de comprar
+            console.log(`[RealTrading] 🛡️ Checking token for transfer tax...`);
+            const taxCheck = await pancake.detectTransferTax(tokenAddress);
+
+            if (!taxCheck.isSafe) {
+                const errorMsg = `Token ${tokenSymbol} has HIGH transfer tax (${taxCheck.taxPercentage}%)! Blocking purchase to protect funds.`;
+                console.error(`[RealTrading] 🚨 ${errorMsg}`);
+                console.error(`[RealTrading] 🚨 Warnings: ${taxCheck.warnings.join(', ')}`);
+                return {
+                    success: false,
+                    error: errorMsg
+                };
+            }
+
+            if (taxCheck.hasTax) {
+                console.log(`[RealTrading] ⚠️ Token has ${taxCheck.taxPercentage}% transfer tax (acceptable)`);
+            } else {
+                console.log(`[RealTrading] ✅ Token appears safe (no detectable transfer tax)`);
+            }
+
+            // 5. Converter USD para BNB usando preço real
             const bnbPrice = await this.getBNBPrice();
             const amountBNB = (amountUSD / bnbPrice).toFixed(6);
 
             console.log(`[RealTrading] 💱 Converting: $${amountUSD} = ${amountBNB} BNB @ $${bnbPrice}/BNB`);
 
-            // 4. Executar swap BNB → Token
+            // 6. Executar swap BNB → Token
             const swapResult = await pancake.buyTokenWithBNB(
                 privateKey,
                 tokenAddress,
@@ -117,7 +151,33 @@ export class RealTradingService {
             );
 
             console.log(`[RealTrading] ✅ REAL BUY executed! TX: ${swapResult.txHash}`);
-            console.log(`[RealTrading] 💰 Received ${swapResult.amountOut} tokens`);
+            console.log(`[RealTrading] 💰 Expected to receive: ${swapResult.amountOut} tokens`);
+
+            // 7. VERIFICAÇÃO: Checar saldo real após compra para detectar taxa oculta
+            try {
+                // Aguardar 3 segundos para a transação se propagar
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                const wallet = new (await import('ethers')).Wallet(privateKey);
+                const expectedAmount = (await import('ethers')).ethers.parseUnits(swapResult.amountOut, 18);
+
+                const balanceCheck = await pancake.verifyActualBalance(
+                    tokenAddress,
+                    wallet.address,
+                    expectedAmount
+                );
+
+                if (balanceCheck.hasTax) {
+                    console.log(`[RealTrading] ⚠️ HIDDEN TAX DETECTED: Lost ${balanceCheck.lossPercentage}% in transfer!`);
+                    console.log(`[RealTrading] 📊 Actual balance: ${(await import('ethers')).ethers.formatUnits(balanceCheck.actualBalance, 18)} tokens`);
+                    // TODO: Atualizar o saldo no banco de dados com o valor real
+                } else {
+                    console.log(`[RealTrading] ✅ Balance verified: No hidden tax detected`);
+                }
+            } catch (verifyError: any) {
+                console.error(`[RealTrading] ⚠️ Could not verify balance:`, verifyError.message);
+                // Não falhar a compra por causa disso
+            }
 
             return {
                 success: true,
@@ -281,6 +341,86 @@ export class RealTradingService {
         } catch (error: any) {
             console.error('[RealTradingService] [Balance] Error calculating residual balance:', error.message);
             return null;
+        }
+    }
+
+    /**
+     * Verifica se um token é honeypot/scam usando GoPlus Security API
+     * @param tokenAddress Endereço do token
+     * @returns Objeto indicando se é seguro e motivo
+     */
+    async checkHoneypot(tokenAddress: string): Promise<{
+        isSafe: boolean;
+        reason: string;
+    }> {
+        try {
+            // GoPlus Security API - Free honeypot detection
+            const url = `https://api.gopluslabs.io/api/v1/token_security/56?contract_addresses=${tokenAddress}`;
+
+            const response = await fetch(url);
+            const data: any = await response.json();
+
+            if (!data.result || !data.result[tokenAddress.toLowerCase()]) {
+                console.log(`[RealTrading] ⚠️ Could not fetch honeypot data, proceeding with caution`);
+                return { isSafe: true, reason: 'No data available' };
+            }
+
+            const tokenData = data.result[tokenAddress.toLowerCase()];
+
+            // Verificar flags de perigo
+            const dangers = [];
+
+            // 1. Honeypot direto
+            if (tokenData.is_honeypot === '1' || tokenData.is_honeypot === true) {
+                dangers.push('IS_HONEYPOT');
+            }
+
+            // 2. Não pode vender
+            if (tokenData.cannot_sell_all === '1' || tokenData.cannot_sell_all === true) {
+                dangers.push('CANNOT_SELL');
+            }
+
+            // 3. Taxa de compra/venda muito alta (>50%)
+            const buyTax = parseFloat(tokenData.buy_tax || '0');
+            const sellTax = parseFloat(tokenData.sell_tax || '0');
+
+            if (buyTax > 50) {
+                dangers.push(`HIGH_BUY_TAX(${buyTax}%)`);
+            }
+            if (sellTax > 50) {
+                dangers.push(`HIGH_SELL_TAX(${sellTax}%)`);
+            }
+
+            // 4. Owner pode mudar saldo
+            if (tokenData.can_take_back_ownership === '1' || tokenData.can_take_back_ownership === true) {
+                dangers.push('OWNER_CAN_TAKE_BACK');
+            }
+
+            // 5. Proprietário tem muito do supply (>50%)
+            const holderCount = parseInt(tokenData.holder_count || '0');
+            if (holderCount < 10) {
+                dangers.push(`LOW_HOLDERS(${holderCount})`);
+            }
+
+            if (dangers.length > 0) {
+                return {
+                    isSafe: false,
+                    reason: dangers.join(', ')
+                };
+            }
+
+            // Log de informações úteis
+            console.log(`[RealTrading] 📊 Token security info:`);
+            console.log(`[RealTrading]    - Buy tax: ${buyTax}%`);
+            console.log(`[RealTrading]    - Sell tax: ${sellTax}%`);
+            console.log(`[RealTrading]    - Holders: ${holderCount}`);
+
+            return { isSafe: true, reason: 'Passed all checks' };
+
+        } catch (error: any) {
+            console.error(`[RealTrading] ⚠️ Error checking honeypot:`, error.message);
+            // Em caso de erro na API, dar benefício da dúvida
+            return { isSafe: true, reason: 'API error - proceeding with caution' };
         }
     }
 }
