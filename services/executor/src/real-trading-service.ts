@@ -82,10 +82,12 @@ export class RealTradingService {
 
             if (isAdmin) {
                 // Admin: usar carteira master diretamente
-                privateKey = process.env.BOT_PRIVATE_KEY || '';
-                if (!privateKey) {
-                    throw new Error('BOT_PRIVATE_KEY not defined in .env');
+                const encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
+                if (!encryptedKey) {
+                    throw new Error('BOT_WALLET_PRIVATE_KEY not defined in .env');
                 }
+                // Descriptografar a chave encriptada
+                privateKey = await this.walletManager.decryptPrivateKey(encryptedKey);
                 console.log(`[RealTrading] 👮 Admin detected, using master wallet for real trade`);
             } else {
                 // Outros usuários: buscar carteira individual
@@ -152,10 +154,12 @@ export class RealTradingService {
 
             if (isAdmin) {
                 // Admin: usar carteira master diretamente
-                privateKey = process.env.BOT_PRIVATE_KEY || '';
-                if (!privateKey) {
-                    throw new Error('BOT_PRIVATE_KEY not defined in .env');
+                const encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
+                if (!encryptedKey) {
+                    throw new Error('BOT_WALLET_PRIVATE_KEY not defined in .env');
                 }
+                // Descriptografar a chave encriptada
+                privateKey = await this.walletManager.decryptPrivateKey(encryptedKey);
                 console.log(`[RealTrading] 👮 Admin detected, using master wallet for real trade`);
             } else {
                 // Outros usuários: buscar carteira individual
