@@ -82,8 +82,17 @@ type TokenFeedItem = {
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
-const formatCurrency = (value: number | null | undefined) =>
-  Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }).format(value ?? 0)
+const formatCurrency = (value: number | null | undefined) => {
+  const val = value ?? 0;
+  if (val === 0) return 'US$ 0,00';
+
+  // Para valores muito baixos (< 0.01), mostrar mais casas decimais
+  if (val < 0.01) {
+    return `US$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 10 })}`;
+  }
+
+  return Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }).format(val);
+}
 
 const formatPercent = (value: number | null | undefined) =>
   `${Number(value ?? 0).toFixed(2)}%`
@@ -518,7 +527,7 @@ export default function DashboardPage() {
                     <p className="mt-3 text-sm text-neutral-400 leading-relaxed">{signal.reasoning}</p>
                   )}
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
-                    <span>Preço: {formatCurrency(signal.price_usd)}</span>
+                    <span>Cotação: {formatCurrency(signal.price_usd)}</span>
                     <span>Emitido em: {new Date(signal.created_at).toLocaleString('pt-BR')}</span>
                   </div>
                 </div>
