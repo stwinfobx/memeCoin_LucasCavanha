@@ -45,14 +45,10 @@ export class TradeExecutor {
   private async ensureDefaultUser(): Promise<string> {
     const userId = this.defaultUserId;
 
-    // Se estivermos em modo LIVE, não criamos usuário fake nem depositamos saldo de mentira
-    if (this.executionMode === 'live') {
-      console.log(`[Executor] 🚨 LIVE MODE: Skipping paper trading user creation and initial deposit.`);
-      return userId;
-    }
-
+    // Apenas garantir que o perfil do usuário padrão existe se não estivermos em LIVE
+    // Mas NUNCA depositar dinheiro falso
     const userResult = await this.pool.query('SELECT id FROM users WHERE id = $1', [userId]);
-    if (userResult.rowCount === 0) {
+    if (userResult.rowCount === 0 && this.executionMode !== 'live') {
       await this.pool.query(
         `INSERT INTO users (id, email, password_hash, mfa_enabled, is_active)
          VALUES ($1, $2, $3, false, true)
@@ -63,50 +59,10 @@ export class TradeExecutor {
         `INSERT INTO user_profiles (user_id, risk_profile, bot_enabled, bot_intensity, max_loss_percent, max_gain_percent, max_open_trades)
          VALUES ($1, 'aggressive', true, 10, 10, 25, 5)
          ON CONFLICT (user_id) DO UPDATE SET
-           bot_enabled = true,
-           bot_intensity = 10,
-           risk_profile = 'aggressive',
-           max_open_trades = 5`,
+           bot_enabled = true`,
         [userId]
       );
-      console.log(`[Executor] ✅ Paper trading user profile created/updated with bot enabled`);
-    }
-
-    // Garantir que o usuário tenha saldo inicial de $100 USD para simulação
-    // Calcular saldo correto (créditos - débitos)
-    const balanceResult = await this.pool.query(
-      `SELECT 
-         COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-         COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-       FROM ledger_entries
-       WHERE user_id = $1`,
-      [userId]
-    );
-    const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-    const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-    const currentBalance = Math.max(0, credits - debits);
-
-    if (currentBalance < 100) {
-      // Criar depósito inicial de $100 USD
-      const depositAmount = 100 - currentBalance;
-      await this.pool.query(
-        `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
-         VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
-        [userId, depositAmount, currentBalance, currentBalance + depositAmount]
-      );
-      console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for paper trading user | Balance before: $${currentBalance.toFixed(2)} | Balance after: $${(currentBalance + depositAmount).toFixed(2)}`);
-
-      // Criar notificação de saldo inicial
-      await this.createNotification(
-        userId,
-        'order_executed',
-        'success',
-        'Sistema iniciado',
-        `🤖 Sistema de trading iniciado! Saldo inicial de $${depositAmount} USD foi creditado. Aguardando oportunidades de trading...`,
-        { amount: depositAmount, type: 'initial_deposit' }
-      );
-    } else {
-      console.log(`[Executor] 💰 User balance: $${currentBalance.toFixed(2)} | Ready for trading`);
+      console.log(`[Executor] ✅ Paper trading user skeleton created/updated`);
     }
 
     return userId;
@@ -1893,7 +1849,7 @@ export class TradeExecutor {
         }
       );
 
-      // Garantir que o usuário tenha perfil e saldo inicial
+      // Garantir que o usuário tenha perfil
       const userProfileResult = await this.pool.query(
         'SELECT user_id FROM user_profiles WHERE user_id = $1',
         [userId]
@@ -1908,50 +1864,6 @@ export class TradeExecutor {
           [userId]
         );
         console.log(`[Executor] ✅ Created profile for user ${userId}`);
-      }
-
-      // Garantir saldo inicial para este usuário (apenas se em modo SIMULATION)
-      if (this.executionMode === 'simulation') {
-        const existingDeposit = await this.pool.query(
-          `SELECT COUNT(*) as count FROM ledger_entries 
-         WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
-          [userId]
-        );
-
-        // Se já existe depósito inicial, não criar outro
-        if (Number(existingDeposit.rows[0]?.count ?? 0) === 0) {
-          const balanceResult = await this.pool.query(
-            `SELECT 
-             COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-             COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-           FROM ledger_entries
-           WHERE user_id = $1`,
-            [userId]
-          );
-          const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-          const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-          const currentBalance = Math.max(0, credits - debits);
-
-          if (currentBalance < 100) {
-            const depositAmount = 100 - currentBalance;
-            await this.pool.query(
-              `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
-             VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
-              [userId, depositAmount, currentBalance, currentBalance + depositAmount]
-            );
-            console.log(`[Executor] 💰 Created initial deposit of $${depositAmount} for user ${userId}`);
-
-            // Criar notificação de saldo inicial
-            await this.createNotification(
-              userId,
-              'order_executed',
-              'success',
-              'Sistema iniciado',
-              `🤖 Sistema de trading iniciado! Saldo inicial de $${depositAmount} USD foi creditado. Aguardando oportunidades de trading...`,
-              { amount: depositAmount, type: 'initial_deposit' }
-            );
-          }
-        }
       }
 
       if (signal.signal_type === 'BUY') {

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { pool } from '../config/database';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { getAdminBalance } from '../utils/balance';
 
 const router = Router();
 
@@ -16,55 +17,6 @@ interface Summary {
   lowRiskTokens: number;
 }
 
-// Helper para garantir saldo inicial
-async function ensureUserInitialBalance(pool: any, userId: string): Promise<void> {
-  // Se estivermos em modo LIVE, não criamos saldo fake
-  if (process.env.BOT_EXECUTION_MODE === 'live') {
-    return;
-  }
-
-  // IMPORTANTE: Verificar se o usuário existe na tabela users
-  const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
-  if (userCheck.rows.length === 0) {
-    console.warn(`[Dashboard] ⚠️ User ${userId} does not exist in users table, skipping initial balance creation`);
-    return;
-  }
-
-  // Verificar se já existe um depósito inicial para evitar duplicação
-  const existingDeposit = await pool.query(
-    `SELECT COUNT(*) as count FROM ledger_entries 
-     WHERE user_id = $1 AND entry_type = 'deposit' AND description = 'Initial paper trading deposit'`,
-    [userId]
-  );
-
-  // Se já existe depósito inicial, não criar outro
-  if (Number(existingDeposit.rows[0]?.count ?? 0) > 0) {
-    return;
-  }
-
-  // Calcular saldo correto (créditos - débitos)
-  const balanceResult = await pool.query(
-    `SELECT 
-       COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-       COALESCE(SUM(CASE WHEN entry_type IN ('trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-     FROM ledger_entries
-     WHERE user_id = $1`,
-    [userId]
-  );
-  const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-  const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-  const currentBalance = Math.max(0, credits - debits);
-
-  if (currentBalance < 100) {
-    const depositAmount = 100 - currentBalance;
-    await pool.query(
-      `INSERT INTO ledger_entries (user_id, entry_type, amount_usd, description, balance_before, balance_after)
-       VALUES ($1, 'deposit', $2, 'Initial paper trading deposit', $3, $4)`,
-      [userId, depositAmount, currentBalance, currentBalance + depositAmount]
-    );
-    console.log(`[Dashboard] 💰 Created initial deposit of $${depositAmount} for user ${userId}`);
-  }
-}
 
 router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
@@ -81,8 +33,7 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
   }
 
   try {
-    // Garantir que o usuário tenha saldo inicial
-    await ensureUserInitialBalance(pool, userId);
+    const userEmail = req.user?.email || '';
 
     const [depositsResult, tradesResult, riskResult, positionsResult, signalsResult, ordersResult] =
       await Promise.all([
@@ -178,7 +129,14 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     const realizedLoss = Number(trades.total_loss_realized ?? 0);
 
     // Saldo total = depósitos + lucros realizados - perdas realizadas
-    const totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
+    let totalBalance = Math.max(0, totalDeposits + realizedProfit - realizedLoss);
+
+    // Se for admin, o "totalBalance" é substituído pelo residual da blockchain
+    const adminData = await getAdminBalance(pool, userId, userEmail);
+    if (adminData) {
+      console.log(`[Dashboard] 👮 Admin detected, overriding summary balance from ${totalBalance} to ${adminData.total_balance_usd}`);
+      totalBalance = adminData.total_balance_usd;
+    }
 
     // Buscar investido em posições abertas e lucros/perdas não realizados
     const openPositionsBalance = await pool.query(

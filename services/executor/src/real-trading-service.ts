@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 export class RealTradingService {
     private pool: Pool;
     private walletManager: WalletManager;
+    private static cachedBNBPrice: number | null = null;
 
     constructor(pool: Pool) {
         this.pool = pool;
@@ -21,11 +22,19 @@ export class RealTradingService {
             const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
             const data: any = await response.json();
             if (data && data.binancecoin && typeof data.binancecoin.usd === 'number') {
+                RealTradingService.cachedBNBPrice = data.binancecoin.usd;
                 return data.binancecoin.usd;
             }
         } catch (e) {
             console.error('[RealTradingService] Failed to fetch BNB price from CoinGecko:', e);
         }
+
+        // Usar cache se disponível, senão fallback do env ou valor fixo
+        if (RealTradingService.cachedBNBPrice !== null) {
+            console.log(`[RealTradingService] 🔄 Using cached BNB price: $${RealTradingService.cachedBNBPrice}`);
+            return RealTradingService.cachedBNBPrice;
+        }
+
         return Number(process.env.BNB_PRICE || 600);
     }
 
@@ -168,13 +177,20 @@ export class RealTradingService {
      * Saldo Residual = Saldo Real (BNB) na Carteira - Soma dos Saldos Reais dos outros usuários
      */
     async getAdminResidualBalance(userId: string): Promise<number | null> {
-        const adminEmail = process.env.ADMIN_EMAIL || 'mulack.zuguenberg@gmail.com';
+        const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+
+        if (!adminEmail) {
+            console.warn('[RealTradingService] ⚠️ ADMIN_EMAIL not defined in .env! Admin identification will fail.');
+        }
 
         // Buscar email do usuário para confirmar se é admin
         const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
-        const userEmail = userResult.rows[0]?.email || '';
+        const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
 
-        if (userEmail.toLowerCase() !== adminEmail.toLowerCase()) {
+        console.log(`[RealTradingService] 🔍 admin check: DB(${userEmail}) vs ENV(${adminEmail})`);
+
+        if (userEmail !== adminEmail) {
+            console.log(`[RealTradingService] ❌ User ${userEmail} is NOT admin. Skipping residual calculation.`);
             return null;
         }
 
