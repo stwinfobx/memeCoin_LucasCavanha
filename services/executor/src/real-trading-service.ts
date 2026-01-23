@@ -168,6 +168,12 @@ export class RealTradingService {
      * Calcula saldo real disponível (depósitos confirmados - posições abertas)
      */
     async getRealBalance(userId: string): Promise<number> {
+        // Se for o admin, retornar o balanço residual da blockchain
+        const residualBalance = await this.getAdminResidualBalance(userId);
+        if (residualBalance !== null) {
+            return residualBalance;
+        }
+
         const result = await this.pool.query(
             `SELECT 
          COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,

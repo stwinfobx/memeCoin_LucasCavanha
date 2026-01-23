@@ -151,8 +151,8 @@ export class TradeExecutor {
     });
 
     // Verificar se há saldo disponível mínimo
-    if (availableBalance < 5) {
-      console.log(`[Executor] ⚠️ Insufficient available balance: $${availableBalance.toFixed(2)} (minimum: $5.00)`);
+    if (availableBalance < 1) {
+      console.log(`[Executor] ⚠️ Insufficient available balance: $${availableBalance.toFixed(2)} (minimum: $1.00)`);
       return {
         amountUsd: 0,
         baseAmount: 0,
@@ -723,8 +723,8 @@ export class TradeExecutor {
     const investment = await this.calculateIntendedInvestment(userId, request.token_id, request.signal_id);
     const amountUsd = investment.amountUsd;
 
-    if (amountUsd < 5) {
-      throw new Error('Insufficient balance for real trading (minimum $5)');
+    if (amountUsd < 1) {
+      throw new Error('Insufficient balance for real trading (minimum $1)');
     }
 
     // Executar trade real on-chain
