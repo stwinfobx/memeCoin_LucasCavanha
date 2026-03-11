@@ -38,26 +38,29 @@ const normalizeNumber = (value: number | undefined | null, defaultValue = 0): nu
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 function calculateLiquidityScore(liquidityUsd: number): number {
-  if (liquidityUsd <= 5_000) return 0.1;
-  if (liquidityUsd <= 20_000) return 0.3;
-  if (liquidityUsd <= 100_000) return 0.6;
-  if (liquidityUsd <= 500_000) return 0.8;
+  if (liquidityUsd <= 0) return 0.4;   // Desconhecido (token novo, API ainda não indexou)
+  if (liquidityUsd <= 5_000) return 0.2;
+  if (liquidityUsd <= 20_000) return 0.4;
+  if (liquidityUsd <= 100_000) return 0.65;
+  if (liquidityUsd <= 500_000) return 0.85;
   return 1;
 }
 
 function calculateVolumeScore(volumeUsd: number): number {
-  if (volumeUsd <= 1_000) return 0.1;
-  if (volumeUsd <= 5_000) return 0.3;
-  if (volumeUsd <= 25_000) return 0.5;
-  if (volumeUsd <= 100_000) return 0.7;
-  return 0.9;
+  if (volumeUsd <= 0) return 0.4;      // Desconhecido (token novo)
+  if (volumeUsd <= 1_000) return 0.2;
+  if (volumeUsd <= 5_000) return 0.4;
+  if (volumeUsd <= 25_000) return 0.6;
+  if (volumeUsd <= 100_000) return 0.8;
+  return 0.95;
 }
 
 function calculateHolderScore(holdersCount: number): number {
-  if (holdersCount < 30) return 0.1;
-  if (holdersCount < 100) return 0.3;
-  if (holdersCount < 500) return 0.6;
-  if (holdersCount < 2_000) return 0.8;
+  if (holdersCount <= 0) return 0.4;   // Desconhecido (token novo)
+  if (holdersCount < 30) return 0.15;
+  if (holdersCount < 100) return 0.35;
+  if (holdersCount < 500) return 0.65;
+  if (holdersCount < 2_000) return 0.85;
   return 1;
 }
 
@@ -136,13 +139,16 @@ function deriveMemecoinScore(input: RiskComputationInput): number {
 }
 
 function determineRiskLevel(riskScore: number, scamProbability: number): RiskLevel {
-  if (scamProbability >= 75 || riskScore <= 25) {
+  // Tier 1: Honeypot confirmado ou muito baixo score de segurança
+  if (scamProbability >= 85 || riskScore <= 15) {
     return 'critical';
   }
-  if (scamProbability >= 55 || riskScore <= 45) {
+  // Tier 2: Alto risco (suspeito)
+  if (scamProbability >= 65 || riskScore <= 35) {
     return 'high';
   }
-  if (scamProbability >= 35 || riskScore <= 65) {
+  // Tier 3: Risco moderado (token novo não verificado)
+  if (scamProbability >= 45 || riskScore <= 55) {
     return 'moderate';
   }
   return 'low';
@@ -158,27 +164,29 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   const memecoinScore = deriveMemecoinScore(input);
 
   const honeypotPenalty = input.isHoneypot ? 0 : 1;
-  const liquidityLockBonus = input.liquidityLocked ? 1 : 0.3;
+  // liquidityLockBonus: neutro (0.6) porque checkLiquidityLocked nunca foi implementado
+  // Não punir tokens por algo que não verificamos
+  const liquidityLockBonus = input.liquidityLocked ? 1 : 0.6;
 
   const safeScore =
-    (liquidityScore * 0.18) +
-    (volumeScore * 0.12) +
-    (holdersScore * 0.2) +
-    (ageScore * 0.14) +
+    (liquidityScore * 0.22) +
+    (volumeScore * 0.18) +
+    (holdersScore * 0.15) +
+    (ageScore * 0.12) +
     (holderConcentrationScore * 0.18) +
-    (honeypotPenalty * 0.1) +
-    (liquidityLockBonus * 0.08);
+    (honeypotPenalty * 0.12) +
+    (liquidityLockBonus * 0.03);
 
   const normalizedSafeScore = clamp(safeScore * 100, 0, 100);
 
   let scamProbability = 100 - normalizedSafeScore;
 
+  // Penalizar honeypot confirmado fortemente
   if (input.isHoneypot) {
-    scamProbability = 95;
-  } else if (!input.liquidityLocked) {
-    scamProbability += 8;
+    scamProbability = Math.max(scamProbability, 95);
   }
 
+  // Penalizar concentração extrema de holders (whale risk)
   if (input.topHolders && input.topHolders.length > 0) {
     const totalTop3 = input.topHolders
       .slice(0, 3)

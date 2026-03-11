@@ -1,0 +1,3297 @@
+[
+  {
+    "pool": {
+      "symbol": "灯塔",
+      "name": "灯塔",
+      "address": "0x86d6108b5e94ed8b1f7ac6d6df45151ac02a2aaf",
+      "poolAddress": "0x3b35fbb76f790d43e985976b053d58a8f7939f72",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000102125809808495,
+      "liquidityUsd": 14046.6480654161,
+      "volume24h": 0.22216668,
+      "poolCreatedAt": "2026-03-09T20:15:29Z",
+      "ageMinutes": 1
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "can_take_back_ownership": "0",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "2",
+      "holders": [
+        {
+          "address": "0x07974e3d846b2a494b00802ae57ad5b6e8227a30",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "930987340235024005110693888",
+          "percent": "0.930987340235024005",
+          "is_locked": 0
+        },
+        {
+          "address": "0xf95286a24268b620f26644271c711247c1b1cff6",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "69012659764975994889306112",
+          "percent": "0.069012659764975994",
+          "is_locked": 0
+        }
+      ],
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "",
+      "slippage_modifiable": "0",
+      "total_supply": "1000000000000000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_2_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "EXIT",
+      "name": "NeuralExit",
+      "address": "0x20595d9374d857a60affead60167577cc24a12d0",
+      "poolAddress": "0x1585e488f9cd4e1ce67336f0877fc76f9e8a1dce",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.0000521372499810394,
+      "liquidityUsd": 9512.16,
+      "volume24h": 178.898832,
+      "poolCreatedAt": "2026-03-09T20:14:41Z",
+      "ageMinutes": 1
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "4759.73050000",
+          "pair": "0x1585e488f9cd4e1ce67336f0877fc76f9e8a1dce"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "NeuralExit ",
+      "token_symbol": "EXIT",
+      "total_supply": "100000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_0_HOLDERS"
+    ],
+    "warnings": []
+  },
+  {
+    "pool": {
+      "symbol": "钻石爪",
+      "name": "Diamond Claw",
+      "address": "0x61a634f73c58f0fcd93a9cf03ce0c4dfd3ed4444",
+      "poolAddress": "0x61a634f73c58f0fcd93a9cf03ce0c4dfd3ed4444",
+      "quoteSymbol": "BNB",
+      "priceUsd": 0.00000656300837378908,
+      "liquidityUsd": 4716.6706,
+      "volume24h": 1340.2682952853,
+      "poolCreatedAt": "2026-03-09T20:13:51Z",
+      "ageMinutes": 2
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "can_take_back_ownership": "0",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "3",
+      "holders": [
+        {
+          "address": "0x5c952063c7fc8610ffdb798152d69f0b9550762b",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "878528359.164647802",
+          "percent": "0.878528359164647802",
+          "is_locked": 0
+        },
+        {
+          "address": "0x31be0308db48cf91683bf7c60a59533f5b1834f5",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "88045932.027876781",
+          "percent": "0.088045932027876781",
+          "is_locked": 0
+        },
+        {
+          "address": "0x2abb1cdf891f028dc5b5deb8575db41c9e26608b",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "33425708.807475417",
+          "percent": "0.033425708807475417",
+          "is_locked": 0
+        }
+      ],
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_address": "0x5c952063c7fc8610ffdb798152d69f0b9550762b",
+      "owner_balance": "839866103.2577388",
+      "owner_change_balance": "0",
+      "owner_percent": "0.839866",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "",
+      "slippage_modifiable": "0",
+      "token_name": "Diamond Claw",
+      "token_symbol": "钻石爪",
+      "total_supply": "1000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "1",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_3_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "𓂺 MASTURBATION",
+      "name": "𓂺 Masturbation",
+      "address": "0x2214d77593775713608760a93c26e00e4c86afb9",
+      "poolAddress": "0xcdee2ad5302289ee0536f73b98dee2cab0329ee1",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000125969928467501,
+      "liquidityUsd": 15354.9735,
+      "volume24h": 7033.1756454654,
+      "poolCreatedAt": "2026-03-09T20:12:28Z",
+      "ageMinutes": 4
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0xf91dd4c66ee7b0234b9cbd6a459e60c62e63bd00",
+      "creator_balance": "69010802.758035908572741632",
+      "creator_percent": "0.069011",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "3",
+      "holders": [
+        {
+          "address": "0xdd31e81957820fdba38ade701604f85fd306dee6",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "930989197.241964091427258368",
+          "percent": "0.930989197241964091",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcdee2ad5302289ee0536f73b98dee2cab0329ee1",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "69008621.07869961650255237",
+          "percent": "0.069008621078699616",
+          "is_locked": 0
+        },
+        {
+          "address": "0x63199880a5d34860678e27b9f868deddd0f7683a",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "2181.679336292070189262",
+          "percent": "0.000002181679336292",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "𓂺 Masturbation",
+      "token_symbol": "𓂺 Masturbation",
+      "total_supply": "1000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_3_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "破茧",
+      "name": "破茧成蝶",
+      "address": "0x919dab5952fd2dc89863bd7fafa1444b4acf1648",
+      "poolAddress": "0xfa03588f20c868afa76c8f91e23137cf66bcb440",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.0000327614872267562,
+      "liquidityUsd": 154.5542,
+      "volume24h": 12.8062055,
+      "poolCreatedAt": "2026-03-09T20:12:15Z",
+      "ageMinutes": 4
+    },
+    "goplus": {
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "holder_count": "1",
+      "holders": [
+        {
+          "address": "0x919dab5952fd2dc89863bd7fafa1444b4acf1648",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "8640000",
+          "percent": "1.000000000000000000",
+          "is_locked": 0
+        }
+      ],
+      "is_in_dex": "0",
+      "is_open_source": "0",
+      "owner_address": "",
+      "sell_tax": "",
+      "token_name": "破茧成蝶",
+      "token_symbol": "破茧",
+      "total_supply": "8640000"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_1_HOLDERS"
+    ],
+    "warnings": [
+      "🔐 CÓDIGO_FECHADO",
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "TRN",
+      "name": "Tardven Token",
+      "address": "0x4444ac763bbc18f1c48b34e8da3d6f9cc0624931",
+      "poolAddress": "0x4444ac763bbc18f1c48b34e8da3d6f9cc0624931",
+      "quoteSymbol": "BNB",
+      "priceUsd": 0.0000102824951063477,
+      "liquidityUsd": 8225.9733512726,
+      "volume24h": 2.2961143647,
+      "poolCreatedAt": "2026-03-09T20:12:01Z",
+      "ageMinutes": 4
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "can_take_back_ownership": "0",
+      "creator_address": "0x3f96d780b587c64753beee4fceb4281572d7ab5f",
+      "creator_balance": "0",
+      "creator_percent": "0.000000",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "1",
+      "holders": [
+        {
+          "address": "0x5c952063c7fc8610ffdb798152d69f0b9550762b",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "1000000000",
+          "percent": "1.000000000000000000",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "launchpad_token": {
+        "is_launchpad_token": "1",
+        "launchpad_name": "four.meme"
+      },
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "1000000000",
+      "owner_change_balance": "0",
+      "owner_percent": "1.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "",
+      "slippage_modifiable": "0",
+      "token_name": "Tardven Token",
+      "token_symbol": "TRN",
+      "total_supply": "1000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_1_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "🧙‍♀️WITCHWIFHAT",
+      "name": "🧙‍♀️WitchWifHat",
+      "address": "0x0ba6a1653d1cfc5069e8ebe0b93be2d461be5ac0",
+      "poolAddress": "0xad5448d148bb11e538976dc24aecc7a2f8aa2b62",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000134154777010152,
+      "liquidityUsd": 16180.5653,
+      "volume24h": 10652.4329292317,
+      "poolCreatedAt": "2026-03-09T20:11:02Z",
+      "ageMinutes": 5
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "can_take_back_ownership": "0",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "2",
+      "holders": [
+        {
+          "address": "0x21a5baec3f651fbdbde791efd1881bcc4b3d3b66",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "930902628.02895451767963648",
+          "percent": "0.930902628028954517",
+          "is_locked": 0
+        },
+        {
+          "address": "0xeafd29c4c50e06d1a3bf723273b0cb18b7bf1236",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "69097371.97104548232036352",
+          "percent": "0.069097371971045482",
+          "is_locked": 0
+        }
+      ],
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "",
+      "slippage_modifiable": "0",
+      "token_name": "🧙‍♀️WitchWifHat",
+      "token_symbol": "🧙‍♀️WitchWifHat",
+      "total_supply": "1000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_2_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "FORA基金",
+      "name": "Fora基金",
+      "address": "0x22ffcb9f237ba1b4c51e80becf094cdc275ef1ba",
+      "poolAddress": "0x6483a9b49a096113f6f7066eac70d4c64c534991",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000135971770424924,
+      "liquidityUsd": 16289.3504,
+      "volume24h": 10654.2517708,
+      "poolCreatedAt": "2026-03-09T20:11:02Z",
+      "ageMinutes": 5
+    },
+    "goplus": {
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "holder_count": "2",
+      "holders": [
+        {
+          "address": "0x740e647c3465e7e5124d1a5d06378d6c258abfbf",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "930939302.252075319864328192",
+          "percent": "0.930939302252075319",
+          "is_locked": 0
+        },
+        {
+          "address": "0x0b18b0acc9f991a4d545c16aa37f6dba9497ec31",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "69060697.747924680135671808",
+          "percent": "0.069060697747924680",
+          "is_locked": 0
+        }
+      ],
+      "is_in_dex": "0",
+      "owner_address": "",
+      "sell_tax": "",
+      "token_name": "Fora基金",
+      "token_symbol": "Fora基金",
+      "total_supply": "1000000000"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_2_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "TITS",
+      "name": "TIT COIN",
+      "address": "0x6a8ddba6cdc8c1673d99cf8beed3dba71b0b6750",
+      "poolAddress": "0x3f8a523b04107b3268124a76de7f863127585073",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.12773050110126e-9,
+      "liquidityUsd": 0.0638,
+      "volume24h": 10861.4216033507,
+      "poolCreatedAt": "2026-03-09T20:10:11Z",
+      "ageMinutes": 6
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "can_take_back_ownership": "0",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "2",
+      "holders": [
+        {
+          "address": "0xb088b1f77be39a1de266cf536e430804293169a7",
+          "tag": "",
+          "is_contract": 1,
+          "balance": "930930734.285542728761606144",
+          "percent": "0.930930734285542728",
+          "is_locked": 0
+        },
+        {
+          "address": "0x827565120effe2e745726e7da20a3f714098ef95",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "69069265.714457271238393856",
+          "percent": "0.069069265714457271",
+          "is_locked": 0
+        }
+      ],
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "",
+      "slippage_modifiable": "0",
+      "token_name": "TIT COIN",
+      "token_symbol": "TITS",
+      "total_supply": "1000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_2_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "TENCENTAI",
+      "name": "Tencent AI",
+      "address": "0x146e5d360f94f01b3472fdca6405b65af93fd01d",
+      "poolAddress": "0x276ed8c6d0efeebe9d7cc802a213025e6cb84df1",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000320126456792045,
+      "liquidityUsd": 19153.2,
+      "volume24h": 3.1922,
+      "poolCreatedAt": "2026-03-09T20:10:10Z",
+      "ageMinutes": 6
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "",
+      "cannot_buy": "0",
+      "can_take_back_ownership": "0",
+      "creator_address": "0xd636dae20e8261c9673138149f318b75fdf32a6b",
+      "creator_balance": "30000000",
+      "creator_percent": "1.000000",
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "0",
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "0",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "",
+      "slippage_modifiable": "0",
+      "token_name": "Tencent AI",
+      "token_symbol": "TENCENTAI",
+      "total_supply": "30000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": ""
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👥 SÓ_0_HOLDERS"
+    ],
+    "warnings": [
+      "Fora de DEX"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "4MUSK",
+      "name": "Four Msuk",
+      "address": "0x0ab6bb5818154677277b13253695d9fdab32a804",
+      "poolAddress": "0x8ef47355e6126280cb4aa16048106109a53988bd",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 4.10752022474292e-7,
+      "liquidityUsd": 307.7678,
+      "volume24h": 90.0683187475,
+      "poolCreatedAt": "2026-03-09T20:09:51Z",
+      "ageMinutes": 6
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "破茧",
+      "name": "破茧成蝶",
+      "address": "0xd9e4d1aae8e4b5ca33ef2090f13c4b9bcf7874b3",
+      "poolAddress": "0x6976b974c1bfa64e1f69aea1cf91810d13ba5d04",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.0000295332491967635,
+      "liquidityUsd": 141.7914,
+      "volume24h": 12.7658,
+      "poolCreatedAt": "2026-03-09T20:08:33Z",
+      "ageMinutes": 7
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "ZOMBIE",
+      "name": "ZombieCoin",
+      "address": "0x16546b1fd7926246fca9138f8191aa0bf6a9628c",
+      "poolAddress": "0xcaf9e061d003469e3b8e488f42c557a3ab01fcfc",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000177018526268552,
+      "liquidityUsd": 220.8864,
+      "volume24h": 150.8600684036,
+      "poolCreatedAt": "2026-03-09T20:08:04Z",
+      "ageMinutes": 8
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "BTC_HD",
+      "name": "Bitcoin_HD",
+      "address": "0xd5f017f893db1c394012c29cb3075d02fd4aa964",
+      "poolAddress": "0xc960e0dea0a0522bdf496404373dd2a82604cfec",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.0000380910365722545,
+      "liquidityUsd": 14.0444,
+      "volume24h": 0.635203025,
+      "poolCreatedAt": "2026-03-09T20:07:28Z",
+      "ageMinutes": 9
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "☯️缘份",
+      "name": "缘份",
+      "address": "0x41a9e6e0f1cabf13d71e85feb5115a39a2c1ffd8",
+      "poolAddress": "0xed743caf67cc215f13860d87ae6000b0be54718a",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.87314975972034e-9,
+      "liquidityUsd": 0.0638,
+      "volume24h": 10876.1758007397,
+      "poolCreatedAt": "2026-03-09T20:06:54Z",
+      "ageMinutes": 9
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "👹恶魔出没",
+      "name": "恶魔出没",
+      "address": "0xdcc53967350755c9a805c51487fb3cc76ea8b998",
+      "poolAddress": "0x98341ab91a5ed9716db28f557e8bfbe0e469376b",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.80125007158166e-9,
+      "liquidityUsd": 9.3246,
+      "volume24h": 10928.6797792812,
+      "poolCreatedAt": "2026-03-09T20:05:35Z",
+      "ageMinutes": 10
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "真相终将战胜一切",
+      "name": "真相终将战胜一切",
+      "address": "0xa1f006d9a236911eca3828c08e3d20251c0a8cfe",
+      "poolAddress": "0xb7a10013bd46aee25c322e303c31b675bfea895c",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.12519887685218e-9,
+      "liquidityUsd": 0.0639,
+      "volume24h": 10927.4460105053,
+      "poolCreatedAt": "2026-03-09T20:05:22Z",
+      "ageMinutes": 11
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "🔶BNB GIRL",
+      "name": "🔶BNB GIRL",
+      "address": "0xc3bb90623a55beb754668d437a8acdc0452a36af",
+      "poolAddress": "0xba98afb61c16d8fc5271b15213c60f984993dceb",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.04512212941152e-9,
+      "liquidityUsd": 16535.4422,
+      "volume24h": 11311.3799058906,
+      "poolCreatedAt": "2026-03-09T20:04:19Z",
+      "ageMinutes": 12
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "破茧",
+      "name": "破茧成蝶",
+      "address": "0xb3a1413a54fa6f8446b22493546f326b3044063e",
+      "poolAddress": "0x8d688880297c2347fd0ea5c433b88727ad398810",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.0000643214371070848,
+      "liquidityUsd": 0.02135002589,
+      "volume24h": 12.7765375065,
+      "poolCreatedAt": "2026-03-09T20:03:01Z",
+      "ageMinutes": 13
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "空气币",
+      "name": "空气币",
+      "address": "0x4fa61edf41d08dcc1994d7e0d16756266d4cd8a6",
+      "poolAddress": "0x07392d67fd95cf9a2e3052fca5e4f32ec43b5c0a",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.08891814717838e-9,
+      "liquidityUsd": 0.0638,
+      "volume24h": 10720.8811086302,
+      "poolCreatedAt": "2026-03-09T20:01:25Z",
+      "ageMinutes": 15
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "PROALPHA",
+      "name": "Project Alpha",
+      "address": "0xc9a8c7e23b61f611b486271bd56c2a205ca8c809",
+      "poolAddress": "0x6de0e007671e07a1707e14b981c3b8899f20fa1e",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.00000577850212077749,
+      "liquidityUsd": 8815.2898,
+      "volume24h": 1554.2178871787,
+      "poolCreatedAt": "2026-03-09T20:00:55Z",
+      "ageMinutes": 15
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "$ASTERCODED",
+      "name": "Aster Coded",
+      "address": "0x7dc1b51dd275528e63da6105c156be08531f4444",
+      "poolAddress": "0x7dc1b51dd275528e63da6105c156be08531f4444",
+      "quoteSymbol": "BNB",
+      "priceUsd": 0.0000036292237365435,
+      "liquidityUsd": 2902.0755,
+      "volume24h": 88.9587718921,
+      "poolCreatedAt": "2026-03-09T20:00:43Z",
+      "ageMinutes": 15
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "火柴人",
+      "name": "火柴人",
+      "address": "0x23a682d388b8dfe68647e17733f5923e6b72f95b",
+      "poolAddress": "0xb026d1e2817ce6da6e2694a15823a5da1907a093",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 5.72333519972031e-9,
+      "liquidityUsd": 0.0639,
+      "volume24h": 11043.9961994523,
+      "poolCreatedAt": "2026-03-09T20:00:07Z",
+      "ageMinutes": 16
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "BINANCE",
+      "name": "事实胜于雄辩,真相终将水落石出",
+      "address": "0xb797a1f7e13a14a6e39af996aa480b2597beef7b",
+      "poolAddress": "0x7076daa5e851b926299ce70a9710243284bad174",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.89527144272814e-9,
+      "liquidityUsd": 0.004442237061,
+      "volume24h": 10923.2206690324,
+      "poolCreatedAt": "2026-03-09T19:59:48Z",
+      "ageMinutes": 16
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "IRIS",
+      "name": "Iran vs israel",
+      "address": "0xcb6d740d3b3ef2b9b4ebeb762f8e3851b41a4444",
+      "poolAddress": "0xcb6d740d3b3ef2b9b4ebeb762f8e3851b41a4444",
+      "quoteSymbol": "BNB",
+      "priceUsd": 0.00000370035759254936,
+      "liquidityUsd": 2961.166,
+      "volume24h": 0.319112,
+      "poolCreatedAt": "2026-03-09T19:59:22Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "BGC",
+      "name": "Bunny Girl",
+      "address": "0x182f32a4f78369a33e427c3c62c8cc68cb022907",
+      "poolAddress": "0x9e5d566f2042536f37fe74070a954f0e7e625b2e",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.06238673377357e-18,
+      "liquidityUsd": 0.000002475693701,
+      "volume24h": 0.01302864486,
+      "poolCreatedAt": "2026-03-09T19:58:59Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "LQX",
+      "name": "LOUQIXI",
+      "address": "0x1810443123f7a9f8bc1c4d44302e869b8b23a0d2",
+      "poolAddress": "0x4f19edef8ee18f86656894cc2d57ddb2a0429789",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 9.78998576629513e-18,
+      "liquidityUsd": 0.00008732183739,
+      "volume24h": 0.01402683497,
+      "poolCreatedAt": "2026-03-09T19:58:58Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "CHILITOKEN",
+      "name": "ChiliToken",
+      "address": "0x17358f7bce5e25733dbf848b5090d1bffd0dbdb7",
+      "poolAddress": "0xe7f89d7a524643fff0ef61828418e1aaf1385b4b",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.00245323176171873,
+      "liquidityUsd": 0.6388,
+      "volume24h": 0.01118482256,
+      "poolCreatedAt": "2026-03-09T19:58:57Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "PERA",
+      "name": "Perra",
+      "address": "0x16e9d34f3a1f9efddd446964855e3581c8912b2b",
+      "poolAddress": "0xb338bfa1fbf401623c78fcfce9538cf44f1b086f",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.09099194100131e-7,
+      "liquidityUsd": 0.0003157270531,
+      "volume24h": 0.01065774862,
+      "poolCreatedAt": "2026-03-09T19:58:56Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0.1",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0x7f4cc11d12506ee40cd2874bf011eeb56ccfa847",
+      "creator_balance": "200236173.756208547",
+      "creator_percent": "0.953628",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01077576",
+          "pair": "0xb338bfa1fbf401623c78fcfce9538cf44f1b086f"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "10",
+      "holders": [
+        {
+          "address": "0x7f4cc11d12506ee40cd2874bf011eeb56ccfa847",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "200236173.756208547",
+          "percent": "0.953627934706268276",
+          "is_locked": 0
+        },
+        {
+          "address": "0xb7837ad032258d982e67d7171588eccbea7620db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "9713777.676646536",
+          "percent": "0.046262019345488363",
+          "is_locked": 0
+        },
+        {
+          "address": "0xf9ea39449f3ca927d42575ce6f413efb6c4cb98a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "13505.399547996",
+          "percent": "0.000064319678291590",
+          "is_locked": 0
+        },
+        {
+          "address": "0x95ac560cc05afd186a4b11ed58b0e985538f1612",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1613.767652624",
+          "percent": "0.000007685593890449",
+          "is_locked": 0
+        },
+        {
+          "address": "0xb2636740ef33ee29998f52882d5e0683ca344b7f",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1607.346304139",
+          "percent": "0.000007655012117041",
+          "is_locked": 0
+        },
+        {
+          "address": "0x5e3773713f0a20806168d633652b905ee7253f83",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1600.96322223",
+          "percent": "0.000007624612588805",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1594.618103383",
+          "percent": "0.000007594393860251",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1588.310647084",
+          "percent": "0.000007564354500175",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1582.040555797",
+          "percent": "0.000007534493091558",
+          "is_locked": 0
+        },
+        {
+          "address": "0xb338bfa1fbf401623c78fcfce9538cf44f1b086f",
+          "tag": "PancakeV2",
+          "is_contract": 1,
+          "balance": "14.238252799",
+          "percent": "0.000000067809903454",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000488742974052",
+          "percent": "0.999999997953934785",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000002046065214",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.000000488742975052",
+      "owner_address": "0x7f4cc11d12506ee40cd2874bf011eeb56ccfa847",
+      "owner_balance": "200236313.57460997",
+      "owner_change_balance": "0",
+      "owner_percent": "0.953629",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0.0005",
+      "slippage_modifiable": "1",
+      "token_name": "Perra",
+      "token_symbol": "PERA",
+      "total_supply": "209973058.117141142",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0.1"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "Taxa compra:10.0%",
+      "10 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "KF",
+      "name": "KOALA FINANCE",
+      "address": "0x16dccfb3c8936ae98ed4d629491a17cfe5269309",
+      "poolAddress": "0xd52a5d05e1182fd28f27eae738e9f60d24472632",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.05738739904986e-15,
+      "liquidityUsd": 0.0001385122001,
+      "volume24h": 0.01386012009,
+      "poolCreatedAt": "2026-03-09T19:58:55Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "1",
+      "buy_tax": "0.07",
+      "can_take_back_ownership": "1",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0xcab42009a7d6407ae9a76cd20ab2d9042561d4a0",
+      "creator_balance": "999440655145568.586795342984480492",
+      "creator_percent": "0.999441",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01399730",
+          "pair": "0xd52a5d05e1182fd28f27eae738e9f60d24472632"
+        },
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV1",
+          "liquidity": "0.00000000",
+          "pair": "0xd0169d17bb10bd0dee3dc7ff20af18ad44354789"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "12",
+      "holders": [
+        {
+          "address": "0xcab42009a7d6407ae9a76cd20ab2d9042561d4a0",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "999440655145568.586795342984480492",
+          "percent": "0.999440655145568586",
+          "is_locked": 0
+        },
+        {
+          "address": "0x0044a0d3bdacef8f854e6625cd98cd9a899ccfcf",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "97284073326.261156843389223295",
+          "percent": "0.000097284073326261",
+          "is_locked": 0
+        },
+        {
+          "address": "0x50bdb44af65e73d049a62b419e52695aafa3e15c",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "84355291434.79794217522011343",
+          "percent": "0.000084355291434797",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "70310724263.219789268781090587",
+          "percent": "0.000070310724263219",
+          "is_locked": 0
+        },
+        {
+          "address": "0x3c1acf05c4dcc8ef94cf7ff48f64f5757aafb9db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "59505133056.004437927031505785",
+          "percent": "0.000059505133056004",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "51013509317.524790507189002996",
+          "percent": "0.000051013509317524",
+          "is_locked": 0
+        },
+        {
+          "address": "0x5c8e1c363eecf0881a9bc81319987b531c4e5ad1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "44219077921.508403173426040269",
+          "percent": "0.000044219077921508",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "38697739703.148469725142338727",
+          "percent": "0.000038697739703148",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6d96254e563907d0b73a5cbaadeea761a20cd8cb",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "34150086515.50092930590587327",
+          "percent": "0.000034150086515500",
+          "is_locked": 0
+        },
+        {
+          "address": "0x4efcff8ca2e81dc9e33f23bc40caed0589f8fc89",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "19447528749.795144766191177355",
+          "percent": "0.000019447528749795",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "1",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "1",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "68.773096420786633164",
+          "percent": "0.999999999999999985",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000000014",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "68.773096420786634164",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0.0004",
+      "slippage_modifiable": "1",
+      "token_name": "KOALA FINANCE",
+      "token_symbol": "KF",
+      "total_supply": "1000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0.07"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👑 OWNER_PODE_RETOMAR"
+    ],
+    "warnings": [
+      "Taxa compra:7.0%",
+      "12 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "AP",
+      "name": "AUTISMUS PRIME",
+      "address": "0x16b368da149da02dcf584dfddfab729fdbefe504",
+      "poolAddress": "0x6368b99c4a894fb41cf51d0c468aad947f104459",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.98510898849399e-18,
+      "liquidityUsd": 0.0003996340793,
+      "volume24h": 0.01333759899,
+      "poolCreatedAt": "2026-03-09T19:58:54Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0x70cdfc3c0cef23299206477ccd6453be65f99c17",
+      "creator_balance": "48735562660092867.161332188",
+      "creator_percent": "0.487356",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01352176",
+          "pair": "0x6368b99c4a894fb41cf51d0c468aad947f104459"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "12",
+      "holders": [
+        {
+          "address": "0x000000000000000000000000000000000000dead",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "50000000000000000",
+          "percent": "0.500000000000000000",
+          "is_locked": 1
+        },
+        {
+          "address": "0x70cdfc3c0cef23299206477ccd6453be65f99c17",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "48735562660092867.161332188",
+          "percent": "0.487355626600928671",
+          "is_locked": 0
+        },
+        {
+          "address": "0x50c26084fa7cf61eba27ee85dc8facedcbc33a32",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "483201758985591.771771304",
+          "percent": "0.004832017589855917",
+          "is_locked": 0
+        },
+        {
+          "address": "0xc6852d54db008061110146f809ed118b61be0ef5",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "245197274294390.933988174",
+          "percent": "0.002451972742943909",
+          "is_locked": 0
+        },
+        {
+          "address": "0xa3fb89d3223d6a6feeb49870341ad903c18fffd3",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "238071603374521.2691484",
+          "percent": "0.002380716033745212",
+          "is_locked": 0
+        },
+        {
+          "address": "0x7c3270c1a6d91a77dce9354d47a36df1e9c5c258",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "49825299263984.175784654",
+          "percent": "0.000498252992639841",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "49725971635641.980927751",
+          "percent": "0.000497259716356419",
+          "is_locked": 0
+        },
+        {
+          "address": "0x3c1acf05c4dcc8ef94cf7ff48f64f5757aafb9db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "49626940852073.532495025",
+          "percent": "0.000496269408520735",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "49528205731366.541809133",
+          "percent": "0.000495282057313665",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6d96254e563907d0b73a5cbaadeea761a20cd8cb",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "49429765097485.955372586",
+          "percent": "0.000494297650974859",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.102369371482866456",
+          "percent": "0.999999999999990231",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000009768",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.102369371482867456",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "AUTISMUS PRIME",
+      "token_symbol": "AP",
+      "total_supply": "100000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "12 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "CR",
+      "name": "CYBER RELAx",
+      "address": "0x1684a1791aa17b96230e2aaf17712bbe6e86c4d0",
+      "poolAddress": "0xf1448ef228bfd96ed69956f0e742b6ccff1450d5",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.58276872597749e-18,
+      "liquidityUsd": 0.0003048767564,
+      "volume24h": 0.01166991533,
+      "poolCreatedAt": "2026-03-09T19:58:53Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0x52765d79622379148e9738aebf654eb4ce199f93",
+      "creator_balance": "49549892886763197.122379846",
+      "creator_percent": "0.495499",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01189195",
+          "pair": "0xf1448ef228bfd96ed69956f0e742b6ccff1450d5"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "10",
+      "holders": [
+        {
+          "address": "0x000000000000000000000000000000000000dead",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "50000000000000000",
+          "percent": "0.500000000000000000",
+          "is_locked": 1
+        },
+        {
+          "address": "0x52765d79622379148e9738aebf654eb4ce199f93",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "49549892886763197.122379846",
+          "percent": "0.495498928867631971",
+          "is_locked": 0
+        },
+        {
+          "address": "0xdda1d16f64b9e48eeedc0de92981692bd8d97831",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "99999999999999.991611392",
+          "percent": "0.000999999999999999",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "58607692737052.694044342",
+          "percent": "0.000586076927370526",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "58470287561283.677402446",
+          "percent": "0.000584702875612836",
+          "is_locked": 0
+        },
+        {
+          "address": "0x3c1acf05c4dcc8ef94cf7ff48f64f5757aafb9db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "58333365238060.380563227",
+          "percent": "0.000583333652380603",
+          "is_locked": 0
+        },
+        {
+          "address": "0x5c8e1c363eecf0881a9bc81319987b531c4e5ad1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "58196923507185.26019089",
+          "percent": "0.000581969235071852",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "58060960121671.73230662",
+          "percent": "0.000580609601216717",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6d96254e563907d0b73a5cbaadeea761a20cd8cb",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "57925472847651.610419252",
+          "percent": "0.000579254728476516",
+          "is_locked": 0
+        },
+        {
+          "address": "0xf1448ef228bfd96ed69956f0e742b6ccff1450d5",
+          "tag": "PancakeV2",
+          "is_contract": 1,
+          "balance": "512411223897.531081985",
+          "percent": "0.000005124112238975",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "1",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.097012225575998269",
+          "percent": "0.999999999999989692",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000010307",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.097012225575999269",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "CYBER RELAx",
+      "token_symbol": "CR",
+      "total_supply": "100000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "♾️ MINTABLE",
+      "10 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "NAUGHTYMILF",
+      "name": "NaughtyMilf",
+      "address": "0x167ba3923049adf36b3487d04bad83820581e368",
+      "poolAddress": "0xeff7d8cb19b31d521d6865746ac2566b0c352fd6",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 5.59647233309689e-14,
+      "liquidityUsd": 0.0639,
+      "volume24h": 0.02361013168,
+      "poolCreatedAt": "2026-03-09T19:58:52Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "1",
+      "buy_tax": "0.1",
+      "can_take_back_ownership": "1",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0xe46d4b97ba876e4726554f51c53e453957a8b93d",
+      "creator_balance": "495298030269411.236320967",
+      "creator_percent": "0.495298",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.02337186",
+          "pair": "0xeff7d8cb19b31d521d6865746ac2566b0c352fd6"
+        },
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV1",
+          "liquidity": "0.00000000",
+          "pair": "0xacfc7332a40871ec48485157410661d000f8324e"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "10",
+      "holders": [
+        {
+          "address": "0x000000000000000000000000000000000000dead",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "500207843227652.292670134",
+          "percent": "0.500207843227652292",
+          "is_locked": 1
+        },
+        {
+          "address": "0xe46d4b97ba876e4726554f51c53e453957a8b93d",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "495298030269411.236320967",
+          "percent": "0.495298030269411236",
+          "is_locked": 0
+        },
+        {
+          "address": "0xbeda389b74bdee17049b697577d66f77078ab9d8",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "969111173645.160508362",
+          "percent": "0.000969111173645160",
+          "is_locked": 0
+        },
+        {
+          "address": "0x5c8e1c363eecf0881a9bc81319987b531c4e5ad1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "794802952122.851650933",
+          "percent": "0.000794802952122851",
+          "is_locked": 0
+        },
+        {
+          "address": "0xe365c9b173c26d73cc37e59fa93d6b0bc3e5832a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "408610016092.077700542",
+          "percent": "0.000408610016092077",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "398723939862.319125853",
+          "percent": "0.000398723939862319",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "396083761217.641275275",
+          "percent": "0.000396083761217641",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "395209529727.463414621",
+          "percent": "0.000395209529727463",
+          "is_locked": 0
+        },
+        {
+          "address": "0x4caabd8090e702c1980ddb513925d60ecd8812f4",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "390027939699.094148396",
+          "percent": "0.000390027939699094",
+          "is_locked": 0
+        },
+        {
+          "address": "0xeff7d8cb19b31d521d6865746ac2566b0c352fd6",
+          "tag": "PancakeV2",
+          "is_contract": 1,
+          "balance": "325870735265.277844642",
+          "percent": "0.000325870735265277",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "1",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "1",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.108860414262719845",
+          "percent": "0.999999999999990813",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000009186",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.108860414262720845",
+      "owner_address": "0xe46d4b97ba876e4726554f51c53e453957a8b93d",
+      "owner_balance": "495307839439011.5",
+      "owner_change_balance": "0",
+      "owner_percent": "0.495308",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0.0009",
+      "slippage_modifiable": "1",
+      "token_name": "NaughtyMilf",
+      "token_symbol": "NaughtyMilf",
+      "total_supply": "1000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0.1"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👑 OWNER_PODE_RETOMAR"
+    ],
+    "warnings": [
+      "Taxa compra:10.0%",
+      "10 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "ETINU",
+      "name": "electric inu",
+      "address": "0x163eddeff90df67e6b0c884693729a98831da4ea",
+      "poolAddress": "0x13550ce5aa538c470154252d1e0f0df5908de796",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.48810859581834e-13,
+      "liquidityUsd": 0.0002113676457,
+      "volume24h": 0.01072013011,
+      "poolCreatedAt": "2026-03-09T19:58:51Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0x9e93b836b05289d4140b9f15780abddd8056cf5c",
+      "creator_balance": "38832874523.82525614431",
+      "creator_percent": "0.907379",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01080969",
+          "pair": "0x13550ce5aa538c470154252d1e0f0df5908de796"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "11",
+      "holders": [
+        {
+          "address": "0x9e93b836b05289d4140b9f15780abddd8056cf5c",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "38832874523.82525614431",
+          "percent": "0.907379041334836620",
+          "is_locked": 0
+        },
+        {
+          "address": "0x31a5ea9008dbf7e44a5f0638bc798dbf6d0c57ab",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "842657001.00000006144",
+          "percent": "0.019689742547190405",
+          "is_locked": 0
+        },
+        {
+          "address": "0x62596783f5c0412b127f110f94c8a6e8e39eaca7",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "523980376.72327859005",
+          "percent": "0.012243461699383893",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "422681340.77745364984",
+          "percent": "0.009876482091210105",
+          "is_locked": 0
+        },
+        {
+          "address": "0x3c1acf05c4dcc8ef94cf7ff48f64f5757aafb9db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "414403628.30211882628",
+          "percent": "0.009683062909591024",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "406366819.18021312609",
+          "percent": "0.009495272738354750",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "398561653.46649427978",
+          "percent": "0.009312895207213486",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6d96254e563907d0b73a5cbaadeea761a20cd8cb",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "390979311.95551237713",
+          "percent": "0.009135724244319999",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6666c898d548da0c4f4e76bac36be9fad414fae2",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "383611391.24388110305",
+          "percent": "0.008963563493566168",
+          "is_locked": 0
+        },
+        {
+          "address": "0x82dcac4db5a75ab30576ffbec40c664fd9c101a9",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "177849442.85370553935",
+          "percent": "0.004155676316455020",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "1",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.002166263862285811",
+          "percent": "0.999999999999538375",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000461624",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.002166263862286811",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "electric inu",
+      "token_symbol": "etinu",
+      "total_supply": "42796750591.34999",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "♾️ MINTABLE",
+      "11 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "SRK",
+      "name": "SAFE ROCKET",
+      "address": "0x15b78e8618f5b7fb623b65be66c8bb1bd0ae6723",
+      "poolAddress": "0x56073c514a6c525ef4ca1425e72c86a5e92544b8",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.59324531576492e-12,
+      "liquidityUsd": 0.0004004713725,
+      "volume24h": 0.0130713447,
+      "poolCreatedAt": "2026-03-09T19:58:48Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "buy_tax": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0xd7fa2cd4e28bc7aade4a5f20c733b1220536461b",
+      "creator_balance": "996801107754.830885111206024771",
+      "creator_percent": "0.996801",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01319878",
+          "pair": "0x56073c514a6c525ef4ca1425e72c86a5e92544b8"
+        }
+      ],
+      "holder_count": "6",
+      "holders": [
+        {
+          "address": "0xd7fa2cd4e28bc7aade4a5f20c733b1220536461b",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "996801107754.830885111206024771",
+          "percent": "0.996801107754830885",
+          "is_locked": 0
+        },
+        {
+          "address": "0x890388296bc2e566a39d0598304cdae1e7e5efa8",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "2823691147.192537114171136169",
+          "percent": "0.002823691147192537",
+          "is_locked": 0
+        },
+        {
+          "address": "0x5e3773713f0a20806168d633652b905ee7253f83",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "124671954.965615224851651309",
+          "percent": "0.000124671954965615",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "124640833.707448896205380028",
+          "percent": "0.000124640833707448",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "124609724.105661487278890891",
+          "percent": "0.000124609724105661",
+          "is_locked": 0
+        },
+        {
+          "address": "0x56073c514a6c525ef4ca1425e72c86a5e92544b8",
+          "tag": "PancakeV2",
+          "is_contract": 1,
+          "balance": "1278585.197852166286916832",
+          "percent": "0.000001278585197852",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_in_dex": "1",
+      "is_open_source": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "5.130753519052635774",
+          "percent": "0.999999999999999805",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000000194",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "5.130753519052636774",
+      "owner_address": "",
+      "sell_tax": "0",
+      "token_name": "SAFE ROCKET",
+      "token_symbol": "SRK",
+      "total_supply": "1000000000000",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "🔐 CÓDIGO_FECHADO",
+      "6 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "GOD",
+      "name": "Guns, Oil and Drugs",
+      "address": "0x1587d3fece7369763669bd26f3ad8d6fdd9406c6",
+      "poolAddress": "0x4ed004d51fffaa749b4e94a3df1299a9d173cec3",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.31960493636278e-12,
+      "liquidityUsd": 0.000297097949477291,
+      "volume24h": 0.01016516339,
+      "poolCreatedAt": "2026-03-09T19:58:47Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "1",
+      "buy_tax": "0.1",
+      "can_take_back_ownership": "1",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0x095dfa088cee5ae0e91d1d5cba90038580b09975",
+      "creator_balance": "999976556841554.595141333",
+      "creator_percent": "0.999977",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01032813",
+          "pair": "0x4ed004d51fffaa749b4e94a3df1299a9d173cec3"
+        },
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV1",
+          "liquidity": "0.00000000",
+          "pair": "0x469bbdb5e09e3c9191a4f8dee2d3928042053293"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "12",
+      "holders": [
+        {
+          "address": "0x095dfa088cee5ae0e91d1d5cba90038580b09975",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "999976556841554.595141333",
+          "percent": "0.999976556841554595",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb6c48757252ad8425497e13bdbb285d3dda3f49",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "818030442.427812585",
+          "percent": "0.000000818030442427",
+          "is_locked": 0
+        },
+        {
+          "address": "0xf6f5b2ed4e8ada6485d3050a5839f077c5213462",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "454219967.991718949",
+          "percent": "0.000000454219967991",
+          "is_locked": 0
+        },
+        {
+          "address": "0x7ff5756725dd542c78cb0fb2723893fd29964218",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "364115135.407053591",
+          "percent": "0.000000364115135407",
+          "is_locked": 0
+        },
+        {
+          "address": "0xc1e6dd3735206b97909ec9f1766dd1205903e34f",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "124155278.124410209",
+          "percent": "0.000000124155278124",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "124073646.138596277",
+          "percent": "0.000000124073646138",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "123992094.669304989",
+          "percent": "0.000000123992094669",
+          "is_locked": 0
+        },
+        {
+          "address": "0x3c1acf05c4dcc8ef94cf7ff48f64f5757aafb9db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "123910623.610660705",
+          "percent": "0.000000123910623610",
+          "is_locked": 0
+        },
+        {
+          "address": "0x5c8e1c363eecf0881a9bc81319987b531c4e5ad1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "123829232.856961776",
+          "percent": "0.000000123829232856",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "123747922.302680198",
+          "percent": "0.000000123747922302",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "1",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "1",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000132270661428259",
+          "percent": "0.999999999992439744",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000007560255",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.000132270661429259",
+      "owner_address": "0x095dfa088cee5ae0e91d1d5cba90038580b09975",
+      "owner_balance": "999976556841554.595141333",
+      "owner_change_balance": "0",
+      "owner_percent": "0.999977",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0.0004",
+      "slippage_modifiable": "1",
+      "token_name": "Guns, Oil and Drugs",
+      "token_symbol": "GOD",
+      "total_supply": "1000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0.1"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "❌ PERIGOSO",
+    "dangers": [
+      "👑 OWNER_PODE_RETOMAR"
+    ],
+    "warnings": [
+      "Taxa compra:10.0%",
+      "12 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "CRYPTEX",
+      "name": "CRYPTEX",
+      "address": "0x15898fc9f5f25088f52e54acb6b9e13e68f0167c",
+      "poolAddress": "0x6813536d2a9147cda095c793d8aa6f68c56e563a",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.60784595464682e-17,
+      "liquidityUsd": 0.0003580277058,
+      "volume24h": 0.01320945592,
+      "poolCreatedAt": "2026-03-09T19:58:47Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0x74d5b73781841ebb077053f57dbb0c45b4e73ad3",
+      "creator_balance": "653952179521354.02921960894",
+      "creator_percent": "0.653952",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.01315463",
+          "pair": "0x6813536d2a9147cda095c793d8aa6f68c56e563a"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "11",
+      "holders": [
+        {
+          "address": "0x74d5b73781841ebb077053f57dbb0c45b4e73ad3",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "653952179521354.02921960894",
+          "percent": "0.653952179521354029",
+          "is_locked": 0
+        },
+        {
+          "address": "0xef23bfe7f48ad2b2faefc5f4d629a6ea4e76ba5a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "300067380604555.43102428888",
+          "percent": "0.300067380604555431",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6666c898d548da0c4f4e76bac36be9fad414fae2",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6950959015397.05945915304",
+          "percent": "0.006950959015397059",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6814103170753.67772087655",
+          "percent": "0.006814103170753677",
+          "is_locked": 0
+        },
+        {
+          "address": "0x7c3270c1a6d91a77dce9354d47a36df1e9c5c258",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6681251331197.95755503054",
+          "percent": "0.006681251331197957",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6552248780172.07352738495",
+          "percent": "0.006552248780172073",
+          "is_locked": 0
+        },
+        {
+          "address": "0x3c1acf05c4dcc8ef94cf7ff48f64f5757aafb9db",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6426948203398.06454768036",
+          "percent": "0.006426948203398064",
+          "is_locked": 0
+        },
+        {
+          "address": "0xffa6431e358ec870c68db2731505a45e6ba4fa37",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6305209267886.00208629158",
+          "percent": "0.006305209267886002",
+          "is_locked": 0
+        },
+        {
+          "address": "0xcb692809bf98a8201648b3c81f7231230f5cdfb1",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "6186898228615.11440769447",
+          "percent": "0.006186898228615114",
+          "is_locked": 0
+        },
+        {
+          "address": "0x6813536d2a9147cda095c793d8aa6f68c56e563a",
+          "tag": "PancakeV2",
+          "is_contract": 1,
+          "balance": "61821876670.59045199069",
+          "percent": "0.000061821876670590",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "0",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.358463552013537382",
+          "percent": "0.999999999999997210",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000002789",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "0.358463552013538382",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "CRYPTEX",
+      "token_symbol": "CRYPTEX",
+      "total_supply": "1000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "11 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "MOON",
+      "name": "To the Moon",
+      "address": "0x156de155ffabbf3183501a28be9d3075593ef0e5",
+      "poolAddress": "0x496db1d45776a0ec6a33ac7bf21ee53a2f162f2d",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.96858923860213e-16,
+      "liquidityUsd": 0.0639,
+      "volume24h": 0.01725155472,
+      "poolCreatedAt": "2026-03-09T19:58:46Z",
+      "ageMinutes": 17
+    },
+    "goplus": {
+      "anti_whale_modifiable": "0",
+      "buy_tax": "0",
+      "can_take_back_ownership": "0",
+      "cannot_buy": "0",
+      "cannot_sell_all": "0",
+      "creator_address": "0xc017d388beaccc1c32769b2818938b965f884eda",
+      "creator_balance": "53218141245811959.056850994",
+      "creator_percent": "0.532181",
+      "dex": [
+        {
+          "liquidity_type": "UniV2",
+          "name": "PancakeV2",
+          "liquidity": "0.02656553",
+          "pair": "0x496db1d45776a0ec6a33ac7bf21ee53a2f162f2d"
+        }
+      ],
+      "external_call": "0",
+      "hidden_owner": "0",
+      "holder_count": "17",
+      "holders": [
+        {
+          "address": "0xc017d388beaccc1c32769b2818938b965f884eda",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "53218141245811959.056850994",
+          "percent": "0.532181412458119590",
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000001",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "40000000000000000",
+          "percent": "0.400000000000000000",
+          "is_locked": 1
+        },
+        {
+          "address": "0x1fc6ae707fb2a567539dcc56c0f720109986f8aa",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "4387540000000000",
+          "percent": "0.043875400000000000",
+          "is_locked": 0
+        },
+        {
+          "address": "0x656b064a0209683b770664aa007a4f238268205a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "1521767832612332.63624494",
+          "percent": "0.015217678326123326",
+          "is_locked": 0
+        },
+        {
+          "address": "0x2cf4565749040c1467dee03d655eb5b238fff29d",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "219673995115557.970741512",
+          "percent": "0.002196739951155579",
+          "is_locked": 0
+        },
+        {
+          "address": "0x26663df4bdb9983466fc83cdf527c973f92428e7",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "218498873922186.038180864",
+          "percent": "0.002184988739221860",
+          "is_locked": 0
+        },
+        {
+          "address": "0xc1f4f2531630ece0bd8c67e95b711640dfb02be3",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "66265478559167.456980584",
+          "percent": "0.000662654785591674",
+          "is_locked": 0
+        },
+        {
+          "address": "0x496db1d45776a0ec6a33ac7bf21ee53a2f162f2d",
+          "tag": "PancakeV2",
+          "is_contract": 1,
+          "balance": "45292518112991.603222868",
+          "percent": "0.000452925181129916",
+          "is_locked": 0
+        },
+        {
+          "address": "0x74ab14b94a1b98c8ac116310189e7f121eaea56a",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "44238064196224.297075597",
+          "percent": "0.000442380641962242",
+          "is_locked": 0
+        },
+        {
+          "address": "0x43d4b4551bc9cd2f1770e5fc59b043043a80d167",
+          "tag": "",
+          "is_contract": 0,
+          "balance": "44102481920023.870995691",
+          "percent": "0.000441024819200238",
+          "is_locked": 0
+        }
+      ],
+      "honeypot_with_same_creator": "0",
+      "is_anti_whale": "0",
+      "is_blacklisted": "0",
+      "is_honeypot": "0",
+      "is_in_dex": "1",
+      "is_mintable": "1",
+      "is_open_source": "1",
+      "is_proxy": "0",
+      "is_whitelisted": "0",
+      "lp_holder_count": "2",
+      "lp_holders": [
+        {
+          "address": "0x07d80ae6f36a5e08dca74ce884a24d39db9934ed",
+          "tag": "",
+          "value": null,
+          "is_contract": 0,
+          "balance": "1.356402482469148545",
+          "percent": "0.999999999999999262",
+          "NFT_list": null,
+          "is_locked": 0
+        },
+        {
+          "address": "0x0000000000000000000000000000000000000000",
+          "tag": "Null Address",
+          "value": null,
+          "is_contract": 0,
+          "balance": "0.000000000000001",
+          "percent": "0.000000000000000737",
+          "NFT_list": null,
+          "is_locked": 1
+        }
+      ],
+      "lp_total_supply": "1.356402482469149545",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "owner_balance": "0",
+      "owner_change_balance": "0",
+      "owner_percent": "0.0",
+      "personal_slippage_modifiable": "0",
+      "selfdestruct": "0",
+      "sell_tax": "0",
+      "slippage_modifiable": "0",
+      "token_name": "To the Moon",
+      "token_symbol": "MOON",
+      "total_supply": "100000000000000000",
+      "trading_cooldown": "0",
+      "transfer_pausable": "0",
+      "transfer_tax": "0"
+    },
+    "goplusError": null,
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "🟡 CUIDADO",
+    "dangers": [],
+    "warnings": [
+      "♾️ MINTABLE",
+      "17 holders"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "AT",
+      "name": "appi token",
+      "address": "0x153b7a39513292b2674ab14eaaf1cd0ba822afa5",
+      "poolAddress": "0x321be5e351235b850bdf2dea62affa84b7fa46bb",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.80540042763546e-18,
+      "liquidityUsd": 0.0002599466288,
+      "volume24h": 0.01272094257,
+      "poolCreatedAt": "2026-03-09T19:58:44Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "狗头",
+      "name": "狗头",
+      "address": "0x05a49ba57baab7ec0ea01eff436cd73211d76f90",
+      "poolAddress": "0x3323f3f1d761b675aca14313f9f4c5d31964c73e",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.09791490251585e-9,
+      "liquidityUsd": 0.0639,
+      "volume24h": 10987.8357525088,
+      "poolCreatedAt": "2026-03-09T19:58:41Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "TRADECLAW",
+      "name": "TradeClaw",
+      "address": "0x9c392a8570d8826d0edf651fa9b93d61eaa14444",
+      "poolAddress": "0x9c392a8570d8826d0edf651fa9b93d61eaa14444",
+      "quoteSymbol": "BNB",
+      "priceUsd": 0.00000364087833329261,
+      "liquidityUsd": 2912.6816,
+      "volume24h": 2972.8774803791,
+      "poolCreatedAt": "2026-03-09T19:58:30Z",
+      "ageMinutes": 17
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "ORCL",
+      "name": "Oracle Corp (Derivatives)",
+      "address": "0x1767289bca7cdcd87c2882473281fb135cb2ab27",
+      "poolAddress": "0xef5f2fe11dd48e52f878dc104f16d316010d0d82",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000110400783084228,
+      "liquidityUsd": 20594.784,
+      "volume24h": 1527.5510776028,
+      "poolCreatedAt": "2026-03-09T19:58:05Z",
+      "ageMinutes": 18
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "FUSAKA",
+      "name": "Fusaka",
+      "address": "0x56828bdb8b0f8e7e3cb659fb67cce30291013906",
+      "poolAddress": "0x380b48fcdda96b415b16f5a6458e62e33d2458bb",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.85502386656912e-11,
+      "liquidityUsd": 5150.1276,
+      "volume24h": 1305.69680214,
+      "poolCreatedAt": "2026-03-09T19:57:15Z",
+      "ageMinutes": 19
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "ROY",
+      "name": "roy",
+      "address": "0xb3c7afb65bfe9d40cfe640bdf73c5f2f9a9d2313",
+      "poolAddress": "0x7ed9eec2179f60c79704e188f51e0326ca5f8cc1",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.89088949529013e-9,
+      "liquidityUsd": 0.0638,
+      "volume24h": 10915.0673329608,
+      "poolCreatedAt": "2026-03-09T19:56:00Z",
+      "ageMinutes": 20
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "宝马",
+      "name": "B・M",
+      "address": "0xa8ee33867cb8594829bc0981739fd98052e403ff",
+      "poolAddress": "0xb5a59bcd74398549392bb46df4165e06c544daf9",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.00000762187128896169,
+      "liquidityUsd": 64791.6391,
+      "volume24h": 4298.763278,
+      "poolCreatedAt": "2026-03-09T19:55:52Z",
+      "ageMinutes": 20
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "月亮锦鲤",
+      "name": "月亮锦鲤",
+      "address": "0x37f04bf380fb91e4c27f9ee4d23444e7ac5e0dbc",
+      "poolAddress": "0x45a3ae1cccb422f11f685055135f48284036fd6b",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 4.48368490235789e-10,
+      "liquidityUsd": 20191.0848,
+      "volume24h": 30373.0875492734,
+      "poolCreatedAt": "2026-03-09T19:54:59Z",
+      "ageMinutes": 21
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "☝️CZ TATTOO",
+      "name": "CZ TATTOO",
+      "address": "0x0114809899cdcf9b6cc0c759229eb7bf6ae7a7d5",
+      "poolAddress": "0x3a676875ae950fff068f5740cba344bd286c8c15",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 3.11403925872663e-9,
+      "liquidityUsd": 0.0639,
+      "volume24h": 10967.358580149,
+      "poolCreatedAt": "2026-03-09T19:54:50Z",
+      "ageMinutes": 21
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "🧸 PEDO",
+      "name": "🧸 Pedo",
+      "address": "0x9ae18d6876a332d6b2148f2c3d44036b082aebe9",
+      "poolAddress": "0xdd36da9e083fd8828bb69b2633fc95c636b395a4",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.87737691323443e-9,
+      "liquidityUsd": 0.03073189641,
+      "volume24h": 11103.8713940552,
+      "poolCreatedAt": "2026-03-09T19:53:18Z",
+      "ageMinutes": 23
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "LTO",
+      "name": "LOBSTER take over",
+      "address": "0x9bbbb54871485b42821a7886c05d0a2772931077",
+      "poolAddress": "0xb55d7714966c35fce2b553fe0be166096c3cb066",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.99260494414051e-9,
+      "liquidityUsd": 9.3258,
+      "volume24h": 10970.0347689977,
+      "poolCreatedAt": "2026-03-09T19:53:18Z",
+      "ageMinutes": 23
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "抢饭",
+      "name": "抢饭",
+      "address": "0x72c5e1a3f1652ce26a1f9c1f2fbb7b9fc9072f0d",
+      "poolAddress": "0x9d28f85c76236cfe46fcb4b7fa4330305bce1089",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 8.25075047492278e-7,
+      "liquidityUsd": 12741.4192,
+      "volume24h": 3096.9323109268,
+      "poolCreatedAt": "2026-03-09T19:53:07Z",
+      "ageMinutes": 23
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "BULL",
+      "name": "Bull Super",
+      "address": "0xf024f95a983ab0f10b47652f2232cc19b4a434ed",
+      "poolAddress": "0x0e627de734d3953c0d1a28e16d4f46ab8ce05053",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 0.000262360633192638,
+      "liquidityUsd": 48932.8526,
+      "volume24h": 111547.584588015,
+      "poolCreatedAt": "2026-03-09T19:53:02Z",
+      "ageMinutes": 23
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "4DOGE",
+      "name": "Swat 4 Doge",
+      "address": "0x05b93e64dd5f4d41ef3ee38900b138bdd9d18252",
+      "poolAddress": "0xdf46e4c27999b40cdae3764473186ecbc55df0da",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 6.08832504443496e-8,
+      "liquidityUsd": 83.6343,
+      "volume24h": 131.4968786565,
+      "poolCreatedAt": "2026-03-09T19:52:59Z",
+      "ageMinutes": 23
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "MISSILE",
+      "name": "MISSILE",
+      "address": "0x4444dd9c4ba016d754f3fe8ab10a39ea5ecd7f95",
+      "poolAddress": "0x4444dd9c4ba016d754f3fe8ab10a39ea5ecd7f95",
+      "quoteSymbol": "BNB",
+      "priceUsd": 0.0000103298303229781,
+      "liquidityUsd": 8271.7545,
+      "volume24h": 44.6401,
+      "poolCreatedAt": "2026-03-09T19:52:43Z",
+      "ageMinutes": 23
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "PIGSHIT",
+      "name": "PigShit",
+      "address": "0x137df9c2a8da9997b76459277b65c676a6efcea4",
+      "poolAddress": "0xfc03bda00fdbd4a980556e96ca6ca65d6d7310da",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 9.20375436309494e-14,
+      "liquidityUsd": 0.1277,
+      "volume24h": 0.01094158065,
+      "poolCreatedAt": "2026-03-09T19:50:26Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "DBUY",
+      "name": "DONTBUY",
+      "address": "0x1334841751cb0ab716ec5c9c2c9ed215375facb9",
+      "poolAddress": "0xa166021f1e005846291f936921483b11c8b81cb1",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.39529378580509e-14,
+      "liquidityUsd": 0.1277,
+      "volume24h": 0.0107874469,
+      "poolCreatedAt": "2026-03-09T19:50:24Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "SCND",
+      "name": "Second",
+      "address": "0x131b437cf106b86ed41d25423ea77faabfcba8f8",
+      "poolAddress": "0x5f9e9a442d65731611ad043c682a2783adcca0cb",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 1.94576962332611e-8,
+      "liquidityUsd": 0.0003795055756,
+      "volume24h": 0.01440915642,
+      "poolCreatedAt": "2026-03-09T19:50:23Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "🐉DRAGONDOGEZ",
+      "name": "🐉DragonDogez",
+      "address": "0x12ef3059fff957bbb0766e7cb35dc070f21b500b",
+      "poolAddress": "0x9c18b0a2c2506955b2eca3d59e032a1ba4aa5e5a",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 4.9304824583249e-12,
+      "liquidityUsd": 0.0002461944265,
+      "volume24h": 0.01049631811,
+      "poolCreatedAt": "2026-03-09T19:50:20Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "SABOKU",
+      "name": "Saboku Inu",
+      "address": "0x1294a8b12c800012f4ce2fc61eca236acbffb99e",
+      "poolAddress": "0x454b54999ead26ed5f7cf02de46ea023bc422340",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 2.36110184322336e-13,
+      "liquidityUsd": 0.0004749078258,
+      "volume24h": 0.01458821192,
+      "poolCreatedAt": "2026-03-09T19:50:18Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "PAWTROL",
+      "name": "Paw Patrol",
+      "address": "0x12863824f942fbdcb88d51f51f8d1b60f6e4f870",
+      "poolAddress": "0xd0b8342a976f321ca6345eea96b75f62bd74e0ba",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 4.49385584589649e-13,
+      "liquidityUsd": 0.0002243277722,
+      "volume24h": 0.009914819655,
+      "poolCreatedAt": "2026-03-09T19:50:16Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  },
+  {
+    "pool": {
+      "symbol": "NOELON",
+      "name": "NoCryptoElon",
+      "address": "0x12a906d274c229259bacbd574666068e60a718b0",
+      "poolAddress": "0x616f73a082e681e76fe9fe0b9564e271068c8658",
+      "quoteSymbol": "WBNB",
+      "priceUsd": 5.34285651316224e-13,
+      "liquidityUsd": 0.0004862027304,
+      "volume24h": 0.01443893849,
+      "poolCreatedAt": "2026-03-09T19:50:15Z",
+      "ageMinutes": 26
+    },
+    "goplus": null,
+    "goplusError": "No data from GoPlus",
+    "bscscanContractAge": null,
+    "bscscanCreator": null,
+    "verdict": "⚠️  SEM_DADOS",
+    "dangers": [],
+    "warnings": [
+      "SEM_DADOS_GOPLUS"
+    ]
+  }
+]

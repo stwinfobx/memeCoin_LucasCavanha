@@ -1,9 +1,29 @@
 import { Pool } from 'pg';
 import { Signal, Token, SignalType } from '@shared/types';
 import crypto from 'crypto';
+import axios from 'axios';
+
+// Interfaces de Mercado para compatibilidade
+interface MarketData {
+    priceUsd: number;
+    liquidityUsd: number;
+    fdvUsd: number;
+    volumeH24: number;
+    volumeH1: number;
+    volumeM5: number;
+    txns24hBuys: number;
+    txns24hSells: number;
+    pairCreatedAt: number | null;
+    dexId: string;
+    source: string;
+    isPumpFun: boolean;
+}
 
 export class SignalAnalyzer {
   private pool: Pool;
+  private readonly BUY_THRESHOLD = 80;
+  private readonly MAX_TOKEN_AGE_MIN = 60; // Limite 1h
+  private readonly IDEAL_TOKEN_AGE_MIN = 15;
 
   constructor(pool: Pool) {
     this.pool = pool;
@@ -18,32 +38,174 @@ export class SignalAnalyzer {
     return (hashNum % 100) / 1000; // 0-0.1 (variação sutil de 0-10%)
   }
 
-  /**
-   * Detecta se um token tem características de meme coin
-   * Meme coins geralmente têm: alta volatilidade, volume alto, muitos holders, idade recente
-   */
-  private isMemecoin(
-    volume24h: number,
-    liquidityUsd: number,
-    holdersCount: number,
-    ageDays: number
-  ): boolean {
-    // Calcular relação volume/liquidez (alta = alta volatilidade)
-    const volumeLiquidityRatio = liquidityUsd > 0 ? volume24h / liquidityUsd : 0;
+  // ===========================================
+  // APIS EXTERNAS (On-the-fly Validation)
+  // ===========================================
+  private async apiGoPlus(chain: string, token: string) {
+      try {
+          const chainId = chain.toLowerCase() === 'bsc' ? '56' : chain.toLowerCase() === 'base' ? '8453' : 'solana';
+          const base = 'https://api.gopluslabs.io/api/v1/token_security';
+          const url = chainId === 'solana'
+              ? `${base}/solana?contract_addresses=${token}`
+              : `${base}/${chainId}?contract_addresses=${token}`;
+              
+          const res = await axios.get(url, { timeout: 12000 });
+          return res.data?.result?.[token.toLowerCase()] || res.data?.result || {};
+      } catch (e: any) { 
+          console.error(`[Analyzer] Erro GoPlus ${token}: ${e.message}`);
+          return { error: e.message }; 
+      }
+  }
 
-    // Critérios para meme coin:
-    // 1. Volume alto em relação à liquidez (volatilidade alta)
-    // 2. Muitos holders (comunidade grande)
-    // 3. Token novo (idade < 30 dias)
-    // 4. Volume absoluto alto (> $50k)
-    const hasHighVolatility = volumeLiquidityRatio > 5; // Volume 5x maior que liquidez
-    const hasManyHolders = holdersCount > 500;
-    const isNewToken = ageDays < 30;
-    const hasHighVolume = volume24h > 50_000;
+  private async apiHoneypotIs(chain: string, token: string) {
+      if (chain.toLowerCase() === 'solana') return null;
+      try {
+          const chainId = chain.toLowerCase() === 'bsc' ? '56' : '8453';
+          const res = await axios.get(
+              `https://api.honeypot.is/v2/IsHoneypot?address=${token}&chainID=${chainId}`,
+              { timeout: 12000 }
+          );
+          return res.data;
+      } catch (e: any) { 
+          return { error: e.message }; 
+      }
+  }
 
-    // É meme coin se atender pelo menos 3 dos 4 critérios
-    const criteriaMet = [hasHighVolatility, hasManyHolders, isNewToken, hasHighVolume].filter(Boolean).length;
-    return criteriaMet >= 3;
+  private async apiRugCheck(chain: string, token: string) {
+      if (chain.toLowerCase() !== 'solana') return null;
+      try {
+          const res = await axios.get(
+              `https://api.rugcheck.xyz/v1/tokens/${token}/report/summary`,
+              { timeout: 12000 }
+          );
+          return res.data;
+      } catch (e: any) { 
+          return { error: e.message }; 
+      }
+  }
+  // ===========================================
+  // LÓGICA CORE DE SCORING (O "Safe Mode")
+  // ===========================================
+  private computeAdvancedScore(
+      chain: string,
+      market: MarketData,
+      goplus: any,
+      honeypot: any,
+      rugcheck: any,
+      foundAtMs: number
+  ) {
+      let score = 50;
+      const issues: string[] = [];
+      const warnings: string[] = [];
+
+      // Idade
+      const ageMs = market.pairCreatedAt ? (foundAtMs - market.pairCreatedAt) : null;
+      const ageMin = ageMs !== null ? Math.round(ageMs / 60000) : null;
+
+      if (ageMin === null) {
+          issues.push('IDADE_DESCONHECIDA');
+          score -= 15;
+      } else if (ageMin > this.MAX_TOKEN_AGE_MIN) {
+          issues.push(`MUITO_ANTIGO:${ageMin}min`);
+          score -= 20;
+      } else if (ageMin > this.IDEAL_TOKEN_AGE_MIN) {
+          warnings.push(`${ageMin}min (vencendo)`);
+          score -= 8;
+      } else {
+          score += 10;
+      }
+
+      // Liquidez / FDV
+      if (chain.toLowerCase() === 'solana' && market.isPumpFun) {
+          const cap = market.fdvUsd || market.liquidityUsd;
+          if (cap <= 0) { issues.push('FDV_ZERO'); score -= 20; }
+          else if (cap < 5_000) { issues.push(`FDV_BAIXO`); score -= 10; }
+          else if (cap < 20_000) { warnings.push(`FDV Baixo`); score -= 3; }
+          else if (cap < 690_000) { score += 8; }
+          
+          if (market.txns24hBuys + market.txns24hSells > 100) score += 5;
+          if (market.txns24hBuys > market.txns24hSells * 1.5) score += 5;
+      } else {
+          if (market.liquidityUsd <= 0) { issues.push('LIQUIDEZ_ZERO'); score -= 25; }
+          else if (market.liquidityUsd < 500) { warnings.push(`Liq super baixa`); score -= 10; }
+          else if (market.liquidityUsd < 5_000) { warnings.push(`Liq baixa`); score -= 5; }
+          else { score += 10; }
+      }
+
+      // Wash Trading
+      if (market.liquidityUsd > 0 && market.volumeH24 > 0) {
+          const ratio = market.volumeH24 / market.liquidityUsd;
+          if (ratio > 500) { issues.push(`WASH_TRADING`); score -= 30; }
+          else if (ratio > 100) { issues.push(`VOLUME_SUSPEITO`); score -= 15; }
+          else if (ratio > 20) { warnings.push(`Vol alto vs liq`); score -= 5; }
+      }
+
+      // GOPLUS Segurança
+      const gp = goplus;
+      const gpHasData = gp && !gp.error && Object.keys(gp).filter(k => k !== 'error').length > 2;
+
+      if (gpHasData) {
+          if (chain.toLowerCase() === 'solana') {
+              if (gp.freezeable === '1') { issues.push('FREEZABLE'); score -= 40; }
+              if (gp.mintable === '1') { issues.push('MINTABLE'); score -= 20; }
+              if (gp.freezeable === '0' && gp.mintable === '0') score += 15;
+          } else {
+              if (gp.is_honeypot === '1') { issues.push('HONEYPOT_GOPLUS'); score -= 55; }
+              if (gp.cannot_sell_all === '1') { issues.push('NAO_PODE_VENDER'); score -= 50; }
+              if (gp.owner_change_balance === '1') { issues.push('DONO_ALTERA_SALDO'); score -= 45; }
+              if (gp.selfdestruct === '1') { issues.push('SELF_DESTRUCT'); score -= 35; }
+              if (gp.hidden_owner === '1') { issues.push('OWNER_OCULTO'); score -= 30; }
+              if (gp.transfer_pausable === '1') { issues.push('TRANSFER_PAUSAVEL'); score -= 25; }
+              if (gp.slippage_modifiable === '1') { issues.push('SLIPPAGE_MODIFICAVEL'); score -= 20; }
+              if (gp.can_take_back_ownership === '1') { issues.push('OWNER_PODE_RETOMAR'); score -= 20; }
+              if (gp.is_proxy === '1') { issues.push('CONTRATO_PROXY'); score -= 18; }
+              
+              const buyTax = parseFloat(gp.buy_tax || '0');
+              const sellTax = parseFloat(gp.sell_tax || '0');
+              if (buyTax > 0.30) { issues.push(`TAXA_COMPRA_CRITICA`); score -= 30; }
+              else if (buyTax > 0.10) { issues.push(`TAXA_COMPRA_ALTA`); score -= 15; }
+              if (sellTax > 0.30) { issues.push(`TAXA_VENDA_CRITICA`); score -= 30; }
+              else if (sellTax > 0.10) { issues.push(`TAXA_VENDA_ALTA`); score -= 15; }
+
+              const holders = parseInt(gp.holder_count || '0');
+              if (holders === 0) { issues.push('ZERO_HOLDERS'); score -= 20; }
+              else if (holders < 5) { issues.push(`POUCOS_HOLDERS`); score -= 15; }
+              else if (holders > 20) { score += 5; }
+
+              const passedAll = gp.is_honeypot === '0' && gp.cannot_sell_all !== '1' && gp.hidden_owner !== '1'
+                  && gp.owner_change_balance !== '1' && gp.selfdestruct !== '1' && buyTax <= 0.05 && sellTax <= 0.05;
+              if (passedAll) score += 15;
+          }
+      } else {
+          issues.push('SEM_DADOS_GOPLUS');
+          score -= 20;
+      }
+
+      // Honeypot Is
+      if (chain.toLowerCase() !== 'solana' && honeypot && !honeypot.error) {
+          const hp = honeypot?.honeypotResult;
+          if (hp?.isHoneypot === true) { issues.push('HONEYPOT_CONFIRMED'); score -= 60; }
+          if (honeypot?.simulationSuccess === false) { issues.push('SIMULACAO_FALHOU'); score -= 20; }
+          if (hp?.isHoneypot === false && honeypot?.simulationSuccess !== false) { score += 10; }
+      }
+
+      // RugCheck
+      if (chain.toLowerCase() === 'solana' && rugcheck && !rugcheck.error) {
+          const rc = rugcheck.score ?? rugcheck.riskScore ?? 0;
+          if (rc > 2000) { issues.push(`RUGCHECK_CRITICO:${rc}`); score -= 40; }
+          else if (rc > 500) { issues.push(`RUGCHECK_ALTO:${rc}`); score -= 25; }
+          else if (rc > 0) { score += 15; }
+      }
+
+      score = Math.max(0, Math.min(100, score));
+
+      return {
+          score,
+          issues,
+          warnings,
+          buySignal: score >= this.BUY_THRESHOLD && issues.length === 0,
+          ageMin
+      };
   }
 
   /**
@@ -65,148 +227,111 @@ export class SignalAnalyzer {
       const liquidityUsd = Number((token as any).liquidity_usd ?? 0);
       const holdersCount = Number((token as any).holders_count ?? 0);
       const priceAtSignal = token.price_usd != null ? Number(token.price_usd) : null;
-
-      // Calcular idade do token em dias
+      
       const firstSeen = (token as any).first_seen_at ?? (token as any).created_at ?? null;
-      const ageDays = firstSeen
-        ? (Date.now() - new Date(firstSeen).getTime()) / (1000 * 60 * 60 * 24)
-        : 0;
+      const isPumpFun = token.contract_address.endsWith('pump');
 
-      // Detectar se é meme coin
-      const isMemecoin = this.isMemecoin(volume24h, liquidityUsd, holdersCount, ageDays);
+      // 1. Adapta os dados de mercado
+      const mktData: MarketData = {
+          priceUsd: priceAtSignal ?? 0,
+          liquidityUsd: liquidityUsd,
+          fdvUsd: isPumpFun ? liquidityUsd : 0, 
+          volumeH24: volume24h,
+          volumeH1: 0,
+          volumeM5: 0,
+          txns24hBuys: 0,
+          txns24hSells: 0,
+          pairCreatedAt: firstSeen ? new Date(firstSeen).getTime() : null,
+          dexId: 'auto',
+          source: 'db',
+          isPumpFun: isPumpFun
+      };
 
-      const volumeScore = this.calculateVolumeScore(volume24h);
-      const liquidityScore = this.calculateLiquidityScore(liquidityUsd);
-      const holdersScore = this.calculateHoldersScore(holdersCount);
-      const ageScore = this.calculateAgeScore(firstSeen);
-      const safetyScore = ((token.safety_score as any) || 0) / 100; // Normalizar para 0-1
+      console.log(`[Signal Analyzer] 🛡️ Validando segurança externa de ${token.symbol}...`);
+      
+      // 2. Chamadas em paralelo para segurança Externa
+      const [goplus, honeypot, rugcheck] = await Promise.all([
+          this.apiGoPlus(token.chain, token.contract_address),
+          this.apiHoneypotIs(token.chain, token.contract_address),
+          this.apiRugCheck(token.chain, token.contract_address)
+      ]);
 
-      // Calcular score geral (pesos conforme especificação)
-      const overallScore =
-        volumeScore * 0.3 +
-        liquidityScore * 0.25 +
-        holdersScore * 0.2 +
-        ageScore * 0.15 +
-        safetyScore * 0.1;
-
-      // Fator único por token para criar variação
-      const uniquenessFactor = this.getTokenUniquenessFactor(token.contract_address);
-
-      // Calcular desvio padrão dos scores individuais (medida de consistência)
-      const scores = [volumeScore, liquidityScore, holdersScore, ageScore, safetyScore];
-      const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-      const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
-      const stdDev = Math.sqrt(variance);
-
-      // Calcular confiança melhorada (30% a 95%)
-      // Baseado em overall_score, mas ajustado por consistência (stdDev) e fatores únicos
-      const consistencyBonus = (1 - stdDev) * 15; // Mais consistente = maior confiança
-      const baseConfidence = overallScore * 100;
-      const adjustedConfidence = Math.max(
-        30,
-        Math.min(95, baseConfidence + consistencyBonus + uniquenessFactor * 100)
+      // 3. Score Avançado de 0 a 100
+      const { score, issues, warnings, buySignal, ageMin } = this.computeAdvancedScore(
+          token.chain, 
+          mktData, 
+          goplus, 
+          honeypot, 
+          rugcheck, 
+          Date.now()
       );
-      const confidenceScore = Number(adjustedConfidence.toFixed(2));
 
-      // Determinar tipo de sinal
+      // 4. Analisa métricas para salvar
       let signalType: SignalType = 'HOLD';
-      let potentialMultiplier: number | undefined;
       let reasoning = '';
+      let potentialMultiplier: number | undefined = undefined;
+      let isActive = true;
 
-      // Calcular relação volume/liquidez para ajustar multiplicador
-      const volumeLiquidityRatio = liquidityUsd > 0 ? volume24h / liquidityUsd : 0;
-      const volumeLiquidityFactor = Math.min(1.5, Math.max(0.5, volumeLiquidityRatio / 10));
-
-      // Ajustar thresholds baseado em se é meme coin
-      // Para meme coins: thresholds mais baixos para movimentos rápidos
-      // BUY threshold: 0.50 para meme coins (vs 0.55 normal)
-      // SELL threshold: 0.30 para meme coins (vs 0.25 normal) - mais conservador para evitar vendas prematuras
-      const buyThreshold = isMemecoin ? 0.50 : 0.55;
-      const sellThreshold = isMemecoin ? 0.30 : 0.25;
-
-      if (overallScore >= buyThreshold && !token.is_honeypot && liquidityUsd > 1_000) {
-        signalType = 'BUY';
-        // Para meme coins: multiplicadores mais agressivos (movimentos rápidos esperados)
-        const memecoinMultiplier = isMemecoin ? 1.2 : 1.0; // 20% extra para meme coins
-        const baseMultiplier = 1 + (overallScore - buyThreshold) * 12; // Mais sensível para scores menores
-        const volumeLiquidityBonus = (volumeLiquidityFactor - 1) * 0.5;
-        const safetyBonus = safetyScore * 2; // Até 2x extra para segurança alta
-        potentialMultiplier = Number(
-          Math.min(5, Math.max(1.1, baseMultiplier * memecoinMultiplier + volumeLiquidityBonus + safetyBonus + uniquenessFactor * 2)).toFixed(2)
-        );
-        const memecoinTag = isMemecoin ? ' [MEME COIN]' : '';
-        reasoning = `Fundamentos positivos${memecoinTag}: volume ${Math.round(volumeScore * 100)}% | liquidez ${Math.round(
-          liquidityScore * 100
-        )}% | holders ${Math.round(holdersScore * 100)}% | segurança ${Math.round(safetyScore * 100)}%`;
-      } else if (overallScore < sellThreshold || token.is_honeypot) {
-        signalType = 'SELL';
-        // Para meme coins: multiplicador SELL mais conservador (evitar vendas prematuras)
-        const memecoinSellFactor = isMemecoin ? 0.95 : 1.0; // 5% menos agressivo para meme coins
-        const severity = token.is_honeypot ? 0.3 : (sellThreshold - overallScore) / sellThreshold;
-        potentialMultiplier = Number(Math.max(0.4, Math.min(0.9, (1 - severity * 0.6) * memecoinSellFactor + uniquenessFactor * 0.1)).toFixed(2));
-        const memecoinTag = isMemecoin ? ' [MEME COIN]' : '';
-        reasoning = token.is_honeypot
-          ? 'Honeypot detectado - risco extremo'
-          : `Indicadores críticos${memecoinTag}: score geral ${Math.round(overallScore * 100)}% abaixo do mínimo`;
-      } else {
-        signalType = 'HOLD';
-        // Multiplicador HOLD varia de 0.8x a 1.5x baseado no drift do score
-        const drift = overallScore - 0.4; // Centro em 0.4 (40%)
-        const driftMultiplier = drift * 1.75; // Ajuste mais sensível
-        potentialMultiplier = Number(
-          Math.min(1.5, Math.max(0.8, 1 + driftMultiplier + uniquenessFactor * 0.3)).toFixed(2)
-        );
-        const memecoinTag = isMemecoin ? ' [MEME COIN - aguardar movimento]' : '';
-        reasoning = `Contexto neutro${memecoinTag}: score geral ${Math.round(overallScore * 100)}% | consistência ${Math.round(
-          (1 - stdDev) * 100
-        )}% - aguardar confirmação`;
+      // Regra 1: Velho Demais -> Pula fora
+      if (ageMin !== null && ageMin > this.MAX_TOKEN_AGE_MIN) {
+          signalType = 'HOLD';
+          reasoning = `Rejeitado: Token antigo (${ageMin}min). Descartando.`;
+          isActive = false;
+      } 
+      // Regra 2: Dados Inválidos/Faltantes -> Espera
+      else if (issues.includes('MUITO_ANTIGO') || issues.includes('SEM_DADOS_MERCADO')) {
+          signalType = 'HOLD';
+          reasoning = `Aguardando Dados / Antigo. Nota: ${score}.`;
+          isActive = true;
+      } 
+      // Regra 3: Issues pesados = Lixo
+      else if (issues.length > 0 && score < 70) {
+          signalType = 'HOLD'; 
+          reasoning = `Fraude/Lixo Detectado: ${issues.join(', ')}.`;
+          isActive = false;
+      } 
+      // Regra 4: Validação Total de Compra
+      else if (buySignal) {
+          signalType = 'BUY';
+          potentialMultiplier = 2.0;
+          reasoning = `APROVADO SAFE MODE ✅ Nota: ${score}/100. Sem problemas detectados!`;
+          isActive = true;
+      } 
+      // Regra 5: Zona Média (Hold / Espera Mais dados / Cuidado com pocos Holders)
+      else {
+          signalType = 'HOLD';
+          reasoning = `Aguardar volume. Nota: ${score}/100. Alertas: ${warnings.join(', ') || 'Nenhum'}.`;
+          isActive = true;
       }
 
       const metrics = {
         token_id: tokenId,
         signal_type: signalType,
-        confidence_score: confidenceScore,
+        confidence_score: score, // Usamos 'confidence_score' como o campo principal do nosso score de 0 a 100
         potential_multiplier: potentialMultiplier,
         reasoning,
-        is_active: true,
-        volume_score: Number((volumeScore * 100).toFixed(2)),
-        liquidity_score: Number((liquidityScore * 100).toFixed(2)),
-        holders_score: Number((holdersScore * 100).toFixed(2)),
-        age_score: Number((ageScore * 100).toFixed(2)),
-        safety_score: Number((safetyScore * 100).toFixed(2)),
-        overall_score: Number((overallScore * 100).toFixed(2)),
+        is_active: isActive,
+        volume_score: 0,
+        liquidity_score: 0,
+        holders_score: Math.min(holdersCount, 999.99),
+        age_score: Math.min(ageMin ?? 0, 999.99),
+        safety_score: score,
+        overall_score: score,
         price_at_signal: priceAtSignal === null ? undefined : priceAtSignal,
       } as const;
 
       const latestSignal = await this.getLatestSignal(tokenId);
 
       if (latestSignal) {
-        const sameType = latestSignal.signal_type === signalType;
-        const confidenceDiff = Math.abs(Number(latestSignal.confidence_score ?? 0) - metrics.confidence_score);
-        const overallDiff = Math.abs(Number(latestSignal.overall_score ?? 0) - metrics.overall_score);
-        const previousPrice = Number(latestSignal.price_at_signal ?? 0);
-        const currentPrice = priceAtSignal ?? previousPrice;
-        const priceDiff = previousPrice > 0 ? Math.abs(previousPrice - currentPrice) / previousPrice : 0;
-
-        const confidenceThreshold = Number(process.env.SIGNAL_CONFIDENCE_THRESHOLD ?? 2);
-        const overallThreshold = Number(process.env.SIGNAL_OVERALL_THRESHOLD ?? 2.5);
-        const priceThreshold = Number(process.env.SIGNAL_PRICE_THRESHOLD ?? 0.02);
-
-        const metricsShifted = confidenceDiff > 0 || overallDiff > 0 || priceDiff > 0;
-        const withinThresholds =
-          confidenceDiff <= confidenceThreshold && overallDiff <= overallThreshold && priceDiff <= priceThreshold;
-
-        // IMPORTANTE: Não criar novo sinal se for igual ao anterior
-        // Isso evita lotar o banco com sinais HOLD repetidos
-        if (sameType && withinThresholds) {
-          if (metricsShifted) {
-            const updated = await this.updateSignal(latestSignal.id, metrics);
-            console.log(`[Signal Analyzer] 🔄 Updated existing signal ${latestSignal.id} for token ${tokenId} (avoided duplicate)`);
-            return updated;
-          }
-          console.log(`[Signal Analyzer] ⏭️ Skipping duplicate signal for token ${tokenId} (same as latest)`);
+        // Não gerar duplicatas de hold
+        if (latestSignal.signal_type === signalType && Math.abs((latestSignal.confidence_score ?? 0) - score) <= 5) {
+          console.log(`[Signal Analyzer] ⏭️ Skipping duplicate signal for token ${token.symbol}. Nota travada em ${score}`);
           return latestSignal;
         }
+
+        const updated = await this.updateSignal(latestSignal.id, metrics);
+        console.log(`[Signal Analyzer] 🔄 Updated signal ${latestSignal.id} for token ${token.symbol}. Nova Nota: ${score}`);
+        return updated;
       }
 
       const signal = await this.saveSignal(metrics);
@@ -326,58 +451,6 @@ export class SignalAnalyzer {
     return result.rows[0] as Signal;
   }
 
-  /**
-   * Calcula score de volume (0-1)
-   */
-  private calculateVolumeScore(volume24h: number): number {
-    if (volume24h === 0) return 0;
-    if (volume24h < 1000) return 0.2;
-    if (volume24h < 5000) return 0.4;
-    if (volume24h < 10000) return 0.6;
-    if (volume24h < 50000) return 0.8;
-    return 1.0;
-  }
-
-  /**
-   * Calcula score de liquidez (0-1)
-   */
-  private calculateLiquidityScore(liquidity: number): number {
-    if (liquidity === 0) return 0;
-    if (liquidity < 1000) return 0.2;
-    if (liquidity < 5000) return 0.4;
-    if (liquidity < 10000) return 0.6;
-    if (liquidity < 50000) return 0.8;
-    return 1.0;
-  }
-
-  /**
-   * Calcula score de holders (0-1)
-   */
-  private calculateHoldersScore(holders: number): number {
-    if (holders === 0) return 0;
-    if (holders < 50) return 0.2;
-    if (holders < 100) return 0.4;
-    if (holders < 500) return 0.6;
-    if (holders < 1000) return 0.8;
-    return 1.0;
-  }
-
-  /**
-   * Calcula score de idade do token (0-1)
-   */
-  private calculateAgeScore(firstSeen: Date | string | null): number {
-    if (!firstSeen) return 0.3; // Token novo, score médio
-
-    const firstSeenDate = typeof firstSeen === 'string' ? new Date(firstSeen) : firstSeen;
-    const now = new Date();
-    const daysSince = (now.getTime() - firstSeenDate.getTime()) / (1000 * 60 * 60 * 24);
-
-    if (daysSince < 1) return 0.3; // Muito novo
-    if (daysSince < 7) return 0.5; // Novinho
-    if (daysSince < 30) return 0.7; // Estabelecido
-    if (daysSince < 90) return 0.9; // Maduro
-    return 1.0; // Muito antigo (confiável)
-  }
 
   /**
    * Obtém sinais ativos

@@ -48,6 +48,48 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/export', async (req: Request, res: Response) => {
+  try {
+    const hours = Number(req.query.hours) || 24; // Padrão: últimas 24h
+    
+    // Buscar tokens e seus respectivos sinais (se houver) aprovados no período
+    const query = await pool.query(
+      `SELECT 
+         t.id, t.symbol, t.name, t.contract_address, t.chain,
+         t.price_usd, t.liquidity_usd, t.volume_24h_usd, t.holders_count,
+         t.is_honeypot, t.created_at as token_found_at,
+         s.signal_type, s.confidence_score, s.reasoning, s.created_at as signal_created_at
+       FROM tokens t
+       LEFT JOIN signals s ON s.token_id = t.id AND s.is_active = true
+       WHERE t.is_validated = true
+         AND t.created_at >= NOW() - INTERVAL '1 hour' * $1
+       ORDER BY t.created_at DESC`,
+      [hours]
+    );
+
+    const exportData = {
+      exported_at: new Date().toISOString(),
+      timeframe_hours: hours,
+      total_tokens: query.rowCount,
+      tokens: query.rows
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="tokens_export_${Date.now()}.json"`);
+    
+    // Retornamos raw (sem o padrao de success/data da API web comum) 
+    // pois este é um endpoint focado no download do JSON local
+    res.send(JSON.stringify(exportData, null, 2));
+
+  } catch (error: any) {
+    console.error('[API] Export tokens error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to export tokens' }
+    });
+  }
+});
+
 router.get('/:contractAddress', async (req: Request, res: Response) => {
   try {
     const { contractAddress } = req.params;

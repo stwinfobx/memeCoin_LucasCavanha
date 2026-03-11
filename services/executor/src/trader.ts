@@ -628,6 +628,20 @@ export class TradeExecutor {
       const signalResult = await this.pool.query('SELECT * FROM signals WHERE id = $1', [request.signal_id]);
       const signal = signalResult.rows[0];
 
+      // DUPLA PROTEÇÃO (SAFE MODE): Garantir que a nota do sinal seja >= 80
+      if (signal && signal.confidence_score !== null && Number(signal.confidence_score) < 80) {
+        console.warn(`[Executor] 🛑 TRADE PROTEGIDO: Tentativa de comprar token com score ${signal.confidence_score} (Abaixo do limite de 80)`);
+        throw new Error(`Safe Mode bloqueou a compra: Score de segurança insatisfatório (${signal.confidence_score} < 80).`);
+      }
+
+      // DUPLA PROTEÇÃO (SAFE MODE): Verificar idade do token
+      const tokenCreatedTimeMs = new Date((token as any).first_seen_at || token.created_at || Date.now()).getTime();
+      const ageMinutes = (Date.now() - tokenCreatedTimeMs) / (1000 * 60);
+      if (ageMinutes > 60) {
+        console.warn(`[Executor] 🛑 TRADE PROTEGIDO: Tentativa de comprar token muito antigo (${ageMinutes.toFixed(1)} min > 60 min)`);
+        throw new Error(`Safe Mode bloqueou a compra: Token muito antigo (${ageMinutes.toFixed(1)} min). O limite é 60 minutos.`);
+      }
+
       const riskResult = await this.pool.query(
         'SELECT memecoin_score, risk_score, scam_probability FROM token_risk_assessments WHERE token_id = $1',
         [request.token_id]
@@ -649,6 +663,15 @@ export class TradeExecutor {
 
     // NOVO: Verificar se é real trading
     const isRealTrading = await this.realTradingService.isRealTradingEnabled(userId);
+
+    // Verificar se o modo de monitoramento está ativado
+    const profileResult = await this.pool.query('SELECT monitoring_mode FROM user_profiles WHERE user_id = $1', [userId]);
+    const isMonitoring = profileResult.rows[0]?.monitoring_mode === true;
+
+    if (isMonitoring) {
+      console.log(`[Executor] 👁️ MONITORING MODE ON for user ${userId}. Skipping trade execution.`);
+      throw new Error('Monitoring mode enabled - trade blocked');
+    }
 
     // Verificação absoluta de modo Live
     if (this.executionMode === 'live') {
@@ -732,7 +755,8 @@ export class TradeExecutor {
       userId,
       token.contract_address,
       token.symbol,
-      amountUsd
+      amountUsd,
+      token.chain
     );
 
     if (!result.success) {
@@ -769,6 +793,15 @@ export class TradeExecutor {
     const tokenResult = await this.pool.query('SELECT * FROM tokens WHERE id = $1', [request.token_id]);
     if (tokenResult.rowCount === 0) throw new Error('Token not found');
     const token = tokenResult.rows[0] as Token;
+
+    // NOVO: Verificar se o modo de monitoramento está ativado
+    const profileResult = await this.pool.query('SELECT monitoring_mode FROM user_profiles WHERE user_id = $1', [userId]);
+    const isMonitoring = profileResult.rows[0]?.monitoring_mode === true;
+
+    if (isMonitoring) {
+      console.log(`[Executor] 👁️ MONITORING MODE ON for user ${userId}. Skipping sell execution.`);
+      throw new Error('Monitoring mode enabled - trade blocked');
+    }
 
     // Buscar posição aberta
     const positionResult = await this.pool.query(
@@ -810,7 +843,8 @@ export class TradeExecutor {
           userId,
           token.contract_address,
           token.symbol,
-          amountToken.toString()
+          amountToken.toString(),
+          token.chain
         );
         if (!result.success) throw new Error(`Real sell failed: ${result.error}`);
 

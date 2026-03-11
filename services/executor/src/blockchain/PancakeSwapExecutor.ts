@@ -1,5 +1,6 @@
 import { ethers, Wallet, Contract } from 'ethers';
 import { Pool } from 'pg';
+import { TradeExecutor, BuyParams, SellParams, TradeResult } from './types';
 
 const PANCAKESWAP_ROUTER_V2 = '0x10ED43C718714eb63d5aA57B78B54704E256024E'; // BSC Mainnet
 const WBNB_ADDRESS = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'; // Wrapped BNB
@@ -27,7 +28,7 @@ export interface SwapResult {
     effectiveGasPrice: string;
 }
 
-export class PancakeSwapExecutor {
+export class PancakeSwapExecutor implements TradeExecutor {
     private provider: ethers.JsonRpcProvider;
     private router: Contract;
     private pool: Pool;
@@ -36,6 +37,49 @@ export class PancakeSwapExecutor {
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
         this.router = new Contract(PANCAKESWAP_ROUTER_V2, ROUTER_ABI, this.provider);
         this.pool = pool;
+    }
+
+    async buyToken(params: BuyParams): Promise<TradeResult> {
+        try {
+            const result = await this.buyTokenWithBNB(params.privateKey, params.tokenAddress, params.amountIn, params.slippage);
+            return {
+                ...result,
+                success: true
+            };
+        } catch (error: any) {
+            return {
+                txHash: '',
+                amountIn: params.amountIn,
+                amountOut: '0',
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    async sellToken(params: SellParams): Promise<TradeResult> {
+        try {
+            const result = await this.sellTokenForBNB(params.privateKey, params.tokenAddress, params.amountIn, params.slippage);
+            return {
+                ...result,
+                success: true
+            };
+        } catch (error: any) {
+            return {
+                txHash: '',
+                amountIn: params.amountIn,
+                amountOut: '0',
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    async getBalance(walletAddress: string, tokenAddress?: string): Promise<string> {
+        if (!tokenAddress || tokenAddress === ethers.ZeroAddress || tokenAddress === 'BNB') {
+            return this.getBNBBalance(walletAddress);
+        }
+        return this.getTokenBalance(walletAddress, tokenAddress);
     }
 
     /**
@@ -70,6 +114,19 @@ export class PancakeSwapExecutor {
             console.log(`[PancakeSwap] Expected output: ${ethers.formatUnits(expectedAmountOut, 18)} tokens`);
             console.log(`[PancakeSwap] Minimum output (${slippagePercent}% slippage): ${ethers.formatUnits(amountOutMin, 18)} tokens`);
 
+            // --- Pre-flight Balance & Gas Check ---
+            const balance = await this.provider.getBalance(wallet.address);
+            const feeData = await this.provider.getFeeData();
+            const gasPrice = feeData.gasPrice || BigInt(3000000000); // 3 gwei fallback
+            const estimatedGasCost = gasPrice * BigInt(300000);
+            const totalRequired = amountIn + estimatedGasCost;
+
+            if (balance < totalRequired) {
+                console.error(`[PancakeSwap] ❌ Insufficient balance for BUY. Have: ${ethers.formatEther(balance)} BNB, Need: ${ethers.formatEther(totalRequired)} BNB`);
+                throw new Error(`Insufficient BNB balance for trade and gas`);
+            }
+            // --- End Pre-flight Check ---
+
             // Deadline: 20 minutos a partir de agora
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
 
@@ -90,6 +147,10 @@ export class PancakeSwapExecutor {
 
             const receipt = await tx.wait();
 
+            if (receipt.status === 0) {
+                throw new Error('Transaction reverted by EVM');
+            }
+
             console.log(`[PancakeSwap] ✅ Transaction confirmed! Block: ${receipt.blockNumber}`);
 
             return {
@@ -101,6 +162,11 @@ export class PancakeSwapExecutor {
             };
         } catch (error: any) {
             console.error('[PancakeSwap] ❌ Buy failed:', error.message);
+            if (error.code === 'CALL_EXCEPTION' || error.message.includes('revert')) {
+                throw new Error(`EVM Revert during buy: ${error.reason || error.message}`);
+            } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient BNB balance for trade and gas');
+            }
             throw new Error(`PancakeSwap buy failed: ${error.message}`);
         }
     }
@@ -162,9 +228,27 @@ export class PancakeSwapExecutor {
 
             // SEMPRE aprovar antes de vender (fix para bug de allowance)
             console.log('[PancakeSwap] 🔓 Approving token spend...');
-            const approveTx = await (tokenWithSigner as any).approve(PANCAKESWAP_ROUTER_V2, ethers.MaxUint256);
-            const approveReceipt = await approveTx.wait();
-            console.log(`[PancakeSwap] ✅ Token approved (tx: ${approveReceipt.hash})`);
+            // Limit approval if necessary...
+            const allowance = await tokenContract.allowance(wallet.address, PANCAKESWAP_ROUTER_V2);
+            if (allowance < actualAmountIn) {
+                console.log(`[PancakeSwap] 🔓 Approving token...`);
+
+                // Pre-flight approval gas check
+                const bnbBalance = await this.provider.getBalance(wallet.address);
+                const feeData = await this.provider.getFeeData();
+                const gasPrice = feeData.gasPrice || BigInt(3000000000);
+                const approvalGasCost = gasPrice * BigInt(100000);
+
+                if (bnbBalance < approvalGasCost) {
+                    throw new Error(`Insufficient BNB balance for token approval gas`);
+                }
+
+                const txApprove = await (tokenWithSigner as any).approve(PANCAKESWAP_ROUTER_V2, ethers.MaxUint256, {
+                    gasLimit: 100000
+                });
+                await txApprove.wait();
+                console.log(`[PancakeSwap] ✅ Token approved`);
+            }
 
             // Verificar se há liquidez suficiente
             console.log('[PancakeSwap] 🔍 Checking liquidity...');
@@ -180,6 +264,17 @@ export class PancakeSwapExecutor {
 
             console.log(`[PancakeSwap] Expected output: ${ethers.formatEther(expectedAmountOut)} BNB`);
             console.log(`[PancakeSwap] Minimum output (${slippagePercent}% slippage): ${ethers.formatEther(amountOutMin)} BNB`);
+
+            // --- Pre-flight gas check for sell ---
+            const bnbBalance = await this.provider.getBalance(wallet.address);
+            const feeData = await this.provider.getFeeData();
+            const gasPrice = feeData.gasPrice || BigInt(3000000000);
+            const swapGasCost = gasPrice * BigInt(300000);
+
+            if (bnbBalance < swapGasCost) {
+                throw new Error(`Insufficient BNB balance for sell gas. Need at least ${ethers.formatEther(swapGasCost)} BNB`);
+            }
+            // --- End Check ---
 
             // Deadline: 20 minutos
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
@@ -206,10 +301,10 @@ export class PancakeSwapExecutor {
             const receipt = await tx.wait();
 
             if (receipt.status === 0) {
-                throw new Error(`Transaction reverted. Hash: ${receipt.hash}`);
+                throw new Error('Transaction reverted by EVM');
             }
 
-            console.log(`[PancakeSwap] ✅ Transaction confirmed! Block: ${receipt.blockNumber}`);
+            console.log(`[PancakeSwap] ✅ Sell transaction confirmed! Block: ${receipt.blockNumber}`);
 
             return {
                 txHash: receipt.hash,
@@ -220,6 +315,11 @@ export class PancakeSwapExecutor {
             };
         } catch (error: any) {
             console.error('[PancakeSwap] ❌ Sell failed:', error.message);
+            if (error.code === 'CALL_EXCEPTION' || error.message.includes('revert')) {
+                throw new Error(`EVM Revert during sell: ${error.reason || error.message}`);
+            } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message.includes('insufficient funds')) {
+                throw new Error('Insufficient BNB balance for sell gas');
+            }
 
             // Detectar erro de replacement underpriced (transação pendente)
             const isReplacementError = error.code === 'REPLACEMENT_UNDERPRICED' ||
@@ -474,6 +574,93 @@ export class PancakeSwapExecutor {
         } catch (error: any) {
             console.error('[PancakeSwap] ❌ Could not verify balance:', error.message);
             throw error;
+        }
+    }
+
+    /**
+     * Verifica a idade do token (quando foi criado)
+     * @param tokenAddress Endereço do token
+     * @param maxAgeDays Idade máxima permitida em dias (padrão: 1)
+     * @returns Objeto indicando se é novo o suficiente
+     */
+    async checkTokenAge(
+        tokenAddress: string,
+        maxAgeDays: number = 1
+    ): Promise<{
+        isNew: boolean;
+        ageInDays: number;
+        createdAt: Date | null;
+        reason: string;
+    }> {
+        try {
+            console.log(`[PancakeSwap] 🕐 Checking token age...`);
+
+            // Buscar o bloco de criação do contrato
+            // Fazemos isso buscando o primeiro evento Transfer do contrato
+            const tokenContract = new Contract(tokenAddress, [
+                'event Transfer(address indexed from, address indexed to, uint256 value)'
+            ], this.provider);
+
+            // Buscar o primeiro Transfer (mint) - from address(0)
+            const filter = tokenContract.filters.Transfer(ethers.ZeroAddress, null);
+
+            // Buscar eventos dos últimos 1000 blocos (aproximadamente 1 mês na BSC)
+            const currentBlock = await this.provider.getBlockNumber();
+            const fromBlock = Math.max(0, currentBlock - 1000000); // ~1 mês atrás
+
+            const events = await tokenContract.queryFilter(filter, fromBlock, currentBlock);
+
+            if (events.length === 0) {
+                console.log(`[PancakeSwap] ⚠️ Could not find token creation event in scan range`);
+                // Se não achou evento de criação recente (último mês), assume que é VELHO
+                // Para sniping, queremos certeza que é novo (< 24h)
+                return {
+                    isNew: false,
+                    ageInDays: 999, // Valor alto para indicar antiguidade
+                    createdAt: null,
+                    reason: 'Token creation not found in recent history (likely > 30 days old)'
+                };
+            }
+
+            // Pegar o primeiro evento (criação do token)
+            const firstEvent = events[0];
+            const block = await this.provider.getBlock(firstEvent.blockNumber);
+
+            if (!block) {
+                return {
+                    isNew: true,
+                    ageInDays: 0,
+                    createdAt: null,
+                    reason: 'Block not found'
+                };
+            }
+
+            const createdAt = new Date(block.timestamp * 1000);
+            const now = new Date();
+            const ageInMs = now.getTime() - createdAt.getTime();
+            const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+
+            const isNew = ageInDays <= maxAgeDays;
+
+            console.log(`[PancakeSwap] 📅 Token age: ${ageInDays.toFixed(1)} days (created: ${createdAt.toISOString()})`);
+            console.log(`[PancakeSwap] ${isNew ? '✅' : '🚨'} Token is ${isNew ? 'NEW' : 'TOO OLD'} (max: ${maxAgeDays} days)`);
+
+            return {
+                isNew,
+                ageInDays,
+                createdAt,
+                reason: isNew ? 'Token is new enough' : `Token is ${ageInDays.toFixed(1)} days old (max: ${maxAgeDays})`
+            };
+
+        } catch (error: any) {
+            console.error(`[PancakeSwap] ⚠️ Error checking token age:`, error.message);
+            // Em caso de erro, NÃO COMPRE (sniping seguro)
+            return {
+                isNew: false,
+                ageInDays: 999,
+                createdAt: null,
+                reason: 'Error checking age - failing safe (blocked)'
+            };
         }
     }
 }

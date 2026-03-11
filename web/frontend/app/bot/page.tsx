@@ -8,6 +8,7 @@ import InsufficientBalanceModal from '../../components/InsufficientBalanceModal'
 
 type BotStatus = {
   bot_enabled: boolean
+  monitoring_mode: boolean
   bot_intensity: number
   risk_profile: 'conservative' | 'moderate' | 'aggressive'
   max_loss_percent: number
@@ -248,8 +249,21 @@ export default function BotPage() {
             </div>
             <dl className="mt-6 space-y-3 text-sm text-neutral-300">
               <div className="flex justify-between">
-                <dt>Modo</dt>
+                <dt>Operação Global</dt>
                 <dd className="font-semibold">{botStatus.bot_enabled ? 'Ativo' : 'Inativo'}</dd>
+              </div>
+              <div className="flex justify-between items-center border-t border-neutral-800 pt-3 mt-3">
+                <div>
+                  <dt className="font-semibold text-neutral-200">Modo Monitoramento (Apenas Simulação)</dt>
+                  <dd className="text-xs text-neutral-500 font-normal max-w-xs mt-1">Se ativo, o bot varre redes, classifica tokens e gera sinais no painel sem executar transações financeiras com seu saldo.</dd>
+                </div>
+                <button
+                  onClick={() => updateConfig({ monitoring_mode: !botStatus.monitoring_mode }, true)}
+                  disabled={saving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${botStatus.monitoring_mode ? 'bg-purple-500' : 'bg-neutral-700'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${botStatus.monitoring_mode ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
               </div>
             </dl>
             <button

@@ -71,7 +71,39 @@ export class PriceUpdateService {
       this.broadcastPriceUpdates();
     }, updateInterval);
 
+    this.setupDatabaseListeners();
+
     console.log(`📡 WebSocket price update service started (interval: ${updateInterval / 1000}s)`);
+  }
+
+  private async setupDatabaseListeners() {
+    try {
+      const client = await this.pool.connect();
+      await client.query('LISTEN new_token_scanned');
+      client.on('notification', (msg) => {
+        if (msg.channel === 'new_token_scanned' && msg.payload) {
+          try {
+            const data = JSON.parse(msg.payload);
+            const message = JSON.stringify({
+              type: 'new_token_scanned',
+              data,
+              timestamp: Date.now()
+            });
+
+            for (const [ws] of this.clients.entries()) {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+              }
+            }
+          } catch (e) {
+            console.error('[WebSocket] Error parsing notification payload', e);
+          }
+        }
+      });
+      console.log('📡 Listening for new_token_scanned events from DB');
+    } catch (err) {
+      console.error('❌ Failed to setup DB listeners:', err);
+    }
   }
 
   private handleConnection(ws: WebSocket, req: any): void {

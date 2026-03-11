@@ -1,0 +1,2247 @@
+[
+  {
+    "timestamp": "2026-03-09T21:00:05.335Z",
+    "chain": "Solana",
+    "token": "HS1PMgbjpRRs3UkY1wNpTCUyYL4XohmPK1gd5yDapump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 2400,
+            "level": "danger"
+          }
+        ],
+        "score": 2401,
+        "score_normalised": 31,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "address": "HS1PMgbjpRRs3UkY1wNpTCUyYL4XohmPK1gd5yDapump",
+        "name": "Mr Sahur CA IN BIO",
+        "symbol": "MrSahur",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/g8pv5bryx1ea4fieby8lezoe2lgd",
+        "coingecko_coin_id": null,
+        "total_supply": null,
+        "normalized_total_supply": "0.0",
+        "price_usd": "0.000002399804814",
+        "fdv_usd": null,
+        "total_reserve_in_usd": null,
+        "volume_usd": {
+          "h24": null
+        },
+        "market_cap_usd": null,
+        "launchpad_details": {
+          "graduation_percentage": null,
+          "completed": false,
+          "completed_at": null,
+          "migrated_destination_pool_address": null
+        }
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 2401"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Volume 24h (Gecko): $0"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:07.634Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0.000002399804814,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 2401"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:07.636Z",
+    "chain": "Solana",
+    "token": "FB3Bs5QyM7aEhnyR2EY89nyZcZ3KU6sRLnEVTbcCpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 120000,
+            "level": "danger"
+          }
+        ],
+        "score": 120001,
+        "score_normalised": 80,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 404"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 120001"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:08.571Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 120001"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:08.231Z",
+    "chain": "BSC",
+    "token": "0xcdA34e33Cc470D91008D6Ae6639761b55B7FA68b",
+    "raw_apis": {
+      "goplus": {
+        "anti_whale_modifiable": "0",
+        "buy_tax": "",
+        "cannot_buy": "0",
+        "can_take_back_ownership": "0",
+        "creator_address": "0xf1c1d94d2e854c325920972fe73c6361cd3e72c6",
+        "creator_balance": "10000000000",
+        "creator_percent": "1.000000",
+        "external_call": "0",
+        "hidden_owner": "0",
+        "holder_count": "0",
+        "honeypot_with_same_creator": "0",
+        "is_anti_whale": "0",
+        "is_blacklisted": "0",
+        "is_honeypot": "0",
+        "is_in_dex": "0",
+        "is_mintable": "0",
+        "is_open_source": "1",
+        "is_proxy": "0",
+        "is_whitelisted": "0",
+        "owner_balance": "0",
+        "owner_change_balance": "0",
+        "owner_percent": "0",
+        "personal_slippage_modifiable": "0",
+        "selfdestruct": "0",
+        "sell_tax": "",
+        "slippage_modifiable": "0",
+        "token_name": "Ishares Msci South Korea ETF (Derivatives)",
+        "token_symbol": "EWY",
+        "total_supply": "10000000000",
+        "trading_cooldown": "0",
+        "transfer_pausable": "0",
+        "transfer_tax": ""
+      },
+      "honeypotIs": {
+        "token": {
+          "name": "Ishares Msci South Korea ETF (Derivatives)",
+          "symbol": "EWY",
+          "decimals": 8,
+          "address": "0xcdA34e33Cc470D91008D6Ae6639761b55B7FA68b",
+          "totalHolders": 0
+        },
+        "withToken": {
+          "name": "Wrapped BNB",
+          "symbol": "WBNB",
+          "decimals": 18,
+          "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "totalHolders": 3943284
+        },
+        "summary": {
+          "risk": "low",
+          "riskLevel": 1,
+          "flags": []
+        },
+        "simulationSuccess": true,
+        "honeypotResult": {
+          "isHoneypot": false
+        },
+        "simulationResult": {
+          "buyTax": 0,
+          "sellTax": 0,
+          "transferTax": 0,
+          "buyGas": "188590",
+          "sellGas": "107938"
+        },
+        "flags": [],
+        "contractCode": {
+          "openSource": true,
+          "rootOpenSource": true,
+          "isProxy": false,
+          "hasProxyCalls": false
+        },
+        "chain": {
+          "id": "56",
+          "name": "Binance Smart Chain",
+          "shortName": "bsc",
+          "currency": "BNB"
+        },
+        "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+        "pair": {
+          "pair": {
+            "name": "PancakeSwap V2: WBNB-EWY",
+            "address": "0xf5703c1779Da49570C20733025d60C163BE1A4e9",
+            "token0": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+            "token1": "0xcdA34e33Cc470D91008D6Ae6639761b55B7FA68b",
+            "type": "UniswapV2"
+          },
+          "chainId": "56",
+          "reserves0": "15000000000000000000",
+          "reserves1": "1000000000000000000",
+          "liquidity": 19152.899999999998,
+          "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+          "createdAtTimestamp": "1773090015",
+          "creationTxHash": "0xd1dd2caa723dd3115e6f81f8931f41300abb52ef379873789f816a490993026f"
+        },
+        "pairAddress": "0xf5703c1779Da49570C20733025d60C163BE1A4e9"
+      },
+      "gecko": {
+        "error": "Request failed with status code 404"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 50,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:09.946Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 50,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:08.573Z",
+    "chain": "Solana",
+    "token": "5kTtHYwCGpt1WDtVs8oQSFeyTvTVcZmJzKC7onZNpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 9600,
+            "level": "danger"
+          }
+        ],
+        "score": 9601,
+        "score_normalised": 49,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "address": "5kTtHYwCGpt1WDtVs8oQSFeyTvTVcZmJzKC7onZNpump",
+        "name": "Drill, Baby, Drill",
+        "symbol": "drill",
+        "decimals": 6,
+        "image_url": "https://assets.geckoterminal.com/1fcav5jmzanohxa9ftfyh30pmpaw",
+        "coingecko_coin_id": null,
+        "total_supply": null,
+        "normalized_total_supply": "0.0",
+        "price_usd": "0.000002439217885",
+        "fdv_usd": null,
+        "total_reserve_in_usd": null,
+        "volume_usd": {
+          "h24": null
+        },
+        "market_cap_usd": null,
+        "launchpad_details": {
+          "graduation_percentage": 2.19,
+          "completed": false,
+          "completed_at": null,
+          "migrated_destination_pool_address": null
+        }
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 9601"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Volume 24h (Gecko): $0"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:10.071Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0.000002439217885,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 9601"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:09.844Z",
+    "chain": "Base",
+    "token": "0x538362315f2dd8bf2F6709FEA7A8c439169ef4ac",
+    "raw_apis": {
+      "goplus": {
+        "buy_tax": "",
+        "cannot_buy": "0",
+        "creator_address": "0xdb5efa7bfa7d2b368bc2f035b82d5fd617ea769a",
+        "creator_balance": "100000000000",
+        "creator_percent": "1.000000",
+        "honeypot_with_same_creator": "0",
+        "is_in_dex": "0",
+        "owner_address": "",
+        "sell_tax": "",
+        "token_name": "ai16zterminalfartARCzereLLMswarm",
+        "token_symbol": "GUDTEK"
+      },
+      "honeypotIs": {
+        "error": "Request failed with status code 404"
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 50,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:10.593Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 50,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:10.073Z",
+    "chain": "Solana",
+    "token": "9hxmXnTf8cUNboPzzjmxGPHA8M7smTU1KpPfHg9rHG4N",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Large Amount of LP Unlocked",
+            "value": "100.00%",
+            "description": "A large amount of LP tokens are unlocked, allowing the owner to remove liquidity at any point.",
+            "score": 11000,
+            "level": "danger"
+          },
+          {
+            "name": "Low amount of LP Providers",
+            "value": "",
+            "description": "Only a few users are providing liquidity",
+            "score": 500,
+            "level": "warn"
+          },
+          {
+            "name": "Mutable metadata",
+            "value": "",
+            "description": "Token metadata can be changed by the owner",
+            "score": 100,
+            "level": "warn"
+          }
+        ],
+        "score": 11601,
+        "score_normalised": 52,
+        "lpLockedPct": 0
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 11601"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:10.845Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 11601"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:10.847Z",
+    "chain": "Solana",
+    "token": "GJ9HdpExidPdLeXEuu97spoW9jng29fkUiREicpAnEZT",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:11.615Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:11.616Z",
+    "chain": "Solana",
+    "token": "H3XneUmixzF5M8WqRZKs37FgeVU1mWjGWPyTyqFKpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 2400,
+            "level": "danger"
+          }
+        ],
+        "score": 2401,
+        "score_normalised": 31,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 2401"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:12.646Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 2401"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:12.648Z",
+    "chain": "Solana",
+    "token": "76m7nMgbrHPJ641p7yT6PqBXuojaRCTYZ1EPuCQFpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 12000,
+            "level": "danger"
+          }
+        ],
+        "score": 12001,
+        "score_normalised": 53,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/eyuczdjxu7t1cgat79wefw1rdxcgngmb9xrma5akszps",
+        "pairAddress": "EyuCZDJXu7T1cgaT79wEfW1RdxCGnGMb9XRMa5aksZpS",
+        "baseToken": {
+          "address": "76m7nMgbrHPJ641p7yT6PqBXuojaRCTYZ1EPuCQFpump",
+          "name": "15% sent and fees locked",
+          "symbol": "SIRI"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002795",
+        "priceUsd": "0.000002398",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 1
+          }
+        },
+        "volume": {
+          "h24": 16.94,
+          "h6": 16.94,
+          "h1": 16.94,
+          "m5": 16.94
+        },
+        "priceChange": {
+          "m5": -0.66,
+          "h1": -0.66,
+          "h6": -0.66,
+          "h24": -0.66
+        },
+        "fdv": 2398.88,
+        "marketCap": 2398.88,
+        "pairCreatedAt": 1773089988000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 12001"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:13.424Z",
+      "time_created": "2026-03-09T20:59:48.000Z",
+      "price_usd": 0.000002398,
+      "liquidity_usd": 2398.88,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 12001"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:13.427Z",
+    "chain": "Solana",
+    "token": "A4qrZ84j6KJXCuETZv5q7NYmT3A47tDcr68ZtpS4pump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 12000,
+            "level": "danger"
+          }
+        ],
+        "score": 12001,
+        "score_normalised": 53,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/7p6qagohuqlpke4k68mskm8a31hjyxxvcv9ypcc9swrk",
+        "pairAddress": "7P6QagoHuqLPke4k68MSKM8A31hJYxxVcV9YPcc9sWRk",
+        "baseToken": {
+          "address": "A4qrZ84j6KJXCuETZv5q7NYmT3A47tDcr68ZtpS4pump",
+          "name": "15% sent and fees locked",
+          "symbol": "SIRI"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002795",
+        "priceUsd": "0.000002398",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 1
+          }
+        },
+        "volume": {
+          "h24": 16.94,
+          "h6": 16.94,
+          "h1": 16.94,
+          "m5": 16.94
+        },
+        "priceChange": {
+          "m5": -0.66,
+          "h1": -0.66,
+          "h6": -0.66,
+          "h24": -0.66
+        },
+        "fdv": 2398.88,
+        "marketCap": 2398.88,
+        "pairCreatedAt": 1773089988000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 12001"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:14.216Z",
+      "time_created": "2026-03-09T20:59:48.000Z",
+      "price_usd": 0.000002398,
+      "liquidity_usd": 2398.88,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 12001"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:14.220Z",
+    "chain": "Solana",
+    "token": "UHrcpQKtGcLEgKWsNsNdWVrdiv9ZHkMKuZVTgFKpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 0
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/bqicfdyw9lgciafh7wotvr2fhicorxmuhonaznlvgcbw",
+        "pairAddress": "BQiCFdyw9LGciafH7woTvR2fHiCoRXMUHonaZnLvgcbw",
+        "baseToken": {
+          "address": "UHrcpQKtGcLEgKWsNsNdWVrdiv9ZHkMKuZVTgFKpump",
+          "name": "15% sent and fees locked",
+          "symbol": "SIRI"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002795",
+        "priceUsd": "0.000002398",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 1
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 1
+          }
+        },
+        "volume": {
+          "h24": 16.94,
+          "h6": 16.94,
+          "h1": 16.94,
+          "m5": 16.94
+        },
+        "priceChange": {
+          "m5": -0.66,
+          "h1": -0.66,
+          "h6": -0.66,
+          "h24": -0.66
+        },
+        "fdv": 2398.88,
+        "marketCap": 2398.88,
+        "pairCreatedAt": 1773089988000
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:23.384Z",
+      "time_created": "2026-03-09T20:59:48.000Z",
+      "price_usd": 0.000002398,
+      "liquidity_usd": 2398.88,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:23.386Z",
+    "chain": "Solana",
+    "token": "gQisku4suHqgVDnxmGq9SKEdBvd43BmTLtaCtu2pump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/h7vcvokwassu4cqq42bab5bffdpvz8bovvika4cnapuy",
+        "pairAddress": "H7VCVokwaSsu4CqQ42Bab5BFFDpVZ8boVviKa4CNAPUy",
+        "baseToken": {
+          "address": "gQisku4suHqgVDnxmGq9SKEdBvd43BmTLtaCtu2pump",
+          "name": "We Push",
+          "symbol": "PUSH"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000003078",
+        "priceUsd": "0.000002641",
+        "txns": {
+          "m5": {
+            "buys": 2,
+            "sells": 1
+          },
+          "h1": {
+            "buys": 2,
+            "sells": 1
+          },
+          "h6": {
+            "buys": 2,
+            "sells": 1
+          },
+          "h24": {
+            "buys": 2,
+            "sells": 1
+          }
+        },
+        "volume": {
+          "h24": 332.19,
+          "h6": 332.19,
+          "h1": 332.19,
+          "m5": 332.19
+        },
+        "priceChange": {
+          "m5": 0.01,
+          "h1": 0.01,
+          "h6": 0.01,
+          "h24": 0.01
+        },
+        "fdv": 2641.97,
+        "marketCap": 2641.97,
+        "pairCreatedAt": 1773089987000
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:24.213Z",
+      "time_created": "2026-03-09T20:59:47.000Z",
+      "price_usd": 0.000002641,
+      "liquidity_usd": 2641.97,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:24.217Z",
+    "chain": "Solana",
+    "token": "UFuhsM3MN7ud9ejLsYp6mBvkQU2ujwoGe92P4Wocorv",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 0
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "meteoradbc",
+        "url": "https://dexscreener.com/solana/giemvhg2kgf1qjmbdwng8ts6tqdmvbqsspdpmgbvnabt",
+        "pairAddress": "GiemVHG2Kgf1QJMbdWng8TS6TQdMVbQSsPDpMGBvnABt",
+        "baseToken": {
+          "address": "UFuhsM3MN7ud9ejLsYp6mBvkQU2ujwoGe92P4Wocorv",
+          "name": "test",
+          "symbol": "TEST"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000004165",
+        "priceUsd": "0.000003576",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 0
+          }
+        },
+        "volume": {
+          "h24": 0.84,
+          "h6": 0.84,
+          "h1": 0.84,
+          "m5": 0.84
+        },
+        "priceChange": {},
+        "fdv": 3576.22,
+        "marketCap": 3576.22,
+        "pairCreatedAt": 1773089983000
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:26.641Z",
+      "time_created": "2026-03-09T20:59:43.000Z",
+      "price_usd": 0.000003576,
+      "liquidity_usd": 3576.22,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:26.643Z",
+    "chain": "Solana",
+    "token": "BUy4SVTEpGobTnsahJtzmwTtsiVvpxqxfWGw5w53NukM",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/4gsfs4tvywcsb9xnxpedv7ibnpgyxqqll694yioosgva",
+        "pairAddress": "4gsfS4TvywcSB9XNxPEDv7iBNpGyxqQLL694yioosgVa",
+        "baseToken": {
+          "address": "BUy4SVTEpGobTnsahJtzmwTtsiVvpxqxfWGw5w53NukM",
+          "name": "short-term",
+          "symbol": "short-term"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002796",
+        "priceUsd": "0.000002398",
+        "txns": {
+          "m5": {
+            "buys": 2,
+            "sells": 1
+          },
+          "h1": {
+            "buys": 2,
+            "sells": 1
+          },
+          "h6": {
+            "buys": 2,
+            "sells": 1
+          },
+          "h24": {
+            "buys": 2,
+            "sells": 1
+          }
+        },
+        "volume": {
+          "h24": 830.23,
+          "h6": 830.23,
+          "h1": 830.23,
+          "m5": 830.23
+        },
+        "priceChange": {
+          "m5": -25.84,
+          "h1": -25.84,
+          "h6": -25.84,
+          "h24": -25.84
+        },
+        "fdv": 2399,
+        "marketCap": 2399,
+        "pairCreatedAt": 1773089983000
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:27.686Z",
+      "time_created": "2026-03-09T20:59:43.000Z",
+      "price_usd": 0.000002398,
+      "liquidity_usd": 2399,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:27.688Z",
+    "chain": "Solana",
+    "token": "CTsKCkMVa5vBWdKHrjAXTzMKTbxD2B3A2QWZstuhGEyc",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Large Amount of LP Unlocked",
+            "value": "100.00%",
+            "description": "A large amount of LP tokens are unlocked, allowing the owner to remove liquidity at any point.",
+            "score": 10999,
+            "level": "danger"
+          },
+          {
+            "name": "Low amount of LP Providers",
+            "value": "",
+            "description": "Only a few users are providing liquidity",
+            "score": 400,
+            "level": "warn"
+          }
+        ],
+        "score": 11400,
+        "score_normalised": 52,
+        "lpLockedPct": 6.263754096754678e-10
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpswap",
+        "url": "https://dexscreener.com/solana/cgh72er9gy9gwrqjwcoe7eipgszz1fw197v1fecoiwvt",
+        "pairAddress": "CGh72er9gY9gWrqJWCoe7eiPgSZZ1Fw197V1fECoiwvt",
+        "baseToken": {
+          "address": "CTsKCkMVa5vBWdKHrjAXTzMKTbxD2B3A2QWZstuhGEyc",
+          "name": "The Jewish Fakeout",
+          "symbol": "FAKEOUT"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.0000003657",
+        "priceUsd": "0.00003138",
+        "txns": {
+          "m5": {
+            "buys": 27,
+            "sells": 11
+          },
+          "h1": {
+            "buys": 27,
+            "sells": 11
+          },
+          "h6": {
+            "buys": 27,
+            "sells": 11
+          },
+          "h24": {
+            "buys": 27,
+            "sells": 11
+          }
+        },
+        "volume": {
+          "h24": 14642.25,
+          "h6": 14642.25,
+          "h1": 14642.25,
+          "m5": 14642.25
+        },
+        "priceChange": {
+          "m5": 35.31,
+          "h1": 35.31,
+          "h6": 35.31,
+          "h24": 35.31
+        },
+        "liquidity": {
+          "usd": 52956.15,
+          "base": 844974738,
+          "quote": 308.1391
+        },
+        "fdv": 31383,
+        "marketCap": 31383,
+        "pairCreatedAt": 1773089981000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 11400"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:28.461Z",
+      "time_created": "2026-03-09T20:59:41.000Z",
+      "price_usd": 0.00003138,
+      "liquidity_usd": 52956.15,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 11400"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:28.037Z",
+    "chain": "BSC",
+    "token": "0x8632e14920f17B4f2677AFA47A45799eB36F89D4",
+    "raw_apis": {
+      "goplus": {},
+      "honeypotIs": {
+        "token": {
+          "name": "IBM (Derivatives)",
+          "symbol": "IBM",
+          "decimals": 8,
+          "address": "0x8632e14920f17B4f2677AFA47A45799eB36F89D4",
+          "totalHolders": 0
+        },
+        "withToken": {
+          "name": "Wrapped BNB",
+          "symbol": "WBNB",
+          "decimals": 18,
+          "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "totalHolders": 3943284
+        },
+        "summary": {
+          "risk": "low",
+          "riskLevel": 1,
+          "flags": []
+        },
+        "simulationSuccess": true,
+        "honeypotResult": {
+          "isHoneypot": false
+        },
+        "simulationResult": {
+          "buyTax": 0,
+          "sellTax": 0,
+          "transferTax": 0,
+          "buyGas": "188680",
+          "sellGas": "107848"
+        },
+        "flags": [],
+        "contractCode": {
+          "openSource": true,
+          "rootOpenSource": true,
+          "isProxy": false,
+          "hasProxyCalls": false
+        },
+        "chain": {
+          "id": "56",
+          "name": "Binance Smart Chain",
+          "shortName": "bsc",
+          "currency": "BNB"
+        },
+        "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+        "pair": {
+          "pair": {
+            "name": "PancakeSwap V2: IBM-WBNB",
+            "address": "0x3437121270Bed7fBE6171d737C38e0AB7d32A6C6",
+            "token0": "0x8632e14920f17B4f2677AFA47A45799eB36F89D4",
+            "token1": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+            "type": "UniswapV2"
+          },
+          "chainId": "56",
+          "reserves0": "3000000000000000",
+          "reserves1": "2500000000000000000",
+          "liquidity": 3192.1499999999996,
+          "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+          "createdAtTimestamp": "1773090035",
+          "creationTxHash": "0x335b577af619246c1712a9c08120de25b8797f1473a21854951a2b7da0dd2228"
+        },
+        "pairAddress": "0x3437121270Bed7fBE6171d737C38e0AB7d32A6C6"
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 50,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:29.121Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 50,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:28.465Z",
+    "chain": "Solana",
+    "token": "5EzftPx8QcphX5R6efFCGs6EJqwuQ6Yig5qgbwhppump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 81600,
+            "level": "danger"
+          },
+          {
+            "name": "Single holder ownership",
+            "value": "51.25%",
+            "description": "One user holds a large amount of the token supply",
+            "score": 5125,
+            "level": "danger"
+          },
+          {
+            "name": "High holder concentration",
+            "value": "",
+            "description": "The top 10 users hold more than 50% token supply",
+            "score": 1013,
+            "level": "warn"
+          }
+        ],
+        "score": 87739,
+        "score_normalised": 77,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/hhaeehpyr3v2ntw4y5xtcco776ywt85jcuynwig4de5j",
+        "pairAddress": "HhaEEhPyr3v2NTW4Y5XtCCo776Ywt85JcUynWiG4dE5j",
+        "baseToken": {
+          "address": "5EzftPx8QcphX5R6efFCGs6EJqwuQ6Yig5qgbwhppump",
+          "name": "Solana Trojan ",
+          "symbol": "TROJAN"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002490",
+        "priceUsd": "0.000002137",
+        "txns": {
+          "m5": {
+            "buys": 13,
+            "sells": 5
+          },
+          "h1": {
+            "buys": 13,
+            "sells": 5
+          },
+          "h6": {
+            "buys": 13,
+            "sells": 5
+          },
+          "h24": {
+            "buys": 13,
+            "sells": 5
+          }
+        },
+        "volume": {
+          "h24": 130.46,
+          "h6": 130.46,
+          "h1": 130.46,
+          "m5": 130.46
+        },
+        "priceChange": {
+          "m5": -11.22,
+          "h1": -11.22,
+          "h6": -11.22,
+          "h24": -11.22
+        },
+        "fdv": 2137.06,
+        "marketCap": 2137.06,
+        "pairCreatedAt": 1773089977000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 87739"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:29.278Z",
+      "time_created": "2026-03-09T20:59:37.000Z",
+      "price_usd": 0.000002137,
+      "liquidity_usd": 2137.06,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 87739"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:29.280Z",
+    "chain": "Solana",
+    "token": "CkzQg5P3JsBRYoVQmvvPjV4LRhqkYUZJHPJBFu8opump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/4x79c8cqa52co17uqtqrfrdj1nm4hg7vkuq5qmwgr63k",
+        "pairAddress": "4x79c8cQA52Co17UqTQRFrDj1nM4Hg7vKUQ5qMwgr63K",
+        "baseToken": {
+          "address": "CkzQg5P3JsBRYoVQmvvPjV4LRhqkYUZJHPJBFu8opump",
+          "name": "Trench Fatigue",
+          "symbol": "Fatigue"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002795",
+        "priceUsd": "0.000002399",
+        "txns": {
+          "m5": {
+            "buys": 2,
+            "sells": 2
+          },
+          "h1": {
+            "buys": 2,
+            "sells": 2
+          },
+          "h6": {
+            "buys": 2,
+            "sells": 2
+          },
+          "h24": {
+            "buys": 2,
+            "sells": 2
+          }
+        },
+        "volume": {
+          "h24": 67.5,
+          "h6": 67.5,
+          "h1": 67.5,
+          "m5": 67.5
+        },
+        "priceChange": {
+          "m5": -0.66,
+          "h1": -0.66,
+          "h6": -0.66,
+          "h24": -0.66
+        },
+        "fdv": 2399.16,
+        "marketCap": 2399.16,
+        "pairCreatedAt": 1773089974000
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:30.087Z",
+      "time_created": "2026-03-09T20:59:34.000Z",
+      "price_usd": 0.000002399,
+      "liquidity_usd": 2399.16,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:29.833Z",
+    "chain": "Base",
+    "token": "0xB7C3C07A2c06656329Fa44B280259A5d42DE62bD",
+    "raw_apis": {
+      "goplus": {},
+      "honeypotIs": {
+        "token": {
+          "name": "NADS",
+          "symbol": "NADS",
+          "decimals": 18,
+          "address": "0xB7C3C07A2c06656329Fa44B280259A5d42DE62bD",
+          "totalHolders": 1
+        },
+        "withToken": {
+          "name": "Wrapped Ether",
+          "symbol": "WETH",
+          "decimals": 18,
+          "address": "0x4200000000000000000000000000000000000006",
+          "totalHolders": 4857935
+        },
+        "summary": {
+          "risk": "high",
+          "riskLevel": 51,
+          "flags": [
+            {
+              "flag": "closed_source",
+              "description": "The source code is not available, allowing for hidden functionality.",
+              "severity": "high",
+              "severityIndex": 16
+            }
+          ]
+        },
+        "simulationSuccess": true,
+        "honeypotResult": {
+          "isHoneypot": false
+        },
+        "simulationResult": {
+          "buyTax": 0,
+          "sellTax": 0,
+          "transferTax": 0,
+          "buyGas": "181561",
+          "sellGas": "109207"
+        },
+        "flags": [],
+        "contractCode": {
+          "openSource": false,
+          "rootOpenSource": false,
+          "isProxy": false,
+          "hasProxyCalls": false
+        },
+        "chain": {
+          "id": "8453",
+          "name": "Base",
+          "shortName": "base",
+          "currency": "ETH"
+        },
+        "router": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
+        "pair": {
+          "pair": {
+            "name": "Uniswap V2: WETH-NADS",
+            "address": "0x1AF3084Be939a5329C883b033dF0Ae6e7Da9413c",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0xB7C3C07A2c06656329Fa44B280259A5d42DE62bD",
+            "type": "UniswapV2"
+          },
+          "chainId": "8453",
+          "reserves0": "15000000000000000",
+          "reserves1": "10000000000000000000000000",
+          "liquidity": 60.7407,
+          "router": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
+          "createdAtTimestamp": "1773090037",
+          "creationTxHash": "0x79251a877933e9ddc959d1ed1c8b20c2b1770d3e68b8061943c6f5a589f40f69"
+        },
+        "pairAddress": "0x1AF3084Be939a5329C883b033dF0Ae6e7Da9413c"
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 50,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:30.633Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 50,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:30.089Z",
+    "chain": "Solana",
+    "token": "87kLW9ZX38sQ4TPschAegLuqGbnPc8T858jmKJv6PTgU",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [],
+        "score": 1,
+        "score_normalised": 1,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/gskevz48qvn6xdxmsjvh2bfcjj8fqp69hlwce1ejgr5j",
+        "pairAddress": "GskeVz48qVn6xdXMSJvH2bfCjJ8fQp69hLwcE1eJGr5j",
+        "baseToken": {
+          "address": "87kLW9ZX38sQ4TPschAegLuqGbnPc8T858jmKJv6PTgU",
+          "name": "wiener dev",
+          "symbol": "WIENER"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000003375",
+        "priceUsd": "0.000002896",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 0
+          }
+        },
+        "volume": {
+          "h24": 254.25,
+          "h6": 254.25,
+          "h1": 254.25,
+          "m5": 254.25
+        },
+        "priceChange": {},
+        "fdv": 2896.47,
+        "marketCap": 2896.47,
+        "pairCreatedAt": 1773089972000
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 70,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:30.714Z",
+      "time_created": "2026-03-09T20:59:32.000Z",
+      "price_usd": 0.000002896,
+      "liquidity_usd": 2896.47,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 70,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:30.715Z",
+    "chain": "Solana",
+    "token": "GNDigJpX3wBFKqrczx7vrSCC1kpDhtvVoWqCQEwgpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 2400,
+            "level": "danger"
+          }
+        ],
+        "score": 2401,
+        "score_normalised": 31,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/7damcaahvtsyaq7xscrx3gwvvtdsmen54ixomrs5zpqq",
+        "pairAddress": "7DaMcAAHVtsyaQ7xsCrX3gWVvTdsmEN54iXoMrs5zPQq",
+        "baseToken": {
+          "address": "GNDigJpX3wBFKqrczx7vrSCC1kpDhtvVoWqCQEwgpump",
+          "name": "Mr Sahur CA IN BIO",
+          "symbol": "MrSahur"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000003059",
+        "priceUsd": "0.000002625",
+        "txns": {
+          "m5": {
+            "buys": 2,
+            "sells": 0
+          },
+          "h1": {
+            "buys": 2,
+            "sells": 0
+          },
+          "h6": {
+            "buys": 2,
+            "sells": 0
+          },
+          "h24": {
+            "buys": 2,
+            "sells": 0
+          }
+        },
+        "volume": {
+          "h24": 118.72,
+          "h6": 118.72,
+          "h1": 118.72,
+          "m5": 118.72
+        },
+        "priceChange": {
+          "m5": 9.42,
+          "h1": 9.42,
+          "h6": 9.42,
+          "h24": 9.42
+        },
+        "fdv": 2625.27,
+        "marketCap": 2625.27,
+        "pairCreatedAt": 1773089972000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 2401"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:31.444Z",
+      "time_created": "2026-03-09T20:59:32.000Z",
+      "price_usd": 0.000002625,
+      "liquidity_usd": 2625.27,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 2401"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:31.448Z",
+    "chain": "Solana",
+    "token": "R5zVFFVKuCAAAKAY9o8XA1FRsp62sXJPaK6ZPDzpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 2400,
+            "level": "danger"
+          }
+        ],
+        "score": 2401,
+        "score_normalised": 31,
+        "lpLockedPct": 0
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/d3jrmsnzdrgkcq24eesnkc3nrhsfaaxmdn6arf3rpfr8",
+        "pairAddress": "D3jrMsnZdRGKCQ24eESnkc3nrHSfAAxMdN6ArF3rPFR8",
+        "baseToken": {
+          "address": "R5zVFFVKuCAAAKAY9o8XA1FRsp62sXJPaK6ZPDzpump",
+          "name": "Mr Sahur CA IN BIO",
+          "symbol": "MrSahur"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002796",
+        "priceUsd": "0.000002399",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 0
+          }
+        },
+        "volume": {
+          "h24": 0.08,
+          "h6": 0.08,
+          "h1": 0.08,
+          "m5": 0.08
+        },
+        "priceChange": {},
+        "fdv": 2399.32,
+        "marketCap": 2399.32,
+        "pairCreatedAt": 1773089972000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 2401"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:32.566Z",
+      "time_created": "2026-03-09T20:59:32.000Z",
+      "price_usd": 0.000002399,
+      "liquidity_usd": 2399.32,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 2401"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:32.568Z",
+    "chain": "Solana",
+    "token": "5GU1i75yXHcKU5bGQgJFATCp9Q99csP4uU8bB9Cvpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 2400,
+            "level": "danger"
+          }
+        ],
+        "score": 2401,
+        "score_normalised": 31,
+        "lpLockedPct": 100
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/epufmfiqdz56g3ugpzui4bsa4szfeebmka7t1ejzaxav",
+        "pairAddress": "EpUFMfiqdZ56G3UGpzUi4bSa4szFEEbmka7T1eJzAXav",
+        "baseToken": {
+          "address": "5GU1i75yXHcKU5bGQgJFATCp9Q99csP4uU8bB9Cvpump",
+          "name": "Mr Sahur CA IN BIO",
+          "symbol": "MrSahur"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002796",
+        "priceUsd": "0.000002399",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 0
+          }
+        },
+        "volume": {
+          "h24": 0.08,
+          "h6": 0.08,
+          "h1": 0.08,
+          "m5": 0.08
+        },
+        "priceChange": {},
+        "fdv": 2399.32,
+        "marketCap": 2399.32,
+        "pairCreatedAt": 1773089972000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 2401"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:33.317Z",
+      "time_created": "2026-03-09T20:59:32.000Z",
+      "price_usd": 0.000002399,
+      "liquidity_usd": 2399.32,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 2401"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:33.319Z",
+    "chain": "Solana",
+    "token": "2wacoDTiKqvp6y2KgTWuwACe8DHXFC36vNBV3i5Cpump",
+    "raw_apis": {
+      "goplus": {},
+      "rugcheck": {
+        "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "tokenType": "",
+        "risks": [
+          {
+            "name": "Creator history of rugged tokens",
+            "value": "",
+            "description": "Creator has a history of rugging tokens.",
+            "score": 2400,
+            "level": "danger"
+          }
+        ],
+        "score": 2401,
+        "score_normalised": 31,
+        "lpLockedPct": 0
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "chainId": "solana",
+        "dexId": "pumpfun",
+        "url": "https://dexscreener.com/solana/5umvay4xsw7rfmvde5cgp272s4fy84jbb7pdudigsmgf",
+        "pairAddress": "5UmvAY4xsw7RfMVDE5cgp272s4fY84jBb7pDudigSmGF",
+        "baseToken": {
+          "address": "2wacoDTiKqvp6y2KgTWuwACe8DHXFC36vNBV3i5Cpump",
+          "name": "Mr Sahur CA IN BIO",
+          "symbol": "MrSahur"
+        },
+        "quoteToken": {
+          "address": "So11111111111111111111111111111111111111112",
+          "name": "Wrapped SOL",
+          "symbol": "SOL"
+        },
+        "priceNative": "0.00000002796",
+        "priceUsd": "0.000002399",
+        "txns": {
+          "m5": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h1": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h6": {
+            "buys": 1,
+            "sells": 0
+          },
+          "h24": {
+            "buys": 1,
+            "sells": 0
+          }
+        },
+        "volume": {
+          "h24": 0.08,
+          "h6": 0.08,
+          "h1": 0.08,
+          "m5": 0.08
+        },
+        "priceChange": {},
+        "fdv": 2399.32,
+        "marketCap": 2399.32,
+        "pairCreatedAt": 1773089972000
+      }
+    },
+    "classification": {
+      "issues": [
+        "RugCheck Alto Risco: 2401"
+      ],
+      "score": 10,
+      "is_valid": false,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:34.266Z",
+      "time_created": "2026-03-09T20:59:32.000Z",
+      "price_usd": 0.000002399,
+      "liquidity_usd": 2399.32,
+      "is_honeypot": false,
+      "is_valid": false,
+      "score": 10,
+      "issues_found": [
+        "RugCheck Alto Risco: 2401"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:34.853Z",
+    "chain": "BSC",
+    "token": "0xdd598e4f97C2caA3e4F1005c02bC41D1b2778A25",
+    "raw_apis": {
+      "goplus": {},
+      "honeypotIs": {
+        "token": {
+          "name": "🎀BNB CHAN",
+          "symbol": "🎀BNB CHAN",
+          "decimals": 18,
+          "address": "0xdd598e4f97C2caA3e4F1005c02bC41D1b2778A25",
+          "totalHolders": 0
+        },
+        "withToken": {
+          "name": "Wrapped BNB",
+          "symbol": "WBNB",
+          "decimals": 18,
+          "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "totalHolders": 3943284
+        },
+        "summary": {
+          "risk": "low",
+          "riskLevel": 1,
+          "flags": []
+        },
+        "simulationSuccess": true,
+        "honeypotResult": {
+          "isHoneypot": false
+        },
+        "simulationResult": {
+          "buyTax": 0,
+          "sellTax": 0,
+          "transferTax": 0,
+          "buyGas": "179813",
+          "sellGas": "105550"
+        },
+        "flags": [],
+        "contractCode": {
+          "openSource": true,
+          "rootOpenSource": true,
+          "isProxy": false,
+          "hasProxyCalls": false
+        },
+        "chain": {
+          "id": "56",
+          "name": "Binance Smart Chain",
+          "shortName": "bsc",
+          "currency": "BNB"
+        },
+        "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+        "pair": {
+          "pair": {
+            "name": "PancakeSwap V2: WBNB-🎀BNB CHA",
+            "address": "0xD2a796E1F6056228B4A2E7dbCc1e60792b15d702",
+            "token0": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+            "token1": "0xdd598e4f97C2caA3e4F1005c02bC41D1b2778A25",
+            "type": "UniswapV2"
+          },
+          "chainId": "56",
+          "reserves0": "11000929453306071000",
+          "reserves1": "69099249405050465946697728",
+          "liquidity": 14046.646781748388,
+          "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+          "createdAtTimestamp": "1773090042",
+          "creationTxHash": "0x8510fcfe1c3827335670d65fcf674742b7eeb4ad2ff81d8963309ac7ae0890c0"
+        },
+        "pairAddress": "0xD2a796E1F6056228B4A2E7dbCc1e60792b15d702"
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 50,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:35.576Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 50,
+      "issues_found": []
+    }
+  },
+  {
+    "timestamp": "2026-03-09T21:00:42.891Z",
+    "chain": "BSC",
+    "token": "0xE23686b3ebCCa31B088b7A68e27af93FD733f94A",
+    "raw_apis": {
+      "goplus": {},
+      "honeypotIs": {
+        "token": {
+          "name": "V",
+          "symbol": "币安AI虚拟人",
+          "decimals": 18,
+          "address": "0xE23686b3ebCCa31B088b7A68e27af93FD733f94A",
+          "totalHolders": 0
+        },
+        "withToken": {
+          "name": "Wrapped BNB",
+          "symbol": "WBNB",
+          "decimals": 18,
+          "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "totalHolders": 3943284
+        },
+        "summary": {
+          "risk": "low",
+          "riskLevel": 1,
+          "flags": []
+        },
+        "simulationSuccess": true,
+        "honeypotResult": {
+          "isHoneypot": false
+        },
+        "simulationResult": {
+          "buyTax": 0,
+          "sellTax": 0,
+          "transferTax": 0,
+          "buyGas": "179813",
+          "sellGas": "105550"
+        },
+        "flags": [],
+        "contractCode": {
+          "openSource": true,
+          "rootOpenSource": true,
+          "isProxy": false,
+          "hasProxyCalls": false
+        },
+        "chain": {
+          "id": "56",
+          "name": "Binance Smart Chain",
+          "shortName": "bsc",
+          "currency": "BNB"
+        },
+        "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+        "pair": {
+          "pair": {
+            "name": "PancakeSwap V2: WBNB-币安AI虚拟人",
+            "address": "0x471eB880C139dFFF60997b1e246618A24BE19126",
+            "token0": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+            "token1": "0xE23686b3ebCCa31B088b7A68e27af93FD733f94A",
+            "type": "UniswapV2"
+          },
+          "chainId": "56",
+          "reserves0": "11000934680582106000",
+          "reserves1": "69073658613827230241739796",
+          "liquidity": 14046.653456248067,
+          "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+          "createdAtTimestamp": "1773090050",
+          "creationTxHash": "0xe5eb14e5f0bbc9f6bcc1fc70dfd699bf9846b871a37944ec681152acbaa8c267"
+        },
+        "pairAddress": "0x471eB880C139dFFF60997b1e246618A24BE19126"
+      },
+      "gecko": {
+        "error": "Request failed with status code 429"
+      },
+      "dexscreener": {
+        "error": "Not found on DexScreener"
+      }
+    },
+    "classification": {
+      "issues": [],
+      "score": 50,
+      "is_valid": true,
+      "warnings": [
+        "Erro GeckoTerminal (Comum em tokens recém-lançados)"
+      ]
+    },
+    "summary": {
+      "time_found": "2026-03-09T21:00:44.024Z",
+      "time_created": "Desconhecido",
+      "price_usd": 0,
+      "liquidity_usd": 0,
+      "is_honeypot": false,
+      "is_valid": true,
+      "score": 50,
+      "issues_found": []
+    }
+  }
+]

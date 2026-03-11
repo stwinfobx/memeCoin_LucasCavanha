@@ -59,6 +59,9 @@ export default function SignalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [priceUpdates, setPriceUpdates] = useState<Map<string, PriceUpdate>>(new Map())
   const [intendedInvestments, setIntendedInvestments] = useState<Map<string, number>>(new Map())
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [exportHours, setExportHours] = useState(24)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -282,6 +285,35 @@ export default function SignalsPage() {
     }
   }, [token, isAuthenticated, apiBase])
 
+  const handleExportJSON = async () => {
+    if (!token) return
+    setIsExporting(true)
+    setError(null)
+    try {
+      const res = await fetch(`${apiBase}/api/tokens/export?hours=${exportHours}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (!res.ok) throw new Error('Falha ao exportar os tokens.')
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `tokens_export_${exportHours}h_${Date.now()}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setIsExportModalOpen(false)
+    } catch (err: any) {
+      console.error('[Export] Erro:', err)
+      setError(err.message || 'Ocorreu um erro na exportação.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -293,10 +325,57 @@ export default function SignalsPage() {
               Acompanhamento dos sinais emitidos pelo motor de regras e do histórico recente.
             </p>
           </div>
-          <Link href="/dashboard" className="btn-secondary px-4 py-2 text-sm">
-            Voltar ao dashboard
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className="btn-primary px-4 py-2 text-sm bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors"
+            >
+              ⇩ Exportar Histórico (JSON)
+            </button>
+            <Link href="/dashboard" className="btn-secondary px-4 py-2 text-sm">
+              Voltar ao dashboard
+            </Link>
+          </div>
         </header>
+
+        {isExportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="w-full max-w-sm rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl">
+              <h3 className="text-xl font-semibold text-neutral-100 mb-2">Exportar Histórico</h3>
+              <p className="text-sm text-neutral-400 mb-6">
+                Faça o download dos tokens validados para análise. Escolha o período (em horas):
+              </p>
+              
+              <div className="flex flex-col gap-4 mb-6">
+                <input
+                  type="number"
+                  min="1"
+                  max="720"
+                  value={exportHours}
+                  onChange={(e) => setExportHours(Number(e.target.value))}
+                  className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-4 py-2 text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+                  placeholder="24"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setIsExportModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium hover:text-white text-neutral-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  disabled={isExporting}
+                  className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {isExporting ? 'Processando...' : 'Baixar JSON'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="surface-strong mt-8 border border-rose-500/40 px-5 py-4 text-sm text-rose-200">

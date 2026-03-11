@@ -40,14 +40,15 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
 
   try {
     const result = await pool.query(
-      `SELECT bot_enabled, bot_intensity, risk_profile, max_loss_percent, max_gain_percent, max_open_trades
-       FROM user_profiles
+      `SELECT bot_enabled, monitoring_mode, bot_intensity, risk_profile, max_loss_percent, max_gain_percent, max_open_trades
+       FROM user_profiles 
        WHERE user_id = $1`,
       [userId]
     );
 
     const profile = result.rows[0] ?? {
       bot_enabled: false,
+      monitoring_mode: false,
       bot_intensity: 5,
       risk_profile: 'moderate',
       max_loss_percent: 10,
@@ -56,8 +57,9 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
     };
 
     const botEnabled = toBoolean(profile.bot_enabled);
-
-    // Se o bot estiver habilitado, verificar se há sinais ativos para processar
+    const monitoringMode = toBoolean(profile.monitoring_mode);
+    // const maxGain = parseFloat(profile.max_gain_percent); // Not used
+    // const maxLoss = parseFloat(profile.max_loss_percent); // Not used
     if (botEnabled) {
       // Processar sinais em background se bot estiver habilitado
       processActiveSignalsForUser(userId).catch((error: any) => {
@@ -69,6 +71,7 @@ router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
       success: true,
       data: {
         bot_enabled: botEnabled,
+        monitoring_mode: monitoringMode,
         bot_intensity: Number(profile.bot_intensity ?? 5),
         risk_profile: profile.risk_profile ?? 'moderate',
         max_loss_percent: Number(profile.max_loss_percent ?? 10),
@@ -107,6 +110,7 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
   try {
     const {
       bot_enabled,
+      monitoring_mode,
       bot_intensity,
       risk_profile,
       max_loss_percent,
@@ -124,18 +128,22 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
     const maxOpenTrades = Number(max_open_trades ?? 3);
 
     await pool.query(
-      `UPDATE user_profiles SET
+      `UPDATE user_profiles
+       SET 
          bot_enabled = $2,
-         bot_intensity = $3,
-         risk_profile = $4,
-         max_loss_percent = $5,
-         max_gain_percent = $6,
-         max_open_trades = $7,
+         monitoring_mode = $3,
+         bot_intensity = $4,
+         risk_profile = $5,
+         max_loss_percent = $6,
+         max_gain_percent = $7,
+         max_open_trades = $8,
          updated_at = NOW()
-       WHERE user_id = $1`,
+       WHERE user_id = $1
+       RETURNING *`,
       [
         userId,
         toBoolean(bot_enabled),
+        toBoolean(monitoring_mode),
         Math.min(Math.max(intensity, 1), 10),
         parsedRiskProfile,
         Math.min(Math.max(maxLoss, 0), 100),
@@ -155,6 +163,8 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
         userId,
         `Configurações do bot foram atualizadas: Intensidade ${finalIntensity}/10, Perfil de risco ${parsedRiskProfile}`,
         JSON.stringify({
+          bot_enabled: toBoolean(bot_enabled),
+          monitoring_mode: toBoolean(monitoring_mode),
           bot_intensity: finalIntensity,
           risk_profile: parsedRiskProfile,
           max_loss_percent: Math.min(Math.max(maxLoss, 0), 100),
@@ -168,6 +178,7 @@ router.post('/config', authenticate, async (req: AuthRequest, res: Response) => 
       success: true,
       data: {
         bot_enabled: toBoolean(bot_enabled),
+        monitoring_mode: toBoolean(monitoring_mode),
         bot_intensity: Math.min(Math.max(intensity, 1), 10),
         risk_profile: parsedRiskProfile,
         max_loss_percent: Math.min(Math.max(maxLoss, 0), 100),
@@ -529,7 +540,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
 
     // Buscar status do bot no banco
     const profileResult = await pool.query(
-      `SELECT bot_enabled, bot_intensity, risk_profile, max_open_trades
+      `SELECT bot_enabled, monitoring_mode, bot_intensity, risk_profile, max_open_trades
        FROM user_profiles
        WHERE user_id = $1`,
       [userId]
@@ -537,6 +548,7 @@ router.get('/diagnostic', authenticate, async (req: AuthRequest, res: Response) 
 
     const profile = profileResult.rows[0] ?? null;
     const botEnabled = profile ? toBoolean(profile.bot_enabled) : false;
+    const monitoringMode = profile ? toBoolean(profile.monitoring_mode) : false;
 
     // Contar sinais BUY ativos
     const signalsResult = await pool.query(

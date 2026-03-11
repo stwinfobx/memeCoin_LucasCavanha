@@ -1,43 +1,20 @@
 import './env';
-import { ethers } from 'ethers';
+import { } from 'ethers';
 import axios from 'axios';
 import { Pool } from 'pg';
 import { Token, TokenRiskAssessment, TokenValidationResponse } from '@shared/types';
 import { ExplorerClient } from './providers/explorer';
 import { computeRiskAssessment, MarketPairData } from './risk-scoring';
+import { FreeSecurityProviders } from './providers/FreeSecurityProviders';
+import {
+  ChainProvider,
+  SupportedChain,
+  createChainProvider,
+  normalizeChainName,
+  getEnabledChains
+} from './chains';
 
-type SupportedChain = 'BSC' | 'ETH' | 'ARBITRUM' | 'POLYGON' | 'SOLANA';
 
-type ChainConfig = {
-  chainId: SupportedChain;
-  label: string;
-  rpcUrl?: string;
-  fallbackEnv?: string;
-};
-
-const CHAIN_CONFIGS: ChainConfig[] = [
-  {
-    chainId: 'BSC',
-    label: 'bsc',
-    rpcUrl: process.env.BSC_RPC_URL ?? process.env.BSC_TESTNET_RPC,
-    fallbackEnv: 'https://bsc-dataseed.binance.org/',
-  },
-  {
-    chainId: 'ETH',
-    label: 'ethereum',
-    rpcUrl: process.env.ETH_RPC_URL,
-  },
-  {
-    chainId: 'ARBITRUM',
-    label: 'arbitrum',
-    rpcUrl: process.env.ARBITRUM_RPC_URL,
-  },
-  {
-    chainId: 'POLYGON',
-    label: 'polygon',
-    rpcUrl: process.env.POLYGON_RPC_URL,
-  },
-];
 
 const GECKO_API_URL = process.env.GECKOTERMINAL_BASE_URL || 'https://api.geckoterminal.com/api/v2';
 const GECKO_HEADERS = {
@@ -59,19 +36,7 @@ function parseNumber(value: string | number | undefined | null): number {
   return 0;
 }
 
-function getNetworkLabel(chain: SupportedChain): string {
-  return CHAIN_CONFIGS.find((config) => config.chainId === chain)?.label ?? chain.toLowerCase();
-}
 
-// ERC20 ABI simplificado
-const ERC20_ABI = [
-  'function totalSupply() view returns (uint256)',
-  'function decimals() view returns (uint8)',
-  'function symbol() view returns (string)',
-  'function name() view returns (string)',
-  'function balanceOf(address) view returns (uint256)',
-  'function transfer(address to, uint256 amount) returns (bool)',
-];
 
 interface ExternalPoolListing {
   poolId?: string;
@@ -101,7 +66,7 @@ export interface ValidationContext {
 }
 
 export class TokenValidator {
-  private providers: Map<SupportedChain, ethers.JsonRpcProvider>;
+  private providers: Map<SupportedChain, ChainProvider>;
   private pool: Pool;
 
   constructor(pool: Pool) {
@@ -111,37 +76,27 @@ export class TokenValidator {
   }
 
   private initializeProviders() {
-    CHAIN_CONFIGS.forEach((config) => {
-      const rpc = config.rpcUrl || config.fallbackEnv;
-      if (!rpc) {
-        return;
-      }
+    const enabledChains = getEnabledChains();
+
+    console.log(`[Validator] Initializing providers for ${enabledChains.length} chains: ${enabledChains.join(', ')}`);
+
+    for (const chain of enabledChains) {
       try {
-        const provider = new ethers.JsonRpcProvider(rpc, undefined, {
-          staticNetwork: true,
-          pollingInterval: Number(process.env.RPC_POLLING_INTERVAL_MS || 15_000),
-        });
-        this.providers.set(config.chainId, provider);
-      } catch (error) {
-        console.error(`Failed to initialize provider for ${config.chainId}`, error);
+        const provider = createChainProvider(chain);
+        this.providers.set(chain, provider);
+        console.log(`[Validator] ✓ ${chain} provider initialized`);
+      } catch (error: any) {
+        console.error(`[Validator] ✗ Failed to initialize ${chain} provider:`, error.message);
       }
-    });
+    }
   }
 
-  private normalizeChain(chain?: string): SupportedChain | null {
-    if (!chain) return null;
-    const value = chain.trim().toUpperCase();
-    if (value === 'BSC' || value === 'BSC_TESTNET') return 'BSC';
-    if (value === 'ETH' || value === 'ETHEREUM') return 'ETH';
-    if (value === 'ARBITRUM') return 'ARBITRUM';
-    if (value === 'POLYGON' || value === 'MATIC') return 'POLYGON';
-    if (value === 'SOL' || value === 'SOLANA') return 'SOLANA';
-    return null;
-  }
-
-  private getProvider(chain?: string): ethers.JsonRpcProvider | null {
-    const normalized = this.normalizeChain(chain);
-    if (!normalized) return null;
+  private getProvider(chain?: string): ChainProvider | null {
+    const normalized = normalizeChainName(chain);
+    if (!normalized) {
+      console.warn(`[Validator] Unknown chain: ${chain}`);
+      return null;
+    }
     return this.providers.get(normalized) ?? null;
   }
 
@@ -155,8 +110,8 @@ export class TokenValidator {
   ): Promise<TokenValidationResponse> {
     const issues: string[] = [];
     let safetyScore = 0;
-    const normalizedChain = this.normalizeChain(chain) ?? 'BSC';
-    const provider = this.getProvider(normalizedChain);
+    const normalizedChain = normalizeChainName(chain) || SupportedChain.BSC;
+    const provider = this.getProvider(chain);
 
     if (!provider) {
       const reason = `Unsupported chain or missing RPC for ${chain}`;
@@ -174,33 +129,59 @@ export class TokenValidator {
     }
 
     try {
-      const contract = new ethers.Contract(contractAddress, ERC20_ABI, provider);
+      // Usar ChainProvider ao invés de ethers diretamente
+      const tokenInfo = await provider.getTokenInfo(contractAddress);
+      const { symbol, name, decimals, totalSupply } = tokenInfo;
 
-      const [symbol, name, decimals, totalSupply] = await Promise.all([
-        contract.symbol().catch(() => 'UNKNOWN'),
-        contract.name().catch(() => 'Unknown Token'),
-        contract.decimals().catch(() => 18),
-        contract.totalSupply().catch(() => ethers.parseUnits('0', 18)),
-      ]);
+      // --- SECURITY CONSENSUS (GoPlus + Honeypot.is + RugCheck via FreeSecurityProviders) ---
+      let isHoneypot = false;
+      try {
+        let consensus;
+        if (normalizedChain === SupportedChain.SOLANA) {
+          consensus = await FreeSecurityProviders.checkSolana(contractAddress);
+        } else {
+          const chainNum = normalizedChain === SupportedChain.BASE ? '8453' : '56';
+          consensus = await FreeSecurityProviders.checkEVM(contractAddress, chainNum as '56' | '8453');
+        }
 
-      const isHoneypot = await this.checkHoneypot(contractAddress, provider);
-      if (isHoneypot) {
-        issues.push('Token is a honeypot');
-        safetyScore -= 50;
+        isHoneypot = consensus.isHoneypot;
+        issues.push(...consensus.issues);
+
+        if (consensus.verdict === 'danger') {
+          safetyScore -= 60;
+          console.log(`[Validator] 🔴 DANGER consensus for ${contractAddress}: ${consensus.issues.join(', ')}`);
+        } else if (consensus.verdict === 'warning') {
+          safetyScore -= 15;
+          console.log(`[Validator] ⚠️ WARNING consensus for ${contractAddress}: ${consensus.issues.join(', ')}`);
+        } else if (consensus.verdict === 'safe') {
+          safetyScore += 25; // Clean token bonus
+          console.log(`[Validator] 🟢 SAFE consensus for ${contractAddress} (sources: ${Object.entries(consensus.sources)
+              .filter(([, v]) => v?.checked)
+              .map(([k]) => k).join(', ')
+            })`);
+        }
+
+      } catch (e) {
+        console.warn(`[Validator] Security consensus failed, falling back to provider check: ${e}`);
+        isHoneypot = await provider.checkHoneypot(contractAddress);
+        if (isHoneypot) {
+          issues.push('Token is a honeypot (Provider Check)');
+          safetyScore -= 50;
+        }
       }
 
-      const marketData = await this.getMarketData(contractAddress, normalizedChain, context);
+      const marketData = await provider.getMarketData(contractAddress, context);
 
-      const liquidityLocked = await this.checkLiquidityLocked(contractAddress, normalizedChain);
-      if (!liquidityLocked) {
-        issues.push('Liquidity not locked');
-        safetyScore -= 20;
-      } else {
-        safetyScore += 20;
+      // liquidityLocked: checkLiquidityLocked retorna false sempre (não implementado)
+      // Não penalizamos por isso para não distorcer os scores
+      const liquidityLocked = await provider.checkLiquidityLocked(contractAddress);
+      if (liquidityLocked) {
+        safetyScore += 20; // Bônus apenas se realmente confirmado
       }
 
       const holdersCount = marketData.holdersCount || 0;
-      if (holdersCount < 10) {
+      // Só penalizar holders se TEMOS a informação e é baixa
+      if (holdersCount > 0 && holdersCount < 10) {
         issues.push('Low number of holders');
         safetyScore -= 10;
       } else if (holdersCount > 100) {
@@ -208,7 +189,8 @@ export class TokenValidator {
       }
 
       const volume24h = marketData.volume24h || 0;
-      if (volume24h < 1000) {
+      // Token novo: não penalizar por volume zero (ainda não foi indexado)
+      if (volume24h > 0 && volume24h < 1000) {
         issues.push('Low 24h volume');
         safetyScore -= 10;
       } else if (volume24h > 10_000) {
@@ -216,7 +198,8 @@ export class TokenValidator {
       }
 
       const liquidity = marketData.liquidity || 0;
-      if (liquidity < 5_000) {
+      // Token novo: não penalizar por liquidez zero (ainda não foi indexado)
+      if (liquidity > 0 && liquidity < 5_000) {
         issues.push('Low liquidity');
         safetyScore -= 15;
       } else if (liquidity > 50_000) {
@@ -226,12 +209,12 @@ export class TokenValidator {
       safetyScore = Math.max(0, Math.min(100, 50 + safetyScore));
 
       const token = await this.saveToken({
-        contract_address: contractAddress.toLowerCase(),
+        contract_address: provider.normalizeAddress(contractAddress),
         chain: normalizedChain,
-        symbol,
-        name,
+        symbol: String(symbol),
+        name: String(name),
         decimals: Number(decimals),
-        total_supply: totalSupply.toString(),
+        total_supply: BigInt(totalSupply || '0'),
         liquidity_usd: liquidity,
         liquidity_locked: liquidityLocked,
         holders_count: holdersCount,
@@ -243,7 +226,7 @@ export class TokenValidator {
         validated_at: new Date(),
       });
 
-      const rawPair = marketData.rawPair || context?.rawListing || null;
+      const rawPair = context?.rawListing || null;
 
       const resolveNumeric = (value: any): number => {
         if (typeof value === 'number') return value;
@@ -323,42 +306,20 @@ export class TokenValidator {
     }
   }
 
-  /**
-   * Verifica se o token é honeypot simulando uma transfer
-   */
-  private async checkHoneypot(contractAddress: string, provider: ethers.JsonRpcProvider): Promise<boolean> {
-    try {
-      const code = await provider.getCode(contractAddress);
-      if (code === '0x') {
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Honeypot check error:', error);
-      return true;
-    }
-  }
+
 
   /**
-   * Verifica se a liquidez está bloqueada
+   * DEPRECATED METHODS - Kept for compatibility but no longer used
+   * Now using ChainProvider methods directly
    */
+  private async checkHoneypot(contractAddress: string, provider: any): Promise<boolean> {
+    return false;
+  }
+
   private async checkLiquidityLocked(contractAddress: string, chain: SupportedChain): Promise<boolean> {
-    try {
-      if (chain === 'BSC' && process.env.BSCSCAN_API_KEY) {
-        await axios.get(
-          `https://api.bscscan.com/api?module=token&action=tokeninfo&contractaddress=${contractAddress}&apikey=${process.env.BSCSCAN_API_KEY}`
-        );
-      }
-      return true;
-    } catch (error) {
-      console.error('Liquidity check error:', error);
-      return false;
-    }
+    return false;
   }
 
-  /**
-   * Obtém dados de mercado do GeckoTerminal
-   */
   private async getMarketData(
     contractAddress: string,
     chain: SupportedChain,
@@ -370,122 +331,10 @@ export class TokenValidator {
     holdersCount: number;
     rawPair?: ExternalPoolListing | null;
   }> {
-    try {
-      const listing = context?.rawListing || null;
-      const network = getNetworkLabel(chain);
-      const poolId = listing?.poolId;
-      const pairAddress = listing?.pairAddress;
-      const dexIdentifierRaw = listing?.dexId;
-      const dexIdentifier = dexIdentifierRaw?.replace(/_/g, '-');
-      const tokenAddress = contractAddress.toLowerCase();
-
-      if (listing && (listing.liquidityUsd ?? 0) > 0 && (listing.volume24hUsd ?? 0) > 0) {
-        return {
-          liquidity: listing.liquidityUsd ?? 0,
-          volume24h: listing.volume24hUsd ?? 0,
-          price: listing.priceUsd ?? 0,
-          holdersCount: 0,
-          rawPair: listing,
-        };
-      }
-
-      const poolIdCandidates: string[] = [];
-      if (poolId) poolIdCandidates.push(poolId);
-      if (dexIdentifier && pairAddress) {
-        poolIdCandidates.push(`${network}_${dexIdentifier}_${pairAddress}`);
-        poolIdCandidates.push(`${dexIdentifier}_${pairAddress}`);
-      }
-      if (pairAddress) poolIdCandidates.push(pairAddress);
-
-      for (const candidate of poolIdCandidates) {
-        try {
-          const poolResponse = await axios.get(
-            `${GECKO_API_URL}/networks/${network}/pools/${candidate}?include=base_token,quote_token`,
-            {
-              timeout: 10_000,
-              headers: GECKO_HEADERS,
-            }
-          );
-          const poolAttributes = poolResponse.data?.data?.attributes ?? {};
-          const liquidity = parseNumber(poolAttributes.liquidity_usd ?? listing?.liquidityUsd);
-          const volume24h = parseNumber(poolAttributes.volume_usd?.h24 ?? listing?.volume24hUsd);
-          const price = parseNumber(poolAttributes.base_token_price_usd ?? listing?.priceUsd);
-
-          return {
-            liquidity,
-            volume24h,
-            price,
-            holdersCount: 0,
-            rawPair: listing,
-          };
-        } catch (error: any) {
-          const status = error?.response?.status;
-          const detail = error?.response?.data?.message || error?.message || error;
-          console.warn(`Gecko pool lookup failed (${candidate}): ${detail}`);
-          if (status !== 404) {
-            break;
-          }
-        }
-      }
-
-      if (pairAddress) {
-        try {
-          const pairResponse = await axios.get(
-            `${GECKO_API_URL}/networks/${network}/pools/${pairAddress}`,
-            {
-              timeout: 10_000,
-              headers: GECKO_HEADERS,
-            }
-          );
-          const poolAttributes = pairResponse.data?.data?.attributes ?? {};
-          return {
-            liquidity: parseNumber(poolAttributes.liquidity_usd ?? listing?.liquidityUsd),
-            volume24h: parseNumber(poolAttributes.volume_usd?.h24 ?? listing?.volume24hUsd),
-            price: parseNumber(poolAttributes.base_token_price_usd ?? listing?.priceUsd),
-            holdersCount: 0,
-            rawPair: listing,
-          };
-        } catch (error: any) {
-          const detail = error?.response?.data?.message || error?.message || error;
-          console.warn(`Gecko pair lookup failed (${pairAddress}): ${detail}`);
-        }
-      }
-
-      try {
-        const tokenEndpoint = `${GECKO_API_URL}/networks/${network}/tokens/${tokenAddress}?include=top_pools`;
-        const tokenResponse = await axios.get(tokenEndpoint, {
-          timeout: 10_000,
-          headers: GECKO_HEADERS,
-        });
-
-        const tokenAttributes = tokenResponse.data?.data?.attributes ?? {};
-        const pools = (tokenResponse.data?.included || []).filter((item: any) => item.type === 'pools');
-        const topPoolAttributes = pools[0]?.attributes ?? {};
-
-        return {
-          liquidity: parseNumber(topPoolAttributes.liquidity_usd ?? tokenAttributes.liquidity_usd ?? listing?.liquidityUsd),
-          volume24h: parseNumber(topPoolAttributes.volume_usd?.h24 ?? tokenAttributes.volume_usd?.h24 ?? listing?.volume24hUsd),
-          price: parseNumber(tokenAttributes.price_usd ?? topPoolAttributes.base_token_price_usd ?? listing?.priceUsd),
-          holdersCount: 0,
-          rawPair: listing,
-        };
-      } catch (error: any) {
-        const detail = error?.response?.data?.message || error?.message || error;
-        console.warn(`Gecko token lookup failed (${tokenAddress}): ${detail}`);
-      }
-
-      return {
-        liquidity: listing?.liquidityUsd ?? 0,
-        volume24h: listing?.volume24hUsd ?? 0,
-        price: listing?.priceUsd ?? 0,
-        holdersCount: 0,
-        rawPair: listing,
-      };
-    } catch (error) {
-      console.error('Market data error:', error);
-      return { liquidity: 0, volume24h: 0, price: 0, holdersCount: 0, rawPair: context?.rawListing || null };
-    }
+    // Fallback implementation - should not be called
+    return { liquidity: 0, volume24h: 0, price: 0, holdersCount: 0, rawPair: null };
   }
+
 
   /**
    * Salva ou atualiza token no banco de dados

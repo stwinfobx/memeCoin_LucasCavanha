@@ -74,25 +74,33 @@ type TokenFeedItem = {
   priceUsd: number
   liquidityUsd: number
   volume24hUsd: number
-  memecoinScore?: number | null
+  safetyScore?: number | null
   scamProbability?: number | null
   riskLevel?: 'critical' | 'high' | 'moderate' | 'low' | null
   validatedAt?: string | null
+  chain?: string | null
 }
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 const formatCurrency = (value: number | null | undefined) => {
-  const val = value ?? 0;
-  if (val === 0) return 'US$ 0,00';
+  if (value === null || value === undefined) return null;
+  const val = value;
 
-  // Para valores muito baixos (< 0.01), mostrar mais casas decimais
-  if (val < 0.01) {
+  // Para valores muito baixos (< 0.01) MAS não perfeitamente 0, mostrar mais casas decimais
+  if (val > 0 && val < 0.01) {
     return `US$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 10 })}`;
   }
 
   return Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }).format(val);
 }
+
+const IndexingBadge = () => (
+  <span className="inline-flex items-center gap-1 text-[10px] text-amber-400/80 animate-pulse">
+    <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60"></span>
+    Indexando...
+  </span>
+)
 
 const formatPercent = (value: number | null | undefined) =>
   `${Number(value ?? 0).toFixed(2)}%`
@@ -296,10 +304,11 @@ export default function DashboardPage() {
           priceUsd: Number(item.token.price_usd ?? 0),
           liquidityUsd: Number(item.token.liquidity_usd ?? 0),
           volume24hUsd: Number(item.token.volume_24h_usd ?? 0),
-          memecoinScore: item.risk_assessment?.memecoin_score ?? null,
+          safetyScore: item.risk_assessment?.risk_score ?? null,
           scamProbability: item.risk_assessment?.scam_probability ?? null,
           riskLevel: item.risk_assessment?.risk_level ?? null,
           validatedAt: item.token.validated_at ?? null,
+          chain: item.token.chain ?? null,
         }))
         setTokenFeed(parsed)
       } else if (tokensRes.status === 401) {
@@ -420,6 +429,11 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        {/* Informação sobre fuso horário */}
+        <div className="mt-4 text-[10px] text-neutral-600 uppercase tracking-widest text-right">
+          Exibindo horários em GMT-3 (Brasília)
+        </div>
+
         {error && (
           <div className="surface-strong mt-8 border border-rose-500/40 px-5 py-4 text-sm text-rose-200">
             {error}
@@ -528,7 +542,11 @@ export default function DashboardPage() {
                   )}
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
                     <span>Cotação: {formatCurrency(signal.price_usd)}</span>
-                    <span>Emitido em: {new Date(signal.created_at).toLocaleString('pt-BR')}</span>
+                    <span>Emitido em: {(() => {
+                      const d = new Date(signal.created_at);
+                      d.setHours(d.getHours() - 3); // Fix: UTC to BRT (-3h)
+                      return d.toLocaleString('pt-BR');
+                    })()}</span>
                   </div>
                 </div>
               ))}
@@ -620,7 +638,7 @@ export default function DashboardPage() {
                 Atualizar lista
               </button>
             </div>
-            <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3 max-h-[600px] overflow-y-auto pr-2 small-scrollbar">
               {loadingState && <p className="text-sm text-neutral-500">Coletando informações mais recentes...</p>}
               {!loadingState && tokenFeed.length === 0 && (
                 <p className="text-sm text-neutral-600">
@@ -632,7 +650,7 @@ export default function DashboardPage() {
                   const risk = tokenItem.riskLevel ?? 'moderate'
                   const badge = riskBadgeStyles[risk]
                   return (
-                    <div key={tokenItem.contract} className="surface border border-neutral-800/60 p-5">
+                    <div key={tokenItem.contract} className="surface border border-neutral-800/60 p-5 bg-neutral-900/30 hover:bg-neutral-900/50 transition-colors">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-semibold text-neutral-100">{tokenItem.symbol}</p>
@@ -646,20 +664,20 @@ export default function DashboardPage() {
                       <div className="mt-5 grid grid-cols-2 gap-4 text-xs text-neutral-400">
                         <div>
                           <p className="uppercase tracking-wide text-neutral-500">Preço</p>
-                          <p className="text-neutral-100">{formatCurrency(tokenItem.priceUsd)}</p>
+                          <p className="text-neutral-100">{formatCurrency(tokenItem.priceUsd) ?? <IndexingBadge />}</p>
                         </div>
                         <div>
                           <p className="uppercase tracking-wide text-neutral-500">Liquidez</p>
-                          <p className="text-neutral-100">{formatCurrency(tokenItem.liquidityUsd)}</p>
+                          <p className="text-neutral-100">{formatCurrency(tokenItem.liquidityUsd) ?? <IndexingBadge />}</p>
                         </div>
                         <div>
                           <p className="uppercase tracking-wide text-neutral-500">Volume 24h</p>
-                          <p className="text-neutral-100">{formatCurrency(tokenItem.volume24hUsd)}</p>
+                          <p className="text-neutral-100">{formatCurrency(tokenItem.volume24hUsd) ?? <IndexingBadge />}</p>
                         </div>
                         <div>
-                          <p className="uppercase tracking-wide text-neutral-500">Memecoin Score</p>
+                          <p className="uppercase tracking-wide text-neutral-500">Nota Segurança</p>
                           <p className="text-neutral-100">
-                            {tokenItem.memecoinScore != null ? `${Math.round(tokenItem.memecoinScore)} / 100` : '—'}
+                            {tokenItem.safetyScore != null ? `${Math.round(tokenItem.safetyScore)} / 100` : '—'}
                           </p>
                         </div>
                         <div>
@@ -674,7 +692,7 @@ export default function DashboardPage() {
                           <p className="uppercase tracking-wide text-neutral-500">Atualização</p>
                           <p className="text-neutral-100">
                             {tokenItem.validatedAt
-                              ? new Date(tokenItem.validatedAt).toLocaleString('pt-BR')
+                              ? new Date(tokenItem.validatedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
                               : 'Disponibilizado agora'}
                           </p>
                         </div>
@@ -684,11 +702,17 @@ export default function DashboardPage() {
                           Contrato: {tokenItem.contract.slice(0, 6)}…{tokenItem.contract.slice(-4)}
                         </span>
                         <Link
-                          href={`https://bscscan.com/token/${tokenItem.contract}`}
+                          href={
+                            tokenItem.chain?.toUpperCase() === 'SOLANA'
+                              ? `https://solscan.io/token/${tokenItem.contract}`
+                              : tokenItem.chain?.toUpperCase() === 'BASE'
+                              ? `https://basescan.org/token/${tokenItem.contract}`
+                              : `https://bscscan.com/token/${tokenItem.contract}`
+                          }
                           className="rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-purple-200 hover:text-purple-100"
                           target="_blank"
                         >
-                          Abrir no BscScan
+                          Abrir no {tokenItem.chain?.toUpperCase() === 'SOLANA' ? 'Solscan' : tokenItem.chain?.toUpperCase() === 'BASE' ? 'BaseScan' : 'BscScan'}
                         </Link>
                       </div>
                     </div>
@@ -777,7 +801,11 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <p className="uppercase tracking-wide">Criada</p>
-                      <p className="text-sm text-neutral-200">{new Date(order.created_at).toLocaleString('pt-BR')}</p>
+                      <p className="text-sm text-neutral-200">{(() => {
+                        const d = new Date(order.created_at);
+                        d.setHours(d.getHours() - 3); // Fix: UTC to BRT (-3h)
+                        return d.toLocaleString('pt-BR');
+                      })()}</p>
                     </div>
                   </div>
                 </div>
