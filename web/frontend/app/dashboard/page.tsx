@@ -514,54 +514,64 @@ export default function DashboardPage() {
             </div>
             <div className="mt-6 space-y-4 small-scrollbar max-h-[360px] overflow-y-auto pr-1">
               {loadingState && <p className="text-sm text-neutral-500">Carregando sinais...</p>}
-              {!loadingState && data?.signals.filter(s => s.confidence_score >= 80 && s.signal_type === 'BUY').length === 0 && (
-                <p className="text-sm text-neutral-600">Nenhum sinal de elite (Score {'>'}= 80) recente.</p>
-              )}
-              {data?.signals.filter(s => s.confidence_score >= 80 && s.signal_type === 'BUY').map((signal) => (
-                <div key={signal.id} className="surface border-neutral-800 p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-200">{signal.symbol}</p>
-                      <p className="text-xs text-neutral-500">{signal.name}</p>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-neutral-400">
-                      <span className="badge border-purple-400/30 bg-purple-400/10 text-purple-200">
-                        {signal.signal_type}
-                      </span>
-                      <div className="text-right">
-                        <p className="text-xs text-neutral-500">Confiança</p>
-                        <p className="text-sm font-semibold text-neutral-100">{signal.confidence_score}%</p>
+              {(() => {
+                const eliteSignals = data?.signals.filter(s => {
+                  const score = s.confidence_score || 0;
+                  const isBuy = s.signal_type === 'BUY';
+                  const ageMs = Date.now() - new Date(s.created_at).getTime();
+                  return score >= 80 && isBuy && ageMs < 60 * 60 * 1000;
+                }) || [];
+                
+                if (!loadingState && eliteSignals.length === 0) {
+                  return <p className="text-sm text-neutral-600">Nenhum sinal de elite recente (Score {'>'}= 80, COMPRA, {'<'}1h).</p>;
+                }
+                
+                return eliteSignals.map((signal) => (
+                  <div key={signal.id} className="surface border-neutral-800 p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-200">{signal.symbol}</p>
+                        <p className="text-xs text-neutral-500">{signal.name}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-neutral-500">Multiplicador</p>
-                        <p className="text-sm font-semibold text-neutral-100">
-                          {signal.potential_multiplier ? `${signal.potential_multiplier.toFixed(2)}x` : '—'}
-                        </p>
+                      <div className="flex items-center gap-3 text-sm text-neutral-400">
+                        <span className="badge border-purple-400/30 bg-purple-400/10 text-purple-200">
+                          {signal.signal_type}
+                        </span>
+                        <div className="text-right">
+                          <p className="text-xs text-neutral-500">Confiança</p>
+                          <p className="text-sm font-semibold text-neutral-100">{signal.confidence_score}%</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-neutral-500">Multiplicador</p>
+                          <p className="text-sm font-semibold text-neutral-100">
+                            {signal.potential_multiplier ? `${signal.potential_multiplier.toFixed(2)}x` : '—'}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {signal.reasoning && (
-                    <p className="mt-3 text-sm text-neutral-400 leading-relaxed">{signal.reasoning}</p>
-                  )}
-                  <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
-                    <span>Cotação: {formatCurrency(signal.price_usd)}</span>
-                    <span>Emitido em: {(() => {
-                      const d = new Date(signal.created_at);
-                      d.setHours(d.getHours() - 3); // Forçar fuso horário de Brasília (-3h)
-                      return d.toLocaleString('pt-BR');
-                    })()}</span>
-                    {(signal.contract_address || signal.token_id) && (
-                      <Link
-                        href={`https://dexscreener.com/${signal.chain?.toLowerCase() || 'solana'}/${signal.contract_address || signal.token_id}`}
-                        className="text-emerald-400 hover:text-emerald-300 font-medium"
-                        target="_blank"
-                      >
-                        DexScreener ↗
-                      </Link>
+                    {signal.reasoning && (
+                      <p className="mt-3 text-sm text-neutral-400 leading-relaxed">{signal.reasoning}</p>
                     )}
+                    <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
+                      <span>Cotação: {formatCurrency(signal.price_usd)}</span>
+                      <span>Emitido em: {(() => {
+                        const d = new Date(signal.created_at);
+                        d.setHours(d.getHours() - 3); // Forçar fuso horário de Brasília (-3h)
+                        return d.toLocaleString('pt-BR');
+                      })()}</span>
+                      {(signal.contract_address || signal.token_id) && (
+                        <Link
+                          href={`https://dexscreener.com/${signal.chain?.toLowerCase() || 'solana'}/${signal.contract_address || signal.token_id}`}
+                          className="text-emerald-400 hover:text-emerald-300 font-medium"
+                          target="_blank"
+                        >
+                          DexScreener ↗
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
 
@@ -658,7 +668,11 @@ export default function DashboardPage() {
                 </p>
               )}
               {!loadingState &&
-                tokenFeed.map((tokenItem) => {
+                tokenFeed.filter(t => {
+                  if (!t.validatedAt) return true; // Show if just validated
+                  const ageMs = Date.now() - new Date(t.validatedAt).getTime();
+                  return ageMs < 60 * 60 * 1000; // 1 hora
+                }).map((tokenItem) => {
                   const risk = tokenItem.riskLevel ?? 'moderate'
                   const badge = riskBadgeStyles[risk]
                   return (
@@ -703,9 +717,11 @@ export default function DashboardPage() {
                         <div>
                           <p className="uppercase tracking-wide text-neutral-500">Atualização</p>
                           <p className="text-neutral-100">
-                            {tokenItem.validatedAt
-                              ? new Date(tokenItem.validatedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-                              : 'Disponibilizado agora'}
+                            {tokenItem.validatedAt ? (() => {
+                              const d = new Date(tokenItem.validatedAt);
+                              d.setHours(d.getHours() - 3); // Forçar fuso horário de Brasília (-3h)
+                              return d.toLocaleString('pt-BR');
+                            })() : 'Disponibilizado agora'}
                           </p>
                         </div>
                       </div>

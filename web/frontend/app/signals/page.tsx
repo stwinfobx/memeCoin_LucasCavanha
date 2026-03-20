@@ -440,13 +440,23 @@ export default function SignalsPage() {
 
           {loading ? (
             <p className="mt-6 text-sm text-neutral-500">Carregando sinais de elite...</p>
-          ) : activeSignals.filter(s => (s.confidence_score || 0) >= 80 && s.signal_type === 'BUY').length === 0 ? (
-            <p className="mt-6 text-sm text-neutral-600">Nenhum sinal de elite (Score {'>'}= 80) ativo no momento.</p>
-          ) : (
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-              {activeSignals.filter(s => (s.confidence_score || 0) >= 80 && s.signal_type === 'BUY').map((signal) => (
-                <div key={signal.id} className="surface border-neutral-800 p-5">
-                  <div className="flex items-center justify-between">
+          ) : (() => {
+            const eliteSignals = activeSignals.filter(s => {
+              const score = (s.confidence_score || 0);
+              const isBuy = s.signal_type === 'BUY';
+              const ageMs = Date.now() - new Date(s.created_at).getTime();
+              return score >= 80 && isBuy && ageMs < 60 * 60 * 1000;
+            }) || [];
+
+            if (eliteSignals.length === 0) {
+              return <p className="mt-6 text-sm text-neutral-600">Nenhum sinal de elite (Score {'>'}= 80, COMPRA, {'<'}1h) ativo no momento.</p>;
+            }
+
+            return (
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {eliteSignals.map((signal) => (
+                  <div key={signal.id} className="surface border-neutral-800 p-5">
+                    <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-neutral-200">{signal.symbol}</p>
                       <p className="text-xs text-neutral-500">{signal.name}</p>
@@ -568,8 +578,9 @@ export default function SignalsPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </section>
 
         <section className="mt-10 surface-strong p-6">
