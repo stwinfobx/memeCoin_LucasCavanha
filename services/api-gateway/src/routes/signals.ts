@@ -37,6 +37,8 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
          t.price_usd,
          t.liquidity_usd,
          t.volume_24h_usd,
+         t.contract_address,
+         t.chain,
          t.safety_score AS token_safety_score
        FROM signals s
        JOIN tokens t ON s.token_id = t.id
@@ -69,6 +71,8 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
       age_score: toNumber(row.age_score),
       safety_score: toNumber(row.safety_score) ?? toNumber(row.token_safety_score),
       overall_score: toNumber(row.overall_score),
+      contract_address: row.contract_address,
+      chain: row.chain,
     }));
 
     res.json({
@@ -110,6 +114,8 @@ router.get('/history', authenticate, async (req: AuthRequest, res: Response) => 
            s.overall_score,
            t.symbol,
            t.name,
+           t.contract_address,
+           t.chain,
            LAG(s.signal_type) OVER (PARTITION BY s.token_id ORDER BY s.created_at) AS prev_signal_type,
            LAG(s.confidence_score) OVER (PARTITION BY s.token_id ORDER BY s.created_at) AS prev_confidence,
            LAG(s.overall_score) OVER (PARTITION BY s.token_id ORDER BY s.created_at) AS prev_overall
@@ -140,6 +146,8 @@ router.get('/history', authenticate, async (req: AuthRequest, res: Response) => 
       token_id: row.token_id,
       symbol: row.symbol,
       name: row.name,
+      contract_address: row.contract_address,
+      chain: row.chain,
     }));
 
     res.json({

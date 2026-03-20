@@ -50,22 +50,34 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.get('/export', async (req: Request, res: Response) => {
   try {
-    const hours = Number(req.query.hours) || 24; // Padrão: últimas 24h
+    const hours = Number(req.query.hours) || 24;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
     
-    // Buscar tokens e seus respectivos sinais (se houver) aprovados no período
-    const query = await pool.query(
-      `SELECT 
+    let queryText = `
+      SELECT 
          t.id, t.symbol, t.name, t.contract_address, t.chain,
          t.price_usd, t.liquidity_usd, t.volume_24h_usd, t.holders_count,
-         t.is_honeypot, t.created_at as token_found_at,
+         t.safety_score, t.is_honeypot, t.validated_at,
          s.signal_type, s.confidence_score, s.reasoning, s.created_at as signal_created_at
        FROM tokens t
        LEFT JOIN signals s ON s.token_id = t.id AND s.is_active = true
        WHERE t.is_validated = true
-         AND t.created_at >= NOW() - INTERVAL '1 hour' * $1
-       ORDER BY t.created_at DESC`,
-      [hours]
-    );
+    `;
+    
+    const params: any[] = [];
+    
+    if (startDate && endDate) {
+      params.push(startDate, endDate);
+      queryText += ` AND t.validated_at BETWEEN $1 AND $2`;
+    } else {
+      params.push(hours);
+      queryText += ` AND t.validated_at >= NOW() - INTERVAL '1 hour' * $1`;
+    }
+    
+    queryText += ` ORDER BY t.validated_at DESC`;
+
+    const query = await pool.query(queryText, params);
 
     const exportData = {
       exported_at: new Date().toISOString(),

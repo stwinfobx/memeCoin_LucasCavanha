@@ -33,6 +33,7 @@ type DashboardData = {
   }>
   signals: Array<{
     id: string
+    token_id: string
     signal_type: string
     confidence_score: number
     potential_multiplier?: number
@@ -43,6 +44,8 @@ type DashboardData = {
     price_usd: number
     liquidity_usd?: number
     volume_24h_usd?: number
+    contract_address?: string
+    chain?: string
   }>
   recentOrders: Array<{
     id: string
@@ -87,12 +90,12 @@ const formatCurrency = (value: number | null | undefined) => {
   if (value === null || value === undefined) return null;
   const val = value;
 
-  // Para valores muito baixos (< 0.01) MAS não perfeitamente 0, mostrar mais casas decimais
-  if (val > 0 && val < 0.01) {
-    return `US$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 10 })}`;
+  // Para valores muito baixos (< 0.001) mostrar mais casas decimais
+  if (val > 0 && val < 0.1) {
+    return `US$ ${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 12 })}`;
   }
 
-  return Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }).format(val);
+  return Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(val);
 }
 
 const IndexingBadge = () => (
@@ -496,7 +499,7 @@ export default function DashboardPage() {
         <section className="mt-10 grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="surface-strong xl:col-span-2 p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-neutral-100">Sinais ativos</h2>
+              <h2 className="text-lg font-semibold text-neutral-100">Histórico Recente (Elite Scored)</h2>
               <div className="flex items-center gap-3">
                 <Link href="/bot-performance" className="text-sm text-emerald-300 hover:text-emerald-200">
                   Ver performance
@@ -511,10 +514,10 @@ export default function DashboardPage() {
             </div>
             <div className="mt-6 space-y-4 small-scrollbar max-h-[360px] overflow-y-auto pr-1">
               {loadingState && <p className="text-sm text-neutral-500">Carregando sinais...</p>}
-              {!loadingState && data?.signals.length === 0 && (
-                <p className="text-sm text-neutral-600">Nenhum sinal ativo no momento.</p>
+              {!loadingState && data?.signals.filter(s => s.confidence_score >= 80 && s.signal_type === 'BUY').length === 0 && (
+                <p className="text-sm text-neutral-600">Nenhum sinal de elite (Score {'>'}= 80) recente.</p>
               )}
-              {data?.signals.map((signal) => (
+              {data?.signals.filter(s => s.confidence_score >= 80 && s.signal_type === 'BUY').map((signal) => (
                 <div key={signal.id} className="surface border-neutral-800 p-5">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -543,10 +546,20 @@ export default function DashboardPage() {
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
                     <span>Cotação: {formatCurrency(signal.price_usd)}</span>
                     <span>Emitido em: {(() => {
-                      const d = new Date(signal.created_at);
-                      d.setHours(d.getHours() - 3); // Fix: UTC to BRT (-3h)
+                      // Ensure UTC parsing by adding 'Z' if missing
+                      const dateStr = signal.created_at.endsWith('Z') ? signal.created_at : `${signal.created_at}Z`;
+                      const d = new Date(dateStr);
                       return d.toLocaleString('pt-BR');
                     })()}</span>
+                    {(signal.contract_address || signal.token_id) && (
+                      <Link
+                        href={`https://dexscreener.com/${signal.chain?.toLowerCase() || 'solana'}/${signal.contract_address || signal.token_id}`}
+                        className="text-emerald-400 hover:text-emerald-300 font-medium"
+                        target="_blank"
+                      >
+                        DexScreener ↗
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
@@ -702,17 +715,11 @@ export default function DashboardPage() {
                           Contrato: {tokenItem.contract.slice(0, 6)}…{tokenItem.contract.slice(-4)}
                         </span>
                         <Link
-                          href={
-                            tokenItem.chain?.toUpperCase() === 'SOLANA'
-                              ? `https://solscan.io/token/${tokenItem.contract}`
-                              : tokenItem.chain?.toUpperCase() === 'BASE'
-                              ? `https://basescan.org/token/${tokenItem.contract}`
-                              : `https://bscscan.com/token/${tokenItem.contract}`
-                          }
+                          href={`https://dexscreener.com/${tokenItem.chain?.toLowerCase() || 'solana'}/${tokenItem.contract}`}
                           className="rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-purple-200 hover:text-purple-100"
                           target="_blank"
                         >
-                          Abrir no {tokenItem.chain?.toUpperCase() === 'SOLANA' ? 'Solscan' : tokenItem.chain?.toUpperCase() === 'BASE' ? 'BaseScan' : 'BscScan'}
+                          Abrir no DexScreener
                         </Link>
                       </div>
                     </div>

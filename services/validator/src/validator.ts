@@ -311,6 +311,9 @@ export class TokenValidator {
         is_validated: true,
       });
 
+      // Sync risk_score with safety_score to ensure consistency across tables
+      riskAssessment.risk_score = safetyScore;
+      riskAssessment.memecoin_score = safetyScore;
       riskAssessment.token_id = token.id;
       const persistedRisk = await this.saveRiskAssessment(token, riskAssessment);
 

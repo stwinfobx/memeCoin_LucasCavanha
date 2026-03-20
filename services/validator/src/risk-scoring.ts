@@ -54,10 +54,23 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
 export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAssessment {
   const symbol = (input.market.baseTokenSymbol || input.token.symbol || 'TOKEN').toUpperCase();
   const isSolana = input.token.chain === 'SOLANA';
-  let safetyScore = 65; // Base score (raised from 50 for sniping headroom)
+  let safetyScore = 60; // Base score (sniping headroom)
   const rejectionReasons: string[] = [];
 
-  // --- 1. IMMEDIATELY KILL (Score 0) ---
+  const now = new Date();
+  let firstSeenDate: Date | null = null;
+  if (input.contractCreation?.timestamp) {
+    firstSeenDate = new Date(Number(input.contractCreation.timestamp) * 1000);
+  } else if (input.market.pairCreatedAt) {
+    firstSeenDate = new Date(input.market.pairCreatedAt);
+  } else if (input.token.first_seen_at) {
+    firstSeenDate = new Date(input.token.first_seen_at);
+  } else if (input.first_seen_at) {
+    firstSeenDate = new Date(input.first_seen_at);
+  }
+  
+  const ageSeconds = firstSeenDate ? differenceInSeconds(now, firstSeenDate) : 0;
+  const ageMinutes = ageSeconds / 60;
   if (input.isHoneypot) {
     console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Honeypot Confirmed`);
     return shutDownWithScore(input, 0, 'Honeypot Confirmed');
@@ -78,24 +91,6 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   if (liquidityUsd < MIN_LIQUIDITY_USD && !isSolana) {
     console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Liquidity $${liquidityUsd} < $${MIN_LIQUIDITY_USD}`);
     return shutDownWithScore(input, 0, `Liquidity too low ($${liquidityUsd})`);
-  }
-
-  // Solana dynamic Tier 1: Relax 0-liq-killswitch for very fresh tokens (<120s)
-  let ageSeconds = 0; // Default to 0 if no age data
-  const now = new Date();
-  let firstSeenDate: Date | null = null;
-  if (input.contractCreation?.timestamp) {
-    firstSeenDate = new Date(Number(input.contractCreation.timestamp) * 1000);
-  } else if (input.market.pairCreatedAt) {
-    firstSeenDate = new Date(input.market.pairCreatedAt);
-  } else if (input.token.first_seen_at) {
-    firstSeenDate = new Date(input.token.first_seen_at);
-  } else if (input.first_seen_at) {
-    firstSeenDate = new Date(input.first_seen_at);
-  }
-
-  if (firstSeenDate) {
-    ageSeconds = differenceInSeconds(now, firstSeenDate);
   }
 
   if (isSolana) {
@@ -129,26 +124,47 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
     return shutDownWithScore(input, 0, `Tax too high: ${maxTax}%`);
   }
 
-  // --- 2. TIME RULES ---
+  // --- 2. TIME-SCALED SNIPER RULES (V10) ---
   if (!firstSeenDate) {
     safetyScore -= 15;
     rejectionReasons.push('No age data (-15)');
   } else {
-    const ageMin = differenceInMinutes(now, firstSeenDate);
-    if (ageMin < 15) {
-      safetyScore += 10;
-      rejectionReasons.push('Fresh token bonus (+10)');
-    } else if (ageMin <= 30) {
-      safetyScore -= 8;
-      rejectionReasons.push('15-30m age penalty (-8)');
-    } else {
-      safetyScore -= 20;
-      rejectionReasons.push('Old token (>30m) penalty (-20)');
+    // GRACE PERIOD: 0-5 minutes
+    if (ageMinutes < 5) {
+        safetyScore += 15;
+        rejectionReasons.push('Fresh Sniper Bonus (+15)');
+        
+        // Minor penalty for 0 holders in first 5 mins
+        if (input.holdersCount < 5) {
+            safetyScore -= 5;
+            rejectionReasons.push('Initial holders ramp up (-5)');
+        }
+    } 
+    // RAMP UP: 5-15 minutes
+    else if (ageMinutes < 15) {
+        safetyScore += 10;
+        rejectionReasons.push('Early growth bonus (+10)');
+        
+        if (input.holdersCount < 10) {
+            safetyScore -= 15;
+            rejectionReasons.push('Low holder count for age (-15)');
+        }
+    }
+    // ESTABLISHED: >15 minutes
+    else {
+        if (input.holdersCount < MIN_HOLDERS_SAFE) {
+            safetyScore -= 25;
+            rejectionReasons.push('Insufficient holders (-25)');
+        }
+        
+        if (ageMinutes > 30) {
+            safetyScore -= 15;
+            rejectionReasons.push('Aging token penalty (-15)');
+        }
     }
   }
 
-  // --- 3. FINANCIAL HEALTH ---
-
+  // --- 3. FINANCIAL HEALTH (V10 Time-Scaled) ---
   if (!isSolana) {
     // BSC/Base Liquidity rules
     if (liquidityUsd > 0 && liquidityUsd < 5000) {
@@ -156,19 +172,21 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
       rejectionReasons.push('Low liquidity (<$5k)');
     }
   } else {
-    // Solana/Pump.fun MCAP rules
-    if (fdvUsd < 20000) {
+    // MCAP / FDV Rules
+    if (fdvUsd < 20000 && ageMinutes > 5) {
       safetyScore -= 10;
-      rejectionReasons.push('Low MCAP (<$20k)');
+      rejectionReasons.push('Low MCAP (<$20k) after 5m (-10)');
     } else if (fdvUsd >= 20000 && fdvUsd <= 69000) {
-      safetyScore += 10; // Bonus confidence
+      safetyScore += 10; // "Safe zone" bonus
     }
 
-    // Liquidity Bonuses (Encourage real backing)
-    if (liquidityUsd >= 50000) {
-      safetyScore += 20;
-      rejectionReasons.push('Premium liquidity bonus (+20)');
-    } else if (liquidityUsd >= 15000) {
+    // Liquidity Grace Period
+    if (ageMinutes > 5 && liquidityUsd < 2000) {
+        safetyScore -= 20;
+        rejectionReasons.push('Low liquidity for age (-20)');
+    }
+
+    if (liquidityUsd >= 15000) {
       safetyScore += 15;
       rejectionReasons.push('Healthy liquidity bonus (+15)');
     } else if (liquidityUsd >= 5000) {
@@ -182,6 +200,12 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   if (isWashTrading) {
     safetyScore -= 30;
     rejectionReasons.push('Wash Trading Detected (-30)');
+  }
+
+  // Zero/Low Activity penalty (Anti-Scam)
+  if (volumeUsd === 0 && liquidityUsd < 5000) {
+    safetyScore -= 30;
+    rejectionReasons.push('No market activity/risk (-30)');
   }
 
   // --- 4. SECURITY (UNIFIED) ---

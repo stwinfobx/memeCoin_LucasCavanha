@@ -249,22 +249,20 @@ export class SignalAnalyzer {
 
       console.log(`[Signal Analyzer] 🛡️ Validando segurança externa de ${token.symbol}...`);
       
-      // 2. Chamadas em paralelo para segurança Externa
-      const [goplus, honeypot, rugcheck] = await Promise.all([
-          this.apiGoPlus(token.chain, token.contract_address),
-          this.apiHoneypotIs(token.chain, token.contract_address),
-          this.apiRugCheck(token.chain, token.contract_address)
-      ]);
-
-      // 3. Score Avançado de 0 a 100
-      const { score, issues, warnings, buySignal, ageMin } = this.computeAdvancedScore(
-          token.chain, 
-          mktData, 
-          goplus, 
-          honeypot, 
-          rugcheck, 
-          Date.now()
-      );
+      // 2. TRUST THE VALIDATOR: Use safety_score already calculated during ingestion
+      // This ensures 100% consistency and avoids redundant API calls.
+      const safetyScore = Number(token.safety_score ?? 0);
+      
+      console.log(`[Signal Analyzer] 🛡️ Using validator safety_score for ${token.symbol}: ${safetyScore}`);
+      
+      // We still need the advanced score result structure for compatibility
+      const { score, issues, warnings, buySignal, ageMin } = {
+          score: safetyScore,
+          issues: safetyScore >= 80 ? [] : ['LOW_SAFETY_SCORE'],
+          warnings: [],
+          buySignal: safetyScore >= 80 && !token.is_honeypot,
+          ageMin: mktData.pairCreatedAt ? (Date.now() - mktData.pairCreatedAt) / 60000 : 0
+      };
 
       // 4. Analisa métricas para salvar
       let signalType: SignalType = 'HOLD';

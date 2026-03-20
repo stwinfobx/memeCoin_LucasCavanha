@@ -1,0 +1,18 @@
+﻿Ô£à [Validator] Found root .env at: C:\Users\evilm\OneDrive\Documentos\GitHub\memeCoin_LucasCavanha\.env
+--- STARTING SURGICAL VALIDATION TEST (V3) ---
+[Validator] Initializing providers for 3 chains: BSC, SOLANA, BASE
+[Validator] Ô£ô BSC provider initialized
+[Validator] Ô£ô SOLANA provider initialized
+[Validator] Ô£ô BASE provider initialized
+
+[Test] Validating CzFQ3XzZDmsdGdUYRNLTRhGC47cxcZtLG4CrryfU44ze on SOLANA...
+[RiskScoring] ­ƒôè UNKNOWN Score 25 | Reasons: No age data (-15), Low MCAP (<$20k)
+[Validator] Triggering signal analysis for token 1b15fba5-9fac-4448-ab9f-1c3d47c418f3...
+[Validator] ÔÜí Validation of UNKNOWN (SOLANA) took 5641ms
+[RESULT] UNKNOWN (Unknown Token):
+- Safety Score: 25
+- Is Valid (Threshold 80): ÔØî NO
+- Risk Level: high
+- Reasons: [ 'No age data (-15)', 'Low MCAP (<$20k)' ]
+- Data: Liq $0 | MCAP $0 | Holders 0
+- Security Verdict: unknown

@@ -28,6 +28,12 @@ export default function BotPage() {
   const [showExtremeModal, setShowExtremeModal] = useState(false)
   const [showBalanceModal, setShowBalanceModal] = useState(false)
   const [availableBalance, setAvailableBalance] = useState(0)
+  
+  // Export states
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportHours, setExportHours] = useState(24)
+  const [exportStartDate, setExportStartDate] = useState('')
+  const [exportEndDate, setExportEndDate] = useState('')
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -174,6 +180,39 @@ export default function BotPage() {
       setError(err.message || 'Erro ao alterar status do bot')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleExportJSON = async () => {
+    if (!token) return
+    setIsExporting(true)
+    setError(null)
+    try {
+      let url = `${apiBase}/api/tokens/export?hours=${exportHours}`
+      if (exportStartDate && exportEndDate) {
+        url = `${apiBase}/api/tokens/export?startDate=${exportStartDate}&endDate=${exportEndDate}`
+      }
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (!res.ok) throw new Error('Falha ao exportar os tokens.')
+
+      const blob = await res.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `tokens_export_${Date.now()}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(downloadUrl)
+      document.body.removeChild(a)
+    } catch (err: any) {
+      console.error('[Export] Erro:', err)
+      setError(err.message || 'Ocorreu um erro na exportação.')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -417,7 +456,7 @@ export default function BotPage() {
             )}
           </div>
 
-          {/* Link para Logs */}
+          {/* Logs e notificações */}
           <div className="surface-strong p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -426,10 +465,75 @@ export default function BotPage() {
                   Veja tudo que o bot está fazendo em tempo real: validações, sinais, compras, vendas...
                 </p>
               </div>
-              <Link href="/notifications" className="btn-primary px-4 py-2 text-sm">
+              <Link href="/notifications" className="btn-secondary px-4 py-2 text-sm">
                 Ver logs do bot
               </Link>
             </div>
+          </div>
+
+          {/* Exportar Dados JSON */}
+          <div className="surface-strong p-6 border border-emerald-500/20 bg-emerald-500/5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-emerald-100">Exportar Dados (JSON)</h2>
+                <p className="mt-1 text-sm text-emerald-500/80">
+                  Baixe o histórico de memecoins analisadas e validadas pelo bot para estudo externo.
+                </p>
+                
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] uppercase text-emerald-500/60 font-bold mb-1 block">Início</label>
+                    <input
+                      type="datetime-local"
+                      value={exportStartDate}
+                      onChange={(e) => setExportStartDate(e.target.value)}
+                      className="w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase text-emerald-500/60 font-bold mb-1 block">Fim</label>
+                    <input
+                      type="datetime-local"
+                      value={exportEndDate}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                      className="w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                
+                {!(exportStartDate && exportEndDate) && (
+                  <div className="mt-4">
+                    <label className="text-[10px] uppercase text-emerald-500/60 font-bold mb-1 block">Ou últimos (horas)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="720"
+                      value={exportHours}
+                      onChange={(e) => setExportHours(Number(e.target.value))}
+                      className="w-32 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="shrink-0">
+                <button
+                  onClick={handleExportJSON}
+                  disabled={isExporting}
+                  className="btn-primary flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {isExporting ? 'Processando...' : '⇩ Baixar JSON'}
+                </button>
+              </div>
+            </div>
+            {(exportStartDate || exportEndDate) && (
+              <button 
+                onClick={() => { setExportStartDate(''); setExportEndDate(''); }}
+                className="mt-4 text-[11px] text-rose-400 hover:text-rose-300"
+              >
+                ✕ Limpar datas (usar apenas horas)
+              </button>
+            )}
           </div>
         </div>
 

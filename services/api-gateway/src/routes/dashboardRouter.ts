@@ -60,9 +60,9 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
         pool.query(
           `SELECT
              COUNT(*) AS total_tokens,
-             COUNT(*) FILTER (WHERE risk_score >= 70) AS low_risk,
-             COUNT(*) FILTER (WHERE risk_score < 40) AS high_risk
-           FROM token_risk_assessments`
+             COUNT(*) FILTER (WHERE safety_score >= 80) AS low_risk,
+             COUNT(*) FILTER (WHERE safety_score < 40) AS high_risk
+           FROM tokens`
         ),
         pool.query(
           `SELECT *
@@ -84,7 +84,9 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
              t.name,
              t.price_usd,
              t.liquidity_usd,
-             t.volume_24h_usd
+             t.volume_24h_usd,
+             t.contract_address,
+             t.chain
            FROM signals s
            JOIN tokens t ON t.id = s.token_id
            ORDER BY s.created_at DESC

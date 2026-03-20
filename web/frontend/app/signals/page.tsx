@@ -21,6 +21,8 @@ type Signal = {
   price_at_signal?: number
   liquidity_usd?: number
   volume_24h_usd?: number
+  contract_address?: string
+  chain?: string
   safety_score?: number | null
   overall_score?: number | null
   volume_score?: number | null
@@ -37,8 +39,13 @@ const typeColors: Record<string, string> = {
   HOLD: 'border-purple-400/30 bg-purple-400/10 text-purple-200',
 }
 
-const formatCurrency = (value?: number | null) =>
-  Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value ?? 0)
+const formatCurrency = (val?: number | null) => {
+  if (val === null || val === undefined) return 'US$ 0,00';
+  if (val > 0 && val < 0.1) {
+    return `US$ ${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 12 })}`;
+  }
+  return Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(val);
+}
 
 const formatPercent = (value?: number | null) => `${Number(value ?? 0).toFixed(1)}%`
 
@@ -61,6 +68,8 @@ export default function SignalsPage() {
   const [intendedInvestments, setIntendedInvestments] = useState<Map<string, number>>(new Map())
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [exportHours, setExportHours] = useState(24)
+  const [exportStartDate, setExportStartDate] = useState('')
+  const [exportEndDate, setExportEndDate] = useState('')
   const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
@@ -290,20 +299,25 @@ export default function SignalsPage() {
     setIsExporting(true)
     setError(null)
     try {
-      const res = await fetch(`${apiBase}/api/tokens/export?hours=${exportHours}`, {
+      let url = `${apiBase}/api/tokens/export?hours=${exportHours}`
+      if (exportStartDate && exportEndDate) {
+        url = `${apiBase}/api/tokens/export?startDate=${exportStartDate}&endDate=${exportEndDate}`
+      }
+      
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       })
 
       if (!res.ok) throw new Error('Falha ao exportar os tokens.')
 
       const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
+      const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
+      a.href = downloadUrl
       a.download = `tokens_export_${exportHours}h_${Date.now()}.json`
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
+      window.URL.revokeObjectURL(downloadUrl)
       document.body.removeChild(a)
       setIsExportModalOpen(false)
     } catch (err: any) {
@@ -347,15 +361,48 @@ export default function SignalsPage() {
               </p>
               
               <div className="flex flex-col gap-4 mb-6">
-                <input
-                  type="number"
-                  min="1"
-                  max="720"
-                  value={exportHours}
-                  onChange={(e) => setExportHours(Number(e.target.value))}
-                  className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-4 py-2 text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
-                  placeholder="24"
-                />
+                <div>
+                  <label className="text-[10px] uppercase text-neutral-500 mb-1 block">Período (Horas)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="720"
+                    value={exportHours}
+                    onChange={(e) => setExportHours(Number(e.target.value))}
+                    disabled={!!(exportStartDate || exportEndDate)}
+                    className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-4 py-2 text-neutral-200 focus:border-emerald-500/50 focus:outline-none disabled:opacity-30"
+                    placeholder="24"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase text-neutral-500 mb-1 block">Início</label>
+                    <input
+                      type="datetime-local"
+                      value={exportStartDate}
+                      onChange={(e) => setExportStartDate(e.target.value)}
+                      className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-xs text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase text-neutral-500 mb-1 block">Fim</label>
+                    <input
+                      type="datetime-local"
+                      value={exportEndDate}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                      className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-xs text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                {(exportStartDate || exportEndDate) && (
+                  <button 
+                    onClick={() => { setExportStartDate(''); setExportEndDate(''); }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 text-left"
+                  >
+                    ✕ Limpar datas (usar horas)
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3">
@@ -385,19 +432,19 @@ export default function SignalsPage() {
 
         <section className="mt-10 surface-strong p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-neutral-100">Sinais ativos</h2>
+            <h2 className="text-lg font-semibold text-neutral-100">Sinais de Elite (Score {'>'}= 80)</h2>
             <span className="text-xs uppercase tracking-[0.3em] text-neutral-500">
-              {loading ? 'CARREGANDO...' : `${activeSignals.length} SINAIS`}
+              {loading ? 'CARREGANDO...' : `${activeSignals.filter(s => (s.confidence_score || 0) >= 80).length} SINAIS`}
             </span>
           </div>
 
           {loading ? (
-            <p className="mt-6 text-sm text-neutral-500">Carregando sinais ativos...</p>
-          ) : activeSignals.length === 0 ? (
-            <p className="mt-6 text-sm text-neutral-600">Nenhum sinal ativo no momento.</p>
+            <p className="mt-6 text-sm text-neutral-500">Carregando sinais de elite...</p>
+          ) : activeSignals.filter(s => (s.confidence_score || 0) >= 80 && s.signal_type === 'BUY').length === 0 ? (
+            <p className="mt-6 text-sm text-neutral-600">Nenhum sinal de elite (Score {'>'}= 80) ativo no momento.</p>
           ) : (
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-              {activeSignals.map((signal) => (
+              {activeSignals.filter(s => (s.confidence_score || 0) >= 80 && s.signal_type === 'BUY').map((signal) => (
                 <div key={signal.id} className="surface border-neutral-800 p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -503,9 +550,21 @@ export default function SignalsPage() {
                       ))}
                   </div>
 
-                  <p className="mt-4 text-xs text-neutral-500">
-                    Emitido em {new Date(signal.created_at).toLocaleString('pt-BR')}
-                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-[11px] items-center">
+                    <Link
+                      href={`https://dexscreener.com/solana/${signal.contract_address || signal.token_id}`}
+                      className="rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-purple-200 hover:text-purple-100 transition-colors"
+                      target="_blank"
+                    >
+                      Abrir no DexScreener
+                    </Link>
+                    <p className="text-[10px] text-neutral-600">
+                      Emitido em {(() => {
+                        const dateStr = signal.created_at.endsWith('Z') ? signal.created_at : `${signal.created_at}Z`;
+                        return new Date(dateStr).toLocaleString('pt-BR');
+                      })()}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -556,7 +615,10 @@ export default function SignalsPage() {
                     <td className="py-3">
                       {signal.potential_multiplier ? `${signal.potential_multiplier.toFixed(2)}x` : '—'}
                     </td>
-                    <td className="py-3">{new Date(signal.created_at).toLocaleString('pt-BR')}</td>
+                    <td className="py-3">{(() => {
+                      const dateStr = signal.created_at.endsWith('Z') ? signal.created_at : `${signal.created_at}Z`;
+                      return new Date(dateStr).toLocaleString('pt-BR');
+                    })()}</td>
                     <td className="py-3">
                       {signal.is_active ? (
                         <span className="text-xs uppercase text-emerald-300">Ativo</span>
