@@ -3,9 +3,9 @@ import { } from 'ethers';
 import axios from 'axios';
 import { Pool } from 'pg';
 import { Token, TokenRiskAssessment, TokenValidationResponse } from '@shared/types';
-import { ExplorerClient } from './providers/explorer';
+import { ExplorerClient, ContractCreationInfo, TokenHolderInfo } from './providers/explorer';
 import { computeRiskAssessment, MarketPairData } from './risk-scoring';
-import { FreeSecurityProviders } from './providers/FreeSecurityProviders';
+import { FreeSecurityProviders, SecurityConsensus } from './providers/FreeSecurityProviders';
 import {
   ChainProvider,
   SupportedChain,
@@ -24,6 +24,28 @@ const GECKO_HEADERS = {
   Referer: 'https://geckoterminal.com/',
   'X-Requested-With': 'XMLHttpRequest',
 };
+
+// --- BLACKLIST CACHE (Tier 4) ---
+// Saves API credits by blocking known-bad addresses for 5 minutes
+const BLACKLIST_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const BLACKLIST_MAX_SIZE = 1000;
+const blacklistCache = new Map<string, { reason: string; expiresAt: number }>();
+
+function isBlacklisted(address: string): string | null {
+  const entry = blacklistCache.get(address.toLowerCase());
+  if (entry && entry.expiresAt > Date.now()) return entry.reason;
+  if (entry) blacklistCache.delete(address.toLowerCase());
+  return null;
+}
+
+function addToBlacklist(address: string, reason: string): void {
+  blacklistCache.set(address.toLowerCase(), { reason, expiresAt: Date.now() + BLACKLIST_TTL_MS });
+  // Prevent memory leak
+  if (blacklistCache.size > BLACKLIST_MAX_SIZE) {
+    const firstKey = blacklistCache.keys().next().value;
+    if (firstKey) blacklistCache.delete(firstKey);
+  }
+}
 
 function parseNumber(value: string | number | undefined | null): number {
   if (typeof value === 'number') {
@@ -63,6 +85,7 @@ export interface ValidationContext {
   pairAddress?: string;
   source?: string;
   rawListing?: ExternalPoolListing | null;
+  first_seen_at?: number;
 }
 
 export class TokenValidator {
@@ -108,10 +131,12 @@ export class TokenValidator {
     chain: string = 'BSC',
     context?: ValidationContext
   ): Promise<TokenValidationResponse> {
+    const validationStartMs = Date.now();
     const issues: string[] = [];
     let safetyScore = 0;
     const normalizedChain = normalizeChainName(chain) || SupportedChain.BSC;
     const provider = this.getProvider(chain);
+    const isPumpFun = normalizedChain === SupportedChain.SOLANA && contractAddress.endsWith('pump');
 
     if (!provider) {
       const reason = `Unsupported chain or missing RPC for ${chain}`;
@@ -128,85 +153,146 @@ export class TokenValidator {
       };
     }
 
+    // --- TIER 4: BLACKLIST CACHE CHECK (Cost: 0) ---
+    const blacklistReason = isBlacklisted(contractAddress);
+    if (blacklistReason) {
+      console.log(`[Validator] ⚫ Blacklisted: ${contractAddress} (${blacklistReason})`);
+      return {
+        token: {} as Token,
+        validation_result: {
+          is_valid: false,
+          safety_score: 0,
+          is_honeypot: false,
+          liquidity_locked: false,
+          issues: [`Blacklisted: ${blacklistReason}`],
+        },
+      };
+    }
+
     try {
       // Usar ChainProvider ao invés de ethers diretamente
       const tokenInfo = await provider.getTokenInfo(contractAddress);
       const { symbol, name, decimals, totalSupply } = tokenInfo;
 
-      // --- SECURITY CONSENSUS (GoPlus + Honeypot.is + RugCheck via FreeSecurityProviders) ---
+      const marketData = await provider.getMarketData(contractAddress, context);
+      const liquidityLocked = await provider.checkLiquidityLocked(contractAddress);
+
+      const volume24h = marketData.volume24h || 0;
+      const liquidity = marketData.liquidity || 0;
+      let holdersCount = marketData.holdersCount || 0;
+
+      // --- TIER 2: CONTRACT SECURITY (Cheap) ---
+      // Only proceed if the contract passes security checks
       let isHoneypot = false;
+      let securityConsensus: SecurityConsensus | undefined;
+
       try {
-        let consensus;
         if (normalizedChain === SupportedChain.SOLANA) {
-          consensus = await FreeSecurityProviders.checkSolana(contractAddress);
+          securityConsensus = await FreeSecurityProviders.checkSolana(contractAddress);
         } else {
           const chainNum = normalizedChain === SupportedChain.BASE ? '8453' : '56';
-          consensus = await FreeSecurityProviders.checkEVM(contractAddress, chainNum as '56' | '8453');
+          securityConsensus = await FreeSecurityProviders.checkEVM(contractAddress, chainNum as '56' | '8453');
         }
-
-        isHoneypot = consensus.isHoneypot;
-        issues.push(...consensus.issues);
-
-        if (consensus.verdict === 'danger') {
-          safetyScore -= 60;
-          console.log(`[Validator] 🔴 DANGER consensus for ${contractAddress}: ${consensus.issues.join(', ')}`);
-        } else if (consensus.verdict === 'warning') {
-          safetyScore -= 15;
-          console.log(`[Validator] ⚠️ WARNING consensus for ${contractAddress}: ${consensus.issues.join(', ')}`);
-        } else if (consensus.verdict === 'safe') {
-          safetyScore += 25; // Clean token bonus
-          console.log(`[Validator] 🟢 SAFE consensus for ${contractAddress} (sources: ${Object.entries(consensus.sources)
-              .filter(([, v]) => v?.checked)
-              .map(([k]) => k).join(', ')
-            })`);
+        
+        if (securityConsensus) {
+          isHoneypot = securityConsensus.isHoneypot;
+          issues.push(...securityConsensus.issues);
         }
-
       } catch (e) {
         console.warn(`[Validator] Security consensus failed, falling back to provider check: ${e}`);
         isHoneypot = await provider.checkHoneypot(contractAddress);
-        if (isHoneypot) {
-          issues.push('Token is a honeypot (Provider Check)');
-          safetyScore -= 50;
-        }
+        if (isHoneypot) issues.push('Token is a honeypot (Provider Check)');
       }
 
-      const marketData = await provider.getMarketData(contractAddress, context);
-
-      // liquidityLocked: checkLiquidityLocked retorna false sempre (não implementado)
-      // Não penalizamos por isso para não distorcer os scores
-      const liquidityLocked = await provider.checkLiquidityLocked(contractAddress);
-      if (liquidityLocked) {
-        safetyScore += 20; // Bônus apenas se realmente confirmado
+      // Tier 2 Early Exit: If honeypot confirmed, blacklist and skip expensive calls
+      if (isHoneypot) {
+        addToBlacklist(contractAddress, 'Honeypot');
+        console.log(`[Validator] 💀 Tier 2 REJECT: ${symbol} is Honeypot. Blacklisted for 5min.`);
       }
 
-      const holdersCount = marketData.holdersCount || 0;
-      // Só penalizar holders se TEMOS a informação e é baixa
-      if (holdersCount > 0 && holdersCount < 10) {
-        issues.push('Low number of holders');
-        safetyScore -= 10;
-      } else if (holdersCount > 100) {
-        safetyScore += 15;
+      // --- TIER 3: EXPENSIVE DATA (Explorers / Holders) ---
+      // Only call these expensive APIs if the token passed Tiers 1 & 2
+      const explorerClient = new ExplorerClient(normalizedChain);
+      let contractCreation: ContractCreationInfo | null = null;
+      let holderList: TokenHolderInfo[] | null = null;
+
+      if (!isHoneypot) {
+        [contractCreation, holderList] = await Promise.all([
+          explorerClient.getContractCreation(contractAddress),
+          explorerClient.getTokenHolderConcentration(contractAddress, 10),
+        ]);
       }
 
-      const volume24h = marketData.volume24h || 0;
-      // Token novo: não penalizar por volume zero (ainda não foi indexado)
-      if (volume24h > 0 && volume24h < 1000) {
-        issues.push('Low 24h volume');
-        safetyScore -= 10;
-      } else if (volume24h > 10_000) {
-        safetyScore += 15;
+      // --- FIX: Holder Count Sync ---
+      // Use the maximum between marketData count and explorer list length
+      if (holderList && holderList.length > 0 && holdersCount === 0) {
+        holdersCount = holderList.length;
+        console.log(`[Validator] 🔧 Holder count synced from explorer list: ${holdersCount}`);
       }
 
-      const liquidity = marketData.liquidity || 0;
-      // Token novo: não penalizar por liquidez zero (ainda não foi indexado)
-      if (liquidity > 0 && liquidity < 5_000) {
-        issues.push('Low liquidity');
-        safetyScore -= 15;
-      } else if (liquidity > 50_000) {
-        safetyScore += 20;
+      const rawPair = context?.rawListing || null;
+      const marketSummary: MarketPairData = {
+        pairAddress: context?.pairAddress || rawPair?.pairAddress,
+        dexId: rawPair?.poolId,
+        liquidityUsd: liquidity,
+        fdvUsd: parseNumber(rawPair?.fdvUsd || 0), 
+        volume24hUsd: volume24h,
+        priceUsd: marketData.price,
+        txCount5m: 0,
+        txCount1h: 0,
+        txCount6h: 0,
+        priceChange5m: 0,
+        priceChange1h: 0,
+        priceChange6h: 0,
+        baseTokenSymbol: symbol,
+        baseTokenName: name,
+      };
+
+      // --- UNIFIED SCORING (Validator v3 + Financial Safety) ---
+      const riskAssessment = computeRiskAssessment({
+        token: { contract_address: contractAddress, chain: normalizedChain } as Token,
+        market: marketSummary,
+        isHoneypot,
+        liquidityLocked,
+        holdersCount,
+        contractCreation,
+        topHolders: holderList,
+        security: securityConsensus,
+        first_seen_at: context?.first_seen_at,
+      });
+
+      const safetyScore = riskAssessment.risk_score;
+      const indexing = riskAssessment.is_indexing || false;
+
+      // Blacklist tokens that score 0 to avoid re-processing
+      // BUT ONLY IF NOT INDEXING (if indexing, we want to try again)
+      if (safetyScore === 0 && !indexing) {
+        const reason = riskAssessment.indicators?.rejectionReasons?.[0] || 'Score 0';
+        addToBlacklist(contractAddress, reason);
       }
 
-      safetyScore = Math.max(0, Math.min(100, 50 + safetyScore));
+      // --- PERSISTENCE BYPASS ---
+      // User feedback: Don't save to DB if still indexing.
+      // Return the result immediately so ingestion can retry.
+      if (indexing) {
+        return {
+          token: {
+            contract_address: contractAddress,
+            chain: normalizedChain,
+            symbol: String(symbol),
+            name: String(name),
+          } as Token,
+          validation_result: {
+            is_valid: false,
+            safety_score: 0,
+            is_honeypot: false,
+            liquidity_locked: false,
+            issues: riskAssessment.indicators.rejectionReasons || [],
+            is_indexing: true,
+          },
+          risk_assessment: riskAssessment,
+        };
+      }
 
       const token = await this.saveToken({
         contract_address: provider.normalizeAddress(contractAddress),
@@ -223,69 +309,26 @@ export class TokenValidator {
         safety_score: safetyScore,
         is_honeypot: isHoneypot,
         is_validated: true,
-        validated_at: new Date(),
       });
 
-      const rawPair = context?.rawListing || null;
-
-      const resolveNumeric = (value: any): number => {
-        if (typeof value === 'number') return value;
-        if (typeof value === 'string') {
-          const parsed = parseFloat(value);
-          return Number.isFinite(parsed) ? parsed : 0;
-        }
-        if (value && typeof value === 'object' && 'usd' in value) {
-          return resolveNumeric(value.usd);
-        }
-        return 0;
-      };
-
-      const explorerClient = new ExplorerClient(normalizedChain);
-      const [contractCreation, holderList] = await Promise.all([
-        explorerClient.getContractCreation(contractAddress),
-        explorerClient.getTokenHolderConcentration(contractAddress, 10),
-      ]);
-
-      const marketSummary: MarketPairData = {
-        pairAddress: context?.pairAddress || rawPair?.pairAddress,
-        dexId: rawPair?.poolId, // GeckoTerminal uses poolId for pairId
-        liquidityUsd: marketData.liquidity,
-        fdvUsd: resolveNumeric(rawPair?.fdvUsd),
-        volume24hUsd: marketData.volume24h,
-        priceUsd: marketData.price,
-        txCount5m: 0, // GeckoTerminal doesn't provide 5m tx count
-        txCount1h: 0, // GeckoTerminal doesn't provide 1h tx count
-        txCount6h: 0, // GeckoTerminal doesn't provide 6h tx count
-        priceChange5m: resolveNumeric(rawPair?.priceUsd), // Price change is not directly available from GeckoTerminal
-        priceChange1h: resolveNumeric(rawPair?.priceUsd), // Price change is not directly available from GeckoTerminal
-        priceChange6h: resolveNumeric(rawPair?.priceUsd), // Price change is not directly available from GeckoTerminal
-        pairCreatedAt: rawPair?.priceUsd ? Date.now() - 24 * 60 * 60 * 1000 : undefined, // Estimate if not available
-        baseTokenSymbol: rawPair?.baseToken?.symbol || symbol,
-        baseTokenName: rawPair?.baseToken?.name || name,
-      };
-
-      const riskAssessment = computeRiskAssessment({
-        token,
-        market: marketSummary,
-        isHoneypot,
-        liquidityLocked,
-        holdersCount,
-        contractCreation,
-        topHolders: holderList,
-      });
-
+      riskAssessment.token_id = token.id;
       const persistedRisk = await this.saveRiskAssessment(token, riskAssessment);
 
       await this.triggerSignalGeneration(token.id);
 
+      // --- Latency monitoring ---
+      const latencyMs = Date.now() - validationStartMs;
+      const latencyLabel = latencyMs > 30_000 ? '🐢 SLOW' : '⚡';
+      console.log(`[Validator] ${latencyLabel} Validation of ${symbol} (${normalizedChain}) took ${latencyMs}ms`);
+
       return {
         token,
         validation_result: {
-          is_valid: safetyScore >= 50 && !isHoneypot && liquidityLocked,
+          is_valid: safetyScore >= 80 && !isHoneypot,
           safety_score: safetyScore,
           is_honeypot: isHoneypot,
           liquidity_locked: liquidityLocked,
-          issues,
+          issues: riskAssessment.indicators.rejectionReasons || [],
         },
         risk_assessment: persistedRisk,
       };
@@ -341,12 +384,13 @@ export class TokenValidator {
    */
   private async saveToken(tokenData: Partial<Token>): Promise<Token> {
     const chainValue = (tokenData.chain || 'BSC').toUpperCase();
+    // Use CURRENT_TIMESTAMP for validated_at to eliminate Node.js vs DB timezone drift
     const result = await this.pool.query(
       `INSERT INTO tokens (
         contract_address, chain, symbol, name, decimals, total_supply,
         liquidity_usd, liquidity_locked, holders_count, volume_24h_usd,
         price_usd, safety_score, is_honeypot, is_validated, validated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
       ON CONFLICT (contract_address) 
       DO UPDATE SET
         chain = EXCLUDED.chain,
@@ -360,7 +404,7 @@ export class TokenValidator {
         safety_score = EXCLUDED.safety_score,
         is_honeypot = EXCLUDED.is_honeypot,
         is_validated = EXCLUDED.is_validated,
-        validated_at = EXCLUDED.validated_at,
+        validated_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
       RETURNING *`,
       [
@@ -378,7 +422,6 @@ export class TokenValidator {
         tokenData.safety_score,
         tokenData.is_honeypot || false,
         tokenData.is_validated || false,
-        tokenData.validated_at,
       ]
     );
 
@@ -427,7 +470,7 @@ export class TokenValidator {
       const response = await axios.post(
         `${baseUrl}/analyze`,
         { token_id: tokenId },
-        { timeout: Number(process.env.SIGNAL_REQUEST_TIMEOUT_MS || 5000) }
+        { timeout: Number(process.env.SIGNAL_REQUEST_TIMEOUT_MS || 15000) }
       );
       if (response.data?.data?.signal) {
         const signalType = response.data.data.signal.signal_type;

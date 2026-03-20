@@ -10,8 +10,13 @@ export interface User {
   email: string;
   mfa_enabled: boolean;
   is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
+  status?: string;
+  closed_at?: string;
+  profit_loss_usd?: number;
+  profit_loss_percent?: number;
+  peak_liquidity_usd?: number; // Snapshot of highest liquidity seen
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface UserProfile {
@@ -27,11 +32,14 @@ export interface UserProfile {
   bot_enabled: boolean;
   bot_intensity: number; // 1-10
   kyc_status: 'pending' | 'approved' | 'rejected';
-  max_loss_percent: number;
-  max_gain_percent: number;
-  max_open_trades: number;
-  created_at: Date;
-  updated_at: Date;
+  maxLossPercent: number;
+  maxGainPercent: number;
+  maxOpenTrades: number;
+  trading_strategy: string;
+  real_trading_enabled: boolean;
+  liquidity_drop_threshold?: number; // Threshold for Safety Lock (e.g., 20)
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RegisterRequest {
@@ -80,6 +88,7 @@ export interface Token {
 export interface TokenValidationRequest {
   contract_address: string;
   chain?: string;
+  first_seen_at?: number; // Discovery timestamp fallback
 }
 
 export interface TokenValidationResponse {
@@ -90,6 +99,7 @@ export interface TokenValidationResponse {
     is_honeypot: boolean;
     liquidity_locked: boolean;
     issues: string[];
+    is_indexing?: boolean;
   };
   risk_assessment?: TokenRiskAssessment;
 }
@@ -106,6 +116,7 @@ export interface TokenRiskAssessment {
   scam_probability: number; // 0-100 (maior = mais arriscado)
   risk_level: RiskLevel;
   indicators: Record<string, any>;
+  is_indexing?: boolean;
   created_at?: Date;
   updated_at?: Date;
 }

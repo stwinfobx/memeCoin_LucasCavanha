@@ -65,10 +65,13 @@ export class PriceUpdateService {
       }
     });
 
-    // Iniciar atualização de preços (a cada 30 segundos por padrão para evitar 429)
-    const updateInterval = Number(process.env.PRICE_UPDATE_INTERVAL_MS ?? 30000);
+    // Iniciar atualização de preços (aumentado para 90s para evitar 429)
+    const updateInterval = Number(process.env.PRICE_UPDATE_INTERVAL_MS ?? 90000);
     this.priceUpdateInterval = setInterval(() => {
-      this.broadcastPriceUpdates();
+      // Pequeno jitter aleatório para evitar colisão com outros serviços
+      setTimeout(() => {
+        this.broadcastPriceUpdates();
+      }, Math.random() * 5000);
     }, updateInterval);
 
     this.setupDatabaseListeners();
@@ -203,10 +206,14 @@ export class PriceUpdateService {
 
       // Buscar preços atualizados via GeckoTerminal (usando endpoint MULTI para evitar 429)
       const updates: PriceUpdate[] = [];
-      const network = 'bsc'; // Default
-      const batchSize = 30; // GeckoTerminal multi endpoint suporta até 30 endereços
+      const network = 'bsc'; // Default (TODO: handle multi-chain properly)
+      const batchSize = 10; // Reduzido de 30 para 10 para ser mais discreto
+      let backoffDelay = 0;
 
       for (let i = 0; i < tokens.length; i += batchSize) {
+        // Se encontramos 429 recentemente, pular o resto do ciclo
+        if (backoffDelay > 0) break;
+
         const batch = tokens.slice(i, i + batchSize);
         const addresses = batch.map(t => t.contract_address).join(',');
 
@@ -246,11 +253,16 @@ export class PriceUpdateService {
             }
           }
 
-          // Pequeno delay entre batches para evitar rate limit
+          // Delay entre batches aumentado drasticamente para 10s
           if (tokens.length > batchSize) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 10000));
           }
         } catch (error: any) {
+          if (error.response?.status === 429) {
+            console.warn(`[WebSocket] 🚨 Rate limit (429) hit. Entering cooldown...`);
+            backoffDelay = 120000; // 2 minutos de pausa se bater no limite
+            break;
+          }
           console.error(`[WebSocket] Failed to update prices for batch ${i}:`, error.message);
         }
       }

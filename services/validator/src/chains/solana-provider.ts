@@ -9,6 +9,7 @@ import {
     MarketData,
     ValidationContext
 } from './types';
+import { heliusClient } from '../providers/helius';
 
 const GECKO_BASE_URL = process.env.GECKOTERMINAL_BASE_URL || 'https://api.geckoterminal.com/api/v2';
 const SOLANA_COMMITMENT = (process.env.SOLANA_COMMITMENT || 'confirmed') as any;
@@ -54,18 +55,25 @@ export class SolanaChainProvider implements ChainProvider {
                 supply = mintInfo.supply.toString();
             } catch (mintErr: any) {
                 console.warn(`[Solana] getMint failed for ${address}, returning fallback metadata (Pump Fun protection): ${mintErr.message}`);
-                // PumpTokens usually have 6 decimals
                 decimals = 6;
-                supply = '1000000000000000'; // Fallback to 1B generic supply
+                supply = '1000000000000000';
             }
 
-            try {
-                const metadata = await this.getTokenMetadata(mintPubkey);
-                if (metadata) {
-                    symbol = metadata.symbol || symbol;
-                    name = metadata.name || name;
+            // Try Helius DAS first for metadata (more reliable for Pump.fun tokens)
+            const heliusMeta = await heliusClient.getTokenMetadata(address);
+            if (heliusMeta && heliusMeta.symbol !== 'UNKNOWN') {
+                symbol = heliusMeta.symbol;
+                name = heliusMeta.name;
+            } else {
+                // Fallback to on-chain Metaplex metadata
+                try {
+                    const metadata = await this.getTokenMetadata(mintPubkey);
+                    if (metadata) {
+                        symbol = metadata.symbol || symbol;
+                        name = metadata.name || name;
+                    }
+                } catch {
                 }
-            } catch {
             }
 
             return {
@@ -109,13 +117,38 @@ export class SolanaChainProvider implements ChainProvider {
         }
     }
 
+    /**
+     * Enhanced honeypot detection:
+     * 1. Check freeze authority (can freeze token accounts)
+     * 2. Check mint authority via Helius (can inflate supply)
+     */
     async checkHoneypot(address: string): Promise<boolean> {
         try {
+            // Check 1: Freeze authority via on-chain
             const mintPubkey = new PublicKey(address);
-            const mintInfo = await getMint(this.connection, mintPubkey);
-            if (mintInfo.freezeAuthority !== null) {
-                return true;
+            try {
+                const mintInfo = await getMint(this.connection, mintPubkey);
+                if (mintInfo.freezeAuthority !== null) {
+                    console.log(`[Solana] ⚠️ Freeze authority active for ${address}`);
+                    return true;
+                }
+            } catch {
+                // getMint failed — could be a Pump.fun token, not necessarily honeypot
             }
+
+            // Check 2: Mint authority via Helius (can the dev print more tokens?)
+            const mintAuth = await heliusClient.getMintAuthority(address);
+            if (mintAuth && !mintAuth.isMintRenounced) {
+                console.log(`[Solana] ⚠️ Mint authority NOT renounced for ${address} (owner: ${mintAuth.mintAuthority})`);
+                // Mint authority active is a strong red flag but not always honeypot
+                // For Pump.fun tokens during bonding curve, mint authority is the program
+                const isPumpFun = address.endsWith('pump');
+                if (!isPumpFun) {
+                    return true;  // Non-pump token with active mint = honeypot
+                }
+                // Pump.fun: mint authority is expected during bonding curve phase
+            }
+
             return false;
         } catch (error: any) {
             return false;
@@ -127,6 +160,12 @@ export class SolanaChainProvider implements ChainProvider {
     }
 
     async getMarketData(address: string, context?: ValidationContext): Promise<MarketData> {
+        let holdersCount = 0;
+        try {
+            // Attempt to get holders from Helius (fast fallback)
+            holdersCount = await heliusClient.getHoldersCount(address);
+        } catch {}
+
         try {
             if (context?.rawListing) {
                 const listing = context.rawListing;
@@ -134,7 +173,7 @@ export class SolanaChainProvider implements ChainProvider {
                     liquidity: listing.liquidityUsd || 0,
                     volume24h: listing.volume24hUsd || 0,
                     price: listing.priceUsd || 0,
-                    holdersCount: 0,
+                    holdersCount: holdersCount || 0,
                     pairAddress: listing.pairAddress || context.pairAddress,
                     dexId: listing.dexId
                 };
@@ -142,7 +181,7 @@ export class SolanaChainProvider implements ChainProvider {
 
             const url = `${GECKO_BASE_URL}/networks/solana/tokens/${address}`;
             const response = await axios.get(url, {
-                timeout: 10000,
+                timeout: 5000,
                 headers: { 'Accept': 'application/json', 'User-Agent': 'TradingBotValidator/1.0' }
             });
             const geckoData = response.data?.data?.attributes || {};
@@ -151,7 +190,7 @@ export class SolanaChainProvider implements ChainProvider {
                 liquidity: Number(geckoData.fdv_usd || 0),
                 volume24h: Number(geckoData.volume_usd?.h24 || 0),
                 price: Number(geckoData.price_usd || 0),
-                holdersCount: 0,
+                holdersCount: holdersCount || 0,
                 pairAddress: context?.pairAddress
             };
 
@@ -178,13 +217,13 @@ export class SolanaChainProvider implements ChainProvider {
                         liquidity: Number(pair.liquidity?.usd || 0),
                         volume24h: Number(pair.volume?.h24 || 0),
                         price: Number(pair.priceUsd || 0),
-                        holdersCount: 0,
+                        holdersCount: holdersCount || 0,
                         pairAddress: pair.pairAddress || context?.pairAddress,
                         dexId: pair.dexId
                     };
                 }
             } catch (dsErr) { }
-            return { liquidity: 0, volume24h: 0, price: 0, holdersCount: 0 };
+            return { liquidity: 0, volume24h: 0, price: 0, holdersCount: holdersCount || 0 };
         }
     }
 

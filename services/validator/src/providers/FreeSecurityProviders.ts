@@ -9,7 +9,18 @@ export interface SecurityConsensus {
     sellTax: number;
     riskScore: number; // 0-100, where 0=safe and 100=very dangerous
     sources: {
-        goplus?: { checked: boolean; flagged: boolean; reason?: string };
+        goplus?: {
+            checked: boolean;
+            flagged: boolean;
+            reason?: string;
+            // EVM-specific fields from GoPlus
+            isOpenSource?: boolean;
+            ownerChangeBalance?: boolean;
+            canTakeBackOwnership?: boolean;
+            selfDestruct?: boolean;
+            isBlacklisted?: boolean;
+            ownerAddress?: string;
+        };
         honeypotIs?: { checked: boolean; flagged: boolean; reason?: string };
         rugcheck?: { checked: boolean; score?: number; flagged: boolean; reason?: string };
     };
@@ -53,12 +64,23 @@ export class FreeSecurityProviders {
                 const st = parseFloat(goplusData.sell_tax || '0');
                 const isProxy = goplusData.is_proxy === '1';
                 const isMintable = goplusData.is_mintable === '1';
+                const isOpenSource = goplusData.is_open_source === '1';
+                const ownerChangeBalance = goplusData.owner_change_balance === '1';
+                const canTakeBack = goplusData.can_take_back_ownership === '1';
+                const selfDestruct = goplusData.self_destruct === '1';
+                const isBlacklisted = goplusData.is_blacklisted === '1';
+                const ownerAddress = goplusData.owner_address || undefined;
 
                 if (hp) issues.push('GoPlus: HONEYPOT');
                 if (bt > 10) issues.push(`GoPlus: High buy tax ${bt}%`);
                 if (st > 10) issues.push(`GoPlus: High sell tax ${st}%`);
                 if (isProxy) issues.push('GoPlus: Proxy contract (upgradable risk)');
                 if (isMintable) issues.push('GoPlus: Mint authority active');
+                if (!isOpenSource) issues.push('GoPlus: Source code NOT verified');
+                if (ownerChangeBalance) issues.push('GoPlus: Owner can change balances');
+                if (canTakeBack) issues.push('GoPlus: Owner can reclaim ownership');
+                if (selfDestruct) issues.push('GoPlus: Self-destruct capability');
+                if (isBlacklisted) issues.push('GoPlus: Token has blacklist function');
 
                 if (hp) isHoneypot = true;
                 buyTax = Math.max(buyTax, bt);
@@ -66,10 +88,16 @@ export class FreeSecurityProviders {
 
                 sources.goplus = {
                     checked: true,
-                    flagged: hp || bt > 10 || st > 10,
-                    reason: [hp && 'Honeypot', bt > 10 && `BuyTax ${bt}%`, st > 10 && `SellTax ${st}%`]
+                    flagged: hp || bt > 10 || st > 10 || !isOpenSource || ownerChangeBalance,
+                    reason: [hp && 'Honeypot', bt > 10 && `BuyTax ${bt}%`, st > 10 && `SellTax ${st}%`, !isOpenSource && 'NotVerified', ownerChangeBalance && 'BalanceManip']
                         .filter(Boolean)
                         .join(', ') || undefined,
+                    isOpenSource,
+                    ownerChangeBalance,
+                    canTakeBackOwnership: canTakeBack,
+                    selfDestruct,
+                    isBlacklisted,
+                    ownerAddress,
                 };
             } else {
                 sources.goplus = { checked: false, flagged: false };

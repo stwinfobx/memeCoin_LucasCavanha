@@ -320,12 +320,13 @@ export class TradeExecutor {
         );
       } else {
         // Criar nova posição
+        const currentLiquidity = Number(token.liquidity_usd ?? 0);
         await this.pool.query(
           `INSERT INTO positions (
              user_id, token_id, order_id, signal_id, invested_amount_usd, buy_price_usd,
-             buy_time, current_price_usd, token_balance, status
-           ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7, $8, 'open')`,
-          [order.user_id, order.token_id, order.id, order.signal_id, investedAmount, price, price, amountToken]
+             buy_time, current_price_usd, token_balance, peak_liquidity_usd, status
+           ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7, $8, $9, 'open')`,
+          [order.user_id, order.token_id, order.id, order.signal_id, investedAmount, price, price, amountToken, currentLiquidity]
         );
 
         // Criar notificação de posição aberta
@@ -897,7 +898,9 @@ export class TradeExecutor {
     currentPrice: number,
     buyPrice: number,
     holdTimeMinutes: number,
-    potentialMultiplier: number
+    potentialMultiplier: number,
+    currentLiquidity?: number,
+    peakLiquidity?: number
   ): Promise<{ shouldSell: boolean; reason: string }> {
 
     // PRIORIDADE 0: ANÁLISE TÉCNICA (se disponível)
@@ -956,13 +959,15 @@ export class TradeExecutor {
       return { shouldSell: true, reason: `🚨 VENDA FORÇADA ABSOLUTA: ${holdTimeMinutes.toFixed(0)} minutos - limite de segurança` };
     }
 
-    // Buscar perfil de risco do usuário
-    const profileResult = await this.pool.query('SELECT risk_profile, max_loss_percent, max_gain_percent FROM user_profiles WHERE user_id = $1', [
-      userId,
-    ]);
+    // Buscar perfil de risco do usuário (incluindo novos campos de Sniper)
+    const profileResult = await this.pool.query(
+      'SELECT risk_profile, max_loss_percent, max_gain_percent, liquidity_drop_threshold FROM user_profiles WHERE user_id = $1', 
+      [userId]
+    );
     const profile = profileResult.rows[0];
     const maxLossPercent = Number(profile?.max_loss_percent ?? 10);
-    const maxGainPercent = Number(profile?.max_gain_percent ?? 25);
+    const maxGainPercent = Number(profile?.max_gain_percent ?? 50); // Sniper default: 50%
+    const liquidityDropThreshold = Number(profile?.liquidity_drop_threshold ?? 20); // Safety Lock default: 20%
 
     // Calcular ganho/perda e tempo de hold
     // Validações: evitar divisão por zero e garantir valores válidos
@@ -1006,7 +1011,21 @@ export class TradeExecutor {
     }
 
     // ============================================================================
-    // PRIORIDADE 1: STOP-LOSS ABSOLUTO (configuração do usuário)
+    // PRIORIDADE 1: SAFETY LOCK (Liquidez 20% do topo)
+    // ============================================================================
+    if (currentLiquidity && peakLiquidity && peakLiquidity > 0) {
+      const dropPercent = ((peakLiquidity - currentLiquidity) / peakLiquidity) * 100;
+      if (dropPercent >= liquidityDropThreshold) {
+        console.error(`[Executor] 🚨 SAFETY LOCK ATIVADO: Liquidez caiu ${dropPercent.toFixed(2)}% do topo ($${peakLiquidity.toFixed(0)} -> $${currentLiquidity.toFixed(0)})`);
+        return { 
+          shouldSell: true, 
+          reason: `🛡️ Safety Lock: Liquidez caiu ${dropPercent.toFixed(2)}% do topo (limite: ${liquidityDropThreshold}%)` 
+        };
+      }
+    }
+
+    // ============================================================================
+    // PRIORIDADE 2: STOP-LOSS ABSOLUTO (configuração do usuário)
     // ============================================================================
     // CORRIGIDO: Stop-loss absoluto deve ter PRIORIDADE MÁXIMA
     // Se a perda atingir ou exceder o limite configurado, vender SEMPRE, independente de tempo
@@ -1077,21 +1096,17 @@ export class TradeExecutor {
       }
     }
 
-    // ============================================================================
-    // PRIORIDADE 5: TAKE-PROFIT E GANHO MÁXIMO
-    // ============================================================================
-
-    // TAKE-PROFIT: 30% do alvo → vende rápido
-    const targetPrice = buyPrice * potentialMultiplier;
-    if (currentPrice >= targetPrice * 0.3) {
-      console.log(`[Executor] 🎉 TAKE-PROFIT: ${gainPercent.toFixed(2)}% (30% do alvo)`);
-      return { shouldSell: true, reason: `🎉 Take-profit: ${gainPercent.toFixed(2)}% (30% do alvo)` };
+    // GANHO MÁXIMO ATINGIDO (Configuração do usuário ou 50-100% sniper)
+    if (gainPercent >= maxGainPercent) {
+      console.log(`[Executor] 🎊 GANHO MÁXIMO: ${gainPercent.toFixed(2)}% >= ${maxGainPercent}%`);
+      return { shouldSell: true, reason: `🎊 Ganho máximo: ${gainPercent.toFixed(2)}% (meta atingida)` };
     }
 
-    // Ganho máximo atingido
-    if (gainPercent >= maxGainPercent) {
-      console.log(`[Executor] 🎊 GANHO MÁXIMO: ${gainPercent.toFixed(2)}%`);
-      return { shouldSell: true, reason: `🎊 Ganho máximo: ${gainPercent.toFixed(2)}%` };
+    // TAKE-PROFIT BASEADO NO MULTIPLIER (Se atingir 70% da meta estimada do sinal)
+    const targetPrice = buyPrice * potentialMultiplier;
+    if (currentPrice >= targetPrice * 0.7) {
+      console.log(`[Executor] 🎉 TAKE-PROFIT SIGNAL: ${gainPercent.toFixed(2)}% (70% do alvo do sinal)`);
+      return { shouldSell: true, reason: `🎉 Take-profit: ${gainPercent.toFixed(2)}% (70% da meta do sinal)` };
     }
 
     // ============================================================================
@@ -1283,6 +1298,7 @@ export class TradeExecutor {
            p.*, 
            COALESCE(t.price_usd, p.current_price_usd, p.buy_price_usd) as current_price,
            t.price_usd as token_price_usd,
+           t.liquidity_usd as current_token_liquidity,
            p.current_price_usd as position_current_price,
            s.id as signal_id, 
            s.signal_type, 
@@ -1382,6 +1398,17 @@ export class TradeExecutor {
         const currentPrice = tokenPriceUsd || positionCurrentPrice || buyPrice;
         const potentialMultiplier = Number(pos.potential_multiplier ?? 1.0);
         const tokenBalance = Number(pos.token_balance ?? 0);
+        const currentTokenLiquidity = Number(pos.current_token_liquidity ?? 0);
+        const peakLiquidityUsd = Number(pos.peak_liquidity_usd ?? currentTokenLiquidity);
+
+        // ATUALIZAR TOPO DE LIQUIDEZ (Peak Liquidity)
+        if (currentTokenLiquidity > peakLiquidityUsd) {
+          console.log(`[Executor] 📈 Novo pico de liquidez para ${pos.symbol}: $${currentTokenLiquidity.toFixed(0)} (antigo: $${peakLiquidityUsd.toFixed(0)})`);
+          await this.pool.query(
+            'UPDATE positions SET peak_liquidity_usd = $1, updated_at = NOW() WHERE id = $2',
+            [currentTokenLiquidity, pos.id]
+          );
+        }
 
         // VALIDAÇÃO CRÍTICA: Se hold_time_minutes >= 10, forçar venda ANTES de qualquer outra verificação
         if (holdTimeMinutes >= 10) {
@@ -1491,15 +1518,17 @@ export class TradeExecutor {
           } as Signal;
         }
 
-        // Verificar se deve vender usando hold_time_minutes da query SQL
+        // Verificar se deve vender usando as novas métricas de Sniper
         const decision = await this.shouldSellPosition(
           userId,
           tokenId,
           signal,
           currentPrice,
           buyPrice,
-          holdTimeMinutes, // CORRIGIDO: Passar hold_time_minutes da query SQL
-          potentialMultiplier
+          holdTimeMinutes,
+          potentialMultiplier,
+          currentTokenLiquidity,
+          Math.max(currentTokenLiquidity, peakLiquidityUsd)
         );
 
         // Log detalhado da decisão de venda

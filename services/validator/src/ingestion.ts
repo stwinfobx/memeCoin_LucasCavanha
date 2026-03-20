@@ -16,6 +16,12 @@ const PAIR_CREATED_ABI = [
   'event PairCreated(address indexed token0, address indexed token1, address pair, uint)'
 ];
 
+interface RetryState {
+  attempts: number;
+  lastAttempt: number;
+  firstDiscovered: number; // For 5-minute timeout
+}
+
 export interface MemecoinIngestionOptions {
   validator: TokenValidator;
   pool: Pool;
@@ -32,6 +38,7 @@ export class MemecoinIngestion {
   private evmProviders: { [network: string]: ethers.WebSocketProvider } = {};
   private solanaConnection?: Connection;
   private solanaSubscriptionId?: number;
+  private retryMap: Map<string, RetryState> = new Map();
 
   constructor(options: MemecoinIngestionOptions) {
     this.validator = options.validator;
@@ -97,17 +104,67 @@ export class MemecoinIngestion {
         return;
       }
 
+      const retryState = this.retryMap.get(tokenAddress);
+      const firstSeen = retryState?.firstDiscovered || Date.now();
+
       const context: ValidationContext = {
         pairAddress: pairAddress,
         source: `websocket:${sourceDetails}`,
         rawListing: undefined,
+        first_seen_at: firstSeen,
       };
 
       const result = await this.validator.validateToken(tokenAddress, chainId, context);
 
       const label = `${result.token?.symbol || 'TOKEN'}-${chainId}`;
       const status = result.validation_result?.is_valid ? 'VALID' : 'WARN';
-      console.log(`[Ingestion] ${status} ${label} | score=${result.validation_result?.safety_score ?? 0} | risk=${result.risk_assessment?.risk_level ?? 'n/a'}`);
+      const holders = result.token?.holders_count ?? 0;
+
+      const safetyScore = result.validation_result?.safety_score ?? 0;
+      const isIndexing = result.validation_result?.is_indexing || false;
+
+      console.log(`[Ingestion] ${status} ${label} | score=${safetyScore} | holders=${holders} | risk=${result.risk_assessment?.risk_level ?? 'n/a'} ${isIndexing ? '(INDEXING)' : ''}`);
+
+      // --- Retry Logic (Indexing or 0 Holders) ---
+      const now = Date.now();
+      const firstDiscovered = retryState?.firstDiscovered || now;
+      const ageSeconds = (now - firstDiscovered) / 1000;
+
+      // 1. Indexing Retry: If validator said 'indexing' and we are under 5 mins
+      if (isIndexing && ageSeconds < 300 && this.running) {
+        console.log(`[Ingestion] 🕒 Indexing in progress for ${label} (Age: ${ageSeconds.toFixed(0)}s). Retrying in 60s...`);
+        this.retryMap.set(tokenAddress, { 
+          attempts: (retryState?.attempts || 0) + 1, 
+          lastAttempt: now,
+          firstDiscovered: firstDiscovered
+        });
+        
+        setTimeout(async () => {
+          if (!this.running) return;
+          await this.processNewToken(chainId, tokenAddress, pairAddress, `${sourceDetails}:indexing_retry`);
+        }, 60_000); // 1 minute delay for indexing
+        return; // Don't notify API yet
+      }
+
+      // 2. Holder Re-validation Logic: Original logic for 0 holders
+      if (holders === 0 && ageSeconds < 300 && (!retryState || retryState.attempts < 3) && this.running) {
+        console.log(`[Ingestion] 🕒 Holders indexer lag detected for ${label}. Scheduling re-validation in 120s...`);
+        this.retryMap.set(tokenAddress, { 
+          attempts: (retryState?.attempts || 0) + 1, 
+          lastAttempt: now,
+          firstDiscovered: firstDiscovered
+        });
+        
+        setTimeout(async () => {
+          if (!this.running) return;
+          await this.processNewToken(chainId, tokenAddress, pairAddress, `${sourceDetails}:holder_retry`);
+        }, 120_000);
+      }
+
+      // Clean up retry state if we completed successfully or timed out
+      if (!isIndexing || ageSeconds >= 300) {
+        this.retryMap.delete(tokenAddress);
+      }
 
       // Notify API Gateway for live streaming
       try {
@@ -185,18 +242,45 @@ export class MemecoinIngestion {
   }
 
   private async monitorSolana(rpcUrl: string, wsUrl: string) {
-    console.log(`[Solana] 🟢 Monitoring novas pools via GeckoTerminal Polling (Contornando Restrições RPC)...`);
+    console.log(`[Solana] 🟢 Monitoring novas pools via GeckoTerminal Polling (with exponential backoff)...`);
+
+    let baseIntervalMs = 10_000;   // Start: 10s
+    let currentIntervalMs = baseIntervalMs;
+    const MAX_INTERVAL_MS = 5 * 60 * 1000; // Max: 5 minutes
+    let consecutiveFailures = 0;
 
     const pollGecko = async () => {
       if (!this.running) return;
       try {
         const url = `https://api.geckoterminal.com/api/v2/networks/solana/new_pools?include=base_token`;
         const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) return;
+
+        if (!res.ok) {
+          consecutiveFailures++;
+          const status = res.status;
+          if (status === 429) {
+            console.warn(`[Solana] ⚠️ GeckoTerminal rate limited (429). Backing off... (failures: ${consecutiveFailures})`);
+          } else if (status === 403) {
+            console.warn(`[Solana] 🚫 GeckoTerminal access denied (403). Check IP/proxy.`);
+          } else {
+            console.warn(`[Solana] ⚠️ GeckoTerminal HTTP ${status}. Backing off...`);
+          }
+          // Exponential backoff
+          currentIntervalMs = Math.min(MAX_INTERVAL_MS, currentIntervalMs * 2);
+          this.reschedulePolling(pollGecko, currentIntervalMs);
+          return;
+        }
 
         const data = await res.json() as any;
         const pools = data?.data || [];
         const includes = data?.included || [];
+
+        // Success: reset backoff
+        if (consecutiveFailures > 0) {
+          console.log(`[Solana] ✅ GeckoTerminal recovered after ${consecutiveFailures} failures.`);
+        }
+        consecutiveFailures = 0;
+        currentIntervalMs = baseIntervalMs;
 
         for (const pool of pools) {
           const baseTokenId = pool.relationships?.base_token?.data?.id;
@@ -204,18 +288,31 @@ export class MemecoinIngestion {
           const tokenAddr = baseTokenInfo?.attributes?.address || pool.attributes?.address;
 
           if (tokenAddr) {
-            // processNewToken already skips internally if validated recently
             await this.processNewToken('Solana', tokenAddr, tokenAddr, 'gecko_polling');
           }
         }
       } catch (err: any) {
-        // Silencioso para evitar poluição em caso de falha de conexão ou api limit
+        consecutiveFailures++;
+        if (consecutiveFailures <= 3 || consecutiveFailures % 10 === 0) {
+          console.warn(`[Solana] ⚠️ Gecko poll error (failure #${consecutiveFailures}): ${err.message}`);
+        }
+        currentIntervalMs = Math.min(MAX_INTERVAL_MS, currentIntervalMs * 2);
       }
+
+      // Schedule next poll
+      this.reschedulePolling(pollGecko, currentIntervalMs);
     };
 
     if (this.running) {
       pollGecko();
-      this.solanaSubscriptionId = setInterval(pollGecko, 10000) as any;
     }
+  }
+
+  private reschedulePolling(fn: () => Promise<void>, intervalMs: number) {
+    if (!this.running) return;
+    if (this.solanaSubscriptionId) {
+      clearTimeout(this.solanaSubscriptionId as any);
+    }
+    this.solanaSubscriptionId = setTimeout(fn, intervalMs) as any;
   }
 }

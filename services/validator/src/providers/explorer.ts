@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
+import { heliusClient, SolanaHolderInfo } from './helius';
 
-type SupportedExplorer = 'bsc' | 'eth';
+type SupportedExplorer = 'bsc' | 'eth' | 'base' | 'solana';
 
 interface ExplorerResponse<T = any> {
   status: string;
@@ -22,7 +23,7 @@ export interface TokenHolderInfo {
   percentage: number;
 }
 
-const EXPLORER_CONFIG: Record<SupportedExplorer, { baseUrl: string; apiKey?: string }> = {
+const EXPLORER_CONFIG: Record<string, { baseUrl: string; apiKey?: string }> = {
   bsc: {
     baseUrl: 'https://api.bscscan.com/api',
     apiKey: process.env.BSCSCAN_API_KEY,
@@ -31,17 +32,32 @@ const EXPLORER_CONFIG: Record<SupportedExplorer, { baseUrl: string; apiKey?: str
     baseUrl: 'https://api.etherscan.io/api',
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
+  base: {
+    baseUrl: 'https://api.basescan.org/api',
+    apiKey: process.env.BASESCAN_API_KEY,
+  },
 };
 
 export class ExplorerClient {
   private readonly explorer: SupportedExplorer;
   private readonly http: AxiosInstance;
   private readonly apiKey?: string;
+  private readonly isSolana: boolean;
 
   constructor(chain: string) {
     const normalized = chain.toLowerCase();
-    if (normalized.includes('bsc')) {
-      this.explorer = 'bsc';
+
+    if (normalized.includes('solana') || normalized === 'sol') {
+      this.explorer = 'solana';
+      this.isSolana = true;
+      this.http = axios.create({ timeout: 10_000 });
+      return;
+    }
+
+    this.isSolana = false;
+
+    if (normalized.includes('base')) {
+      this.explorer = 'base';
     } else if (normalized.includes('eth')) {
       this.explorer = 'eth';
     } else {
@@ -49,21 +65,22 @@ export class ExplorerClient {
     }
 
     const config = EXPLORER_CONFIG[this.explorer];
-    this.apiKey = config.apiKey;
+    this.apiKey = config?.apiKey;
     this.http = axios.create({
-      baseURL: config.baseUrl,
+      baseURL: config?.baseUrl,
       timeout: 10_000,
     });
   }
 
   private canCall(): boolean {
+    if (this.isSolana) return heliusClient.isAvailable();
     return Boolean(this.apiKey);
   }
 
   async getContractCreation(contractAddress: string): Promise<ContractCreationInfo | null> {
-    if (!this.canCall()) {
-      return null;
-    }
+    // Solana: no contract creation concept via block explorer
+    if (this.isSolana) return null;
+    if (!this.canCall()) return null;
 
     try {
       const { data } = await this.http.get<ExplorerResponse<ContractCreationInfo[]>>('', {
@@ -88,9 +105,25 @@ export class ExplorerClient {
   }
 
   async getTokenHolderConcentration(contractAddress: string, limit = 10): Promise<TokenHolderInfo[] | null> {
-    if (!this.canCall()) {
-      return null;
+    // --- Solana: use Helius DAS API ---
+    if (this.isSolana) {
+      try {
+        const holders = await heliusClient.getTopHolders(contractAddress, limit);
+        if (!holders || holders.length === 0) return null;
+
+        return holders.map((h: SolanaHolderInfo) => ({
+          address: h.address,
+          value: h.amount,
+          percentage: h.percentage,
+        }));
+      } catch (error: any) {
+        console.warn(`[ExplorerClient/Helius] Failed to get Solana holders for ${contractAddress}: ${error.message}`);
+        return null;
+      }
     }
+
+    // --- EVM: use BscScan/EtherScan/BaseScan ---
+    if (!this.canCall()) return null;
 
     try {
       const { data } = await this.http.get<ExplorerResponse<TokenHolderInfo[]>>('', {
@@ -115,5 +148,3 @@ export class ExplorerClient {
     }
   }
 }
-
-

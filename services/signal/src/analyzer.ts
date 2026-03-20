@@ -291,10 +291,11 @@ export class SignalAnalyzer {
           isActive = false;
       } 
       // Regra 4: Validação Total de Compra
-      else if (buySignal) {
+      else if (buySignal || (score >= 80 && issues.length === 0)) {
           signalType = 'BUY';
-          potentialMultiplier = 2.0;
-          reasoning = `APROVADO SAFE MODE ✅ Nota: ${score}/100. Sem problemas detectados!`;
+          // Sniper target: 1.5x to 2.0x (50-100% gain)
+          potentialMultiplier = score >= 90 ? 2.0 : 1.5;
+          reasoning = `APROVADO SNIPER MODE 🎯 Nota: ${score}/100. Critérios de elite atingidos!`;
           isActive = true;
       } 
       // Regra 5: Zona Média (Hold / Espera Mais dados / Cuidado com pocos Holders)
