@@ -546,9 +546,8 @@ export default function DashboardPage() {
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
                     <span>Cotação: {formatCurrency(signal.price_usd)}</span>
                     <span>Emitido em: {(() => {
-                      // Ensure UTC parsing by adding 'Z' if missing
-                      const dateStr = signal.created_at.endsWith('Z') ? signal.created_at : `${signal.created_at}Z`;
-                      const d = new Date(dateStr);
+                      const d = new Date(signal.created_at);
+                      d.setHours(d.getHours() - 3); // Forçar fuso horário de Brasília (-3h)
                       return d.toLocaleString('pt-BR');
                     })()}</span>
                     {(signal.contract_address || signal.token_id) && (

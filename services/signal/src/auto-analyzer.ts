@@ -65,6 +65,7 @@ export class AutoAnalyzer {
         `SELECT t.id, t.symbol, t.name
          FROM tokens t
          WHERE t.is_validated = true
+         AND t.validated_at > NOW() - INTERVAL '1 hour'
          AND (
            -- Token não tem sinal ativo
            NOT EXISTS (

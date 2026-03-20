@@ -560,8 +560,9 @@ export default function SignalsPage() {
                     </Link>
                     <p className="text-[10px] text-neutral-600">
                       Emitido em {(() => {
-                        const dateStr = signal.created_at.endsWith('Z') ? signal.created_at : `${signal.created_at}Z`;
-                        return new Date(dateStr).toLocaleString('pt-BR');
+                        const d = new Date(signal.created_at);
+                        d.setHours(d.getHours() - 3); // Forçar fuso horário de Brasília (-3h)
+                        return d.toLocaleString('pt-BR');
                       })()}
                     </p>
                   </div>
@@ -616,8 +617,9 @@ export default function SignalsPage() {
                       {signal.potential_multiplier ? `${signal.potential_multiplier.toFixed(2)}x` : '—'}
                     </td>
                     <td className="py-3">{(() => {
-                      const dateStr = signal.created_at.endsWith('Z') ? signal.created_at : `${signal.created_at}Z`;
-                      return new Date(dateStr).toLocaleString('pt-BR');
+                      const d = new Date(signal.created_at);
+                      d.setHours(d.getHours() - 3); // Forçar fuso horário de Brasília (-3h)
+                      return d.toLocaleString('pt-BR');
                     })()}</td>
                     <td className="py-3">
                       {signal.is_active ? (

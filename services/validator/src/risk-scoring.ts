@@ -157,7 +157,10 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
             rejectionReasons.push('Insufficient holders (-25)');
         }
         
-        if (ageMinutes > 30) {
+        if (ageMinutes > 60) {
+            safetyScore -= 100;
+            rejectionReasons.push('Legacy token rejected (>60m) (-100)');
+        } else if (ageMinutes > 30) {
             safetyScore -= 15;
             rejectionReasons.push('Aging token penalty (-15)');
         }
