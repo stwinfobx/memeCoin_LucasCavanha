@@ -4,7 +4,9 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// POST /api/withdrawals/request - Solicitar saque
+/**
+ * POST /api/withdrawals/request - Solicitar saque isolado por rede
+ */
 router.post('/request', authenticate, async (req: AuthRequest, res: Response) => {
     const userId = req.user?.userId;
 
@@ -18,12 +20,13 @@ router.post('/request', authenticate, async (req: AuthRequest, res: Response) =>
 
     try {
         const { amount_usd, wallet_address, chain } = req.body;
+        const targetChain = (chain || 'BSC').toUpperCase();
 
-        // Validacoes
+        // Validacoes básicas
         if (!amount_usd || amount_usd <= 0) {
             return res.status(400).json({
                 success: false,
-                error: { code: 'INVALID_AMOUNT', message: 'Valor invalido' },
+                error: { code: 'INVALID_AMOUNT', message: 'Valor inválido' },
                 timestamp: new Date(),
             });
         }
@@ -31,138 +34,143 @@ router.post('/request', authenticate, async (req: AuthRequest, res: Response) =>
         if (!wallet_address) {
             return res.status(400).json({
                 success: false,
-                error: { code: 'MISSING_WALLET', message: 'Endereco da wallet obrigatorio' },
+                error: { code: 'MISSING_WALLET', message: 'Endereço da wallet obrigatório' },
                 timestamp: new Date(),
             });
         }
 
-        // Calcular saldo disponivel
-        const balanceResult = await pool.query(
-            `SELECT 
-         COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-         COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-       FROM ledger_entries
-       WHERE user_id = $1`,
+        // Mapear coluna de saldo
+        const balanceCol = targetChain === 'SOLANA' || targetChain === 'SOL' ? 'balance_solana' : 
+                          targetChain === 'BASE' ? 'balance_base' : 'balance_bsc';
+
+        // 1. Verificar saldo na chain específica (Source of Truth)
+        const userRes = await pool.query(
+            `SELECT ${balanceCol}, email FROM users WHERE id = $1`,
             [userId]
         );
 
-        const credits = Number(balanceResult.rows[0]?.credits ?? 0);
-        const debits = Number(balanceResult.rows[0]?.debits ?? 0);
-        const availableBalance = Math.max(0, credits - debits);
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: { message: 'Usuário não encontrado' } });
+        }
 
-        // Verificar se tem saldo suficiente
-        if (amount_usd > availableBalance) {
+        const currentBalance = Number(userRes.rows[0][balanceCol] || 0);
+
+        if (amount_usd > currentBalance) {
             return res.status(400).json({
                 success: false,
                 error: {
                     code: 'INSUFFICIENT_BALANCE',
-                    message: `Saldo insuficiente. Disponivel: $${availableBalance.toFixed(2)}`,
+                    message: `Saldo insuficiente na rede ${targetChain}. Disponível: $${currentBalance.toFixed(2)}`,
                 },
                 timestamp: new Date(),
             });
         }
 
-        // Criar registro de saque
-        const withdrawalResult = await pool.query(
-            `INSERT INTO withdrawals (user_id, amount_usd, wallet_address, chain, status)
-       VALUES ($1, $2, $3, $4, 'pending')
-       RETURNING *`,
-            [userId, amount_usd, wallet_address, chain || 'BSC']
-        );
+        // 2. Transação Atômica: Deduzir saldo + Criar Saque + Ledger
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
 
-        const withdrawal = withdrawalResult.rows[0];
+            // Deduzir do saldo virtual da chain
+            await client.query(
+                `UPDATE users SET ${balanceCol} = ${balanceCol} - $1 WHERE id = $2`,
+                [amount_usd, userId]
+            );
 
-        // Criar notificacao
-        await pool.query(
-            `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)
-       VALUES ($1, 'withdrawal_requested', 'info', 'Saque solicitado', $2, $3::jsonb)`,
-            [
-                userId,
-                `Solicitacao de saque de $${amount_usd} USD foi criada e esta aguardando aprovacao.`,
-                JSON.stringify({
+            // Criar registro na fila de saques
+            const withdrawalResult = await client.query(
+                `INSERT INTO withdrawals (user_id, amount_usd, wallet_address, chain, status)
+                 VALUES ($1, $2, $3, $4, 'pending')
+                 RETURNING *`,
+                [userId, amount_usd, wallet_address, targetChain]
+            );
+
+            const withdrawal = withdrawalResult.rows[0];
+
+            // Registrar no Ledger Histórico (para transparência)
+            await client.query(
+                `INSERT INTO ledger_entries (user_id, type, amount_usd, description, chain) 
+                 VALUES ($1, 'WITHDRAWAL', $2, $3, $4)`,
+                [userId, -amount_usd, `Solicitação de saque via ${targetChain} para ${wallet_address.substring(0, 8)}...`, targetChain]
+            );
+
+            // Notificar sistema
+            await client.query(
+                `INSERT INTO bot_notifications (user_id, notification_type, severity, title, message, data)
+                 VALUES ($1, 'withdrawal_requested', 'info', 'Saque solicitado', $2, $3::jsonb)`,
+                [
+                    userId,
+                    `Solicitação de saque de $${amount_usd} USD criada na rede ${targetChain}.`,
+                    JSON.stringify({
+                        withdrawal_id: withdrawal.id,
+                        amount: amount_usd,
+                        wallet: wallet_address,
+                        chain: targetChain,
+                    }),
+                ]
+            );
+
+            await client.query('COMMIT');
+
+            res.json({
+                success: true,
+                data: {
                     withdrawal_id: withdrawal.id,
-                    amount: amount_usd,
-                    wallet: wallet_address,
-                    chain: chain || 'BSC',
-                }),
-            ]
-        );
+                    amount_usd: withdrawal.amount_usd,
+                    wallet_address: withdrawal.wallet_address,
+                    chain: withdrawal.chain,
+                    status: withdrawal.status,
+                    created_at: withdrawal.created_at,
+                },
+                timestamp: new Date(),
+            });
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
 
-        res.json({
-            success: true,
-            data: {
-                withdrawal_id: withdrawal.id,
-                amount_usd: withdrawal.amount_usd,
-                wallet_address: withdrawal.wallet_address,
-                status: withdrawal.status,
-                created_at: withdrawal.created_at,
-            },
-            timestamp: new Date(),
-        });
     } catch (error: any) {
-        console.error('[Withdrawals] request error:', error);
+        console.error('[Withdrawals] Request error:', error);
         res.status(500).json({
             success: false,
-            error: {
-                code: 'WITHDRAWAL_REQUEST_ERROR',
-                message: error.message || 'Erro ao solicitar saque',
-            },
+            error: { code: 'WITHDRAWAL_ERROR', message: error.message },
             timestamp: new Date(),
         });
     }
 });
 
-// GET /api/withdrawals/history - Historico de saques
+/**
+ * GET /api/withdrawals/history - Histórico de saques do usuário
+ */
 router.get('/history', authenticate, async (req: AuthRequest, res: Response) => {
     const userId = req.user?.userId;
 
-    if (!userId) {
-        return res.status(401).json({
-            success: false,
-            error: { code: 'UNAUTHORIZED', message: 'Invalid user context' },
-            timestamp: new Date(),
-        });
-    }
+    if (!userId) return res.status(401).json({ success: false });
 
     try {
         const result = await pool.query(
-            `SELECT id, amount_usd, wallet_address, chain, status, tx_hash, 
-              approved_at, processed_at, rejection_reason, created_at
-       FROM withdrawals
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 50`,
+            `SELECT id, amount_usd, wallet_address, chain, status, tx_hash, created_at
+             FROM withdrawals
+             WHERE user_id = $1
+             ORDER BY created_at DESC
+             LIMIT 50`,
             [userId]
         );
 
         res.json({
             success: true,
             data: {
-                withdrawals: result.rows.map((w) => ({
-                    id: w.id,
-                    amount_usd: Number(w.amount_usd),
-                    wallet_address: w.wallet_address,
-                    chain: w.chain,
-                    status: w.status,
-                    tx_hash: w.tx_hash,
-                    approved_at: w.approved_at,
-                    processed_at: w.processed_at,
-                    rejection_reason: w.rejection_reason,
-                    created_at: w.created_at,
-                })),
+                withdrawals: result.rows.map(w => ({
+                    ...w,
+                    amount_usd: Number(w.amount_usd)
+                }))
             },
             timestamp: new Date(),
         });
     } catch (error: any) {
-        console.error('[Withdrawals] history error:', error);
-        res.status(500).json({
-            success: false,
-            error: {
-                code: 'WITHDRAWAL_HISTORY_ERROR',
-                message: error.message || 'Erro ao buscar historico',
-            },
-            timestamp: new Date(),
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

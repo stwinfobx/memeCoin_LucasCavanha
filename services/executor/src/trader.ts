@@ -845,6 +845,7 @@ export class TradeExecutor {
           token.contract_address,
           token.symbol,
           amountToken.toString(),
+          amountUsd,
           token.chain
         );
         if (!result.success) throw new Error(`Real sell failed: ${result.error}`);

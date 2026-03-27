@@ -220,7 +220,10 @@ try {
 // Inicializar worker de confirmação de depósitos
 try {
   const bscRpcUrl = process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org';
-  depositConfirmer = new DepositConfirmer(pool, bscRpcUrl);
+  const baseRpcUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+  const solanaRpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+  
+  depositConfirmer = new DepositConfirmer(pool, bscRpcUrl, baseRpcUrl, solanaRpcUrl);
   // Será iniciado após o servidor estar pronto
 } catch (error: any) {
   console.error('[API Gateway] Failed to initialize deposit confirmer:', error.message);

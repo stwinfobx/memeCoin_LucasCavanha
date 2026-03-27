@@ -2,40 +2,54 @@
 
 import React, { useState, useEffect } from 'react';
 import { useMetaMask } from '../../hooks/useMetaMask';
+import { usePhantom } from '../../hooks/usePhantom';
 import Link from 'next/link';
 import { ethers } from 'ethers';
+import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+const chainIcons: Record<string, string> = {
+    BSC: '🟡',
+    BASE: '🔵',
+    SOLANA: '🟣'
+};
+
+const chainNativeTokens: Record<string, string> = {
+    BSC: 'BNB',
+    BASE: 'ETH',
+    SOLANA: 'SOL'
+};
+
+const MASTER_ADDRESSES: Record<string, string> = {
+    BSC: process.env.NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS || '0x3c9c21ac9dcffe929f19d552ea5cc80192a73c0b',
+    BASE: process.env.NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS || '0x3c9c21ac9dcffe929f19d552ea5cc80192a73c0b',
+    SOLANA: 'I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C'
+};
+
 export default function DepositWithdrawPage() {
-    const { account, balance: bnbBalance, chainId, isConnecting, connect, switchToBSC } = useMetaMask();
+    const { account: mmAccount, balance: mmBalance, chainId, connect: connectMM, switchToBSC } = useMetaMask();
+    const { publicKey: phAccount, balance: phBalance, connect: connectPH } = usePhantom();
 
-    // Deposit states
-    const [txHash, setTxHash] = useState('');
+    const [selectedChain, setSelectedChain] = useState<'BSC' | 'BASE' | 'SOLANA'>('BSC');
     const [status, setStatus] = useState<'idle' | 'sending' | 'waiting' | 'confirmed' | 'failed'>('idle');
-    const [amountBNB, setAmountBNB] = useState('0.01');
-    const [depositHistory, setDepositHistory] = useState<any[]>([]);
-
-    // Withdraw states  
+    const [amount, setAmount] = useState('0.1');
     const [usdBalance, setUsdBalance] = useState(0);
+    const [depositHistory, setDepositHistory] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
+
+    // Withdraw states
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [withdrawWallet, setWithdrawWallet] = useState('');
     const [withdrawChain, setWithdrawChain] = useState('BSC');
     const [withdrawLoading, setWithdrawLoading] = useState(false);
-    const [withdrawError, setWithdrawError] = useState<string | null>(null);
     const [withdrawSuccess, setWithdrawSuccess] = useState(false);
-    const [withdrawals, setWithdrawals] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
-
-    const botAddress = process.env.NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS || '0x0000000000000000000000000000000000000000';
+    const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (account) {
-            loadDepositHistory();
-            loadWithdrawHistory();
-            loadBalance();
-        }
-    }, [account]);
+        loadBalance();
+        loadDepositHistory();
+    }, [mmAccount, phAccount]);
 
     const loadBalance = async () => {
         try {
@@ -45,11 +59,9 @@ export default function DepositWithdrawPage() {
             });
             const data = await res.json();
             if (data.success) {
-                setUsdBalance(data.data?.balance || 0);
+                setUsdBalance(data.data?.total_balance_usd || 0);
             }
-        } catch (error) {
-            console.error('Error loading balance:', error);
-        }
+        } catch (e) { console.error(e); }
     };
 
     const loadDepositHistory = async () => {
@@ -59,415 +71,275 @@ export default function DepositWithdrawPage() {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
-            if (data.success) {
-                setDepositHistory(data.data.deposits || []);
-            }
-        } catch (error) {
-            console.error('Error loading deposit history:', error);
-        }
+            if (data.success) setDepositHistory(data.data.deposits || []);
+        } catch (e) { console.error(e); }
     };
 
-    const loadWithdrawHistory = async () => {
-        try {
-            const token = localStorage.getItem('access_token');
-            const res = await fetch(`${apiBase}/api/withdrawals/history`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (data.success) {
-                setWithdrawals(data.data?.withdrawals || []);
-            }
-        } catch (error) {
-            console.error('Error loading withdraw history:', error);
-        }
-    };
+    const currentAccount = selectedChain === 'SOLANA' ? phAccount : mmAccount;
+    const currentNativeBalance = selectedChain === 'SOLANA' ? phBalance : Number(mmBalance);
 
     const handleDeposit = async () => {
-        if (!account) {
-            alert('Conecte sua wallet primeiro!');
-            return;
-        }
-
-        if (chainId !== 56) {
-            const shouldSwitch = confirm('Você precisa estar na rede BSC. Deseja trocar?');
-            if (shouldSwitch) {
-                await switchToBSC();
-            }
-            return;
-        }
-
-        const amount = parseFloat(amountBNB);
-        if (isNaN(amount) || amount <= 0) {
-            alert('Valor inválido!');
+        if (!currentAccount) {
+            selectedChain === 'SOLANA' ? connectPH() : connectMM();
             return;
         }
 
         setStatus('sending');
-
         try {
-            const provider = new ethers.BrowserProvider((window as any).ethereum);
-            const signer = await provider.getSigner();
+            let hash = '';
+            const master = MASTER_ADDRESSES[selectedChain];
 
-            console.log('[Deposit] Sending to:', botAddress);
+            if (selectedChain === 'SOLANA') {
+                const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+                const fromPubkey = new PublicKey(phAccount!);
+                const toPubkey = new PublicKey(master);
+                
+                const transaction = new Transaction().add(
+                    SystemProgram.transfer({
+                        fromPubkey,
+                        toPubkey,
+                        lamports: Math.floor(Number(amount) * 1e9),
+                    })
+                );
+                
+                const { blockhash } = await connection.getLatestBlockhash();
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = fromPubkey;
+                
+                const signed = await (window as any).solana.signAndSendTransaction(transaction);
+                hash = signed.signature;
+            } else {
+                const provider = new ethers.BrowserProvider((window as any).ethereum);
+                const signer = await provider.getSigner();
+                const tx = await signer.sendTransaction({
+                    to: master,
+                    value: ethers.parseEther(amount),
+                });
+                hash = tx.hash;
+            }
 
-            const tx = await signer.sendTransaction({
-                to: botAddress,
-                value: ethers.parseEther(amountBNB),
-            });
-
-            setTxHash(tx.hash);
             setStatus('waiting');
 
             const token = localStorage.getItem('access_token');
-            const res = await fetch(`${apiBase}/api/deposits/create`, {
+            await fetch(`${apiBase}/api/deposits/create`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    tx_hash: tx.hash,
-                    chain: 'BSC',
-                    token_symbol: 'BNB',
+                    tx_hash: hash,
+                    chain: selectedChain,
+                    token_symbol: chainNativeTokens[selectedChain],
                 }),
             });
 
-            if (!res.ok) {
-                throw new Error('Erro ao registrar depósito');
-            }
-
-            await tx.wait(3);
             setStatus('confirmed');
-
-            alert(`Depósito confirmado! ${amountBNB} BNB depositados.`);
-            loadDepositHistory();
             loadBalance();
-        } catch (error: any) {
+            loadDepositHistory();
+            setTimeout(() => setStatus('idle'), 3000);
+        } catch (err: any) {
+            console.error(err);
             setStatus('failed');
-            alert('Erro: ' + error.message);
+            alert('Erro: ' + err.message);
         }
     };
 
     const handleWithdraw = async (e: React.FormEvent) => {
         e.preventDefault();
-        setWithdrawError(null);
-        setWithdrawSuccess(false);
-
-        const amount = parseFloat(withdrawAmount);
-        if (!amount || amount <= 0) {
-            setWithdrawError('Valor inválido');
-            return;
-        }
-
-        if (amount > usdBalance) {
-            setWithdrawError(`Saldo insuficiente. Disponível: $${usdBalance.toFixed(2)}`);
-            return;
-        }
-
-        if (!withdrawWallet) {
-            setWithdrawError('Endereço da wallet obrigatório');
-            return;
-        }
-
         setWithdrawLoading(true);
-
+        setWithdrawError(null);
         try {
             const token = localStorage.getItem('access_token');
             const res = await fetch(`${apiBase}/api/withdrawals/request`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    amount_usd: amount,
+                    amount_usd: Number(withdrawAmount),
                     wallet_address: withdrawWallet,
-                    chain: withdrawChain,
+                    chain: withdrawChain
                 }),
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error?.message || 'Erro ao solicitar saque');
+            if (res.ok) {
+                setWithdrawSuccess(true);
+                setWithdrawAmount('');
+                loadBalance();
+            } else {
+                const data = await res.json();
+                setWithdrawError(data.error?.message || 'Erro ao solicitar saque');
             }
-
-            setWithdrawSuccess(true);
-            setWithdrawAmount('');
-            setWithdrawWallet('');
-            loadBalance();
-            loadWithdrawHistory();
         } catch (err: any) {
-            setWithdrawError(err.message || 'Erro ao solicitar saque');
-        } finally {
-            setWithdrawLoading(false);
-        }
-    };
-
-    const withdrawAll = () => {
-        setWithdrawAmount(usdBalance.toString());
+            setWithdrawError(err.message);
+        } finally { setWithdrawLoading(false); }
     };
 
     return (
-        <div className="min-h-screen bg-neutral-950">
-            <div className="mx-auto max-w-5xl px-6 py-10">
-                {/* Header */}
-                <header className="flex flex-wrap items-center justify-between gap-6 border-b border-neutral-900 pb-8">
+        <div className="min-h-screen bg-neutral-950 text-neutral-200">
+            <div className="mx-auto max-w-5xl px-6 py-12">
+                <header className="flex items-center justify-between border-b border-neutral-900 pb-10">
                     <div>
-                        <span className="section-title">Financeiro</span>
-                        <h1 className="mt-3 text-3xl font-semibold text-neutral-50">Depósitos & Saques</h1>
-                        <p className="mt-2 text-sm text-neutral-500">
-                            Gerencie seus fundos com segurança
-                        </p>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-purple-500 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">Financeiro</span>
+                        <h1 className="mt-4 text-4xl font-bold text-neutral-50 tracking-tight">TESOURARIA</h1>
+                        <p className="text-sm text-neutral-500 mt-2">Circulação de capital otimizada para Arbitragem e Sniping</p>
                     </div>
-                    <Link href="/dashboard" className="btn-secondary px-4 py-2 text-sm">
-                        Voltar ao Dashboard
+                    <Link href="/dashboard" className="group flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-100 transition-colors">
+                        <span className="w-8 h-8 rounded-full border border-neutral-800 flex items-center justify-center group-hover:border-neutral-600">←</span>
+                        Painel de Controle
                     </Link>
                 </header>
 
-                {/* Tabs */}
-                <div className="mt-10 flex gap-4 border-b border-neutral-900">
-                    <button
-                        onClick={() => setActiveTab('deposit')}
-                        className={`pb-3 px-4 text-sm font-semibold transition-colors ${activeTab === 'deposit'
-                            ? 'border-b-2 border-purple-500 text-purple-400'
-                            : 'text-neutral-500 hover:text-neutral-300'
-                            }`}
-                    >
-                        Depositar
+                <nav className="mt-12 flex gap-8">
+                    <button onClick={() => setActiveTab('deposit')} className={`relative pb-4 text-xs font-bold uppercase tracking-[0.15em] transition-all ${activeTab === 'deposit' ? 'text-purple-400' : 'text-neutral-600 hover:text-neutral-400'}`}>
+                        Depósitos Ativos
+                        {activeTab === 'deposit' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-500"></span>}
                     </button>
-                    <button
-                        onClick={() => setActiveTab('withdraw')}
-                        className={`pb-3 px-4 text-sm font-semibold transition-colors ${activeTab === 'withdraw'
-                            ? 'border-b-2 border-purple-500 text-purple-400'
-                            : 'text-neutral-500 hover:text-neutral-300'
-                            }`}
-                    >
-                        Sacar
+                    <button onClick={() => setActiveTab('withdraw')} className={`relative pb-4 text-xs font-bold uppercase tracking-[0.15em] transition-all ${activeTab === 'withdraw' ? 'text-purple-400' : 'text-neutral-600 hover:text-neutral-400'}`}>
+                        Solicitar Saque
+                        {activeTab === 'withdraw' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-500"></span>}
                     </button>
-                </div>
+                </nav>
 
-                {/* Deposit Tab */}
                 {activeTab === 'deposit' && (
-                    <div className="mt-8 space-y-6">
-                        {!account ? (
-                            <div className="surface-strong  p-8 text-center">
-                                <p className="text-neutral-400 mb-6">Conecte sua wallet MetaMask para depositar</p>
-                                <button
-                                    onClick={connect}
-                                    disabled={isConnecting}
-                                    className="btn-primary px-6 py-3"
-                                >
-                                    {isConnecting ? 'Conectando...' : 'Conectar MetaMask'}
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="surface-strong p-6">
-                                    <h2 className="text-lg font-semibold text-neutral-100 mb-4">Fazer Depósito</h2>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-neutral-300 mb-2">
-                                                Valor (BNB)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                step="0.001"
-                                                value={amountBNB}
-                                                onChange={(e) => setAmountBNB(e.target.value)}
-                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 text-neutral-100"
-                                            />
-                                            <p className="mt-2 text-xs text-neutral-500">
-                                                Saldo: {parseFloat(bnbBalance).toFixed(4)} BNB
-                                            </p>
+                    <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        <div className="lg:col-span-2 space-y-8">
+                            <section className="bg-neutral-900/30 border border-neutral-900 rounded-3xl p-10 backdrop-blur-sm">
+                                <h2 className="text-xl font-bold text-neutral-50 mb-8 flex items-center gap-3">
+                                    <span className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center text-purple-400">⚡</span>
+                                    Alocação de Capital
+                                </h2>
+
+                                <div className="grid grid-cols-3 gap-5 mb-10">
+                                    {(['BSC', 'BASE', 'SOLANA'] as const).map(chain => (
+                                        <button 
+                                            key={chain}
+                                            onClick={() => setSelectedChain(chain)}
+                                            className={`group relative p-6 border transition-all rounded-2xl flex flex-col items-center gap-3 ${selectedChain === chain ? 'border-purple-500 bg-purple-500/5 shadow-[0_0_20px_rgba(168,85,247,0.1)]' : 'border-neutral-800 bg-neutral-900/50 hover:border-neutral-700'}`}
+                                        >
+                                            <span className="text-3xl group-hover:scale-110 transition-transform">{chainIcons[chain]}</span>
+                                            <span className="text-[10px] font-black tracking-widest uppercase opacity-60">{chain}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="space-y-8">
+                                    <div className="relative">
+                                        <div className="flex justify-between items-end mb-3">
+                                            <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Montante ({chainNativeTokens[selectedChain]})</label>
+                                            <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800/50 px-2 py-1 rounded">Disponível: {Number(currentNativeBalance).toFixed(4)}</span>
                                         </div>
-                                        <button
+                                        <input 
+                                            type="number" 
+                                            value={amount} 
+                                            onChange={e => setAmount(e.target.value)}
+                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-6 py-5 text-2xl font-mono text-neutral-50 focus:outline-none focus:ring-1 focus:ring-purple-500/50 transition-all shadow-inner"
+                                        />
+                                    </div>
+
+                                    {!currentAccount ? (
+                                        <button 
+                                            onClick={selectedChain === 'SOLANA' ? connectPH : connectMM}
+                                            className="w-full py-5 bg-neutral-50 text-neutral-950 text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-white transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-[0.98]"
+                                        >
+                                            Conectar {selectedChain === 'SOLANA' ? 'Phantom' : 'MetaMask'}
+                                        </button>
+                                    ) : (
+                                        <button 
                                             onClick={handleDeposit}
                                             disabled={status !== 'idle'}
-                                            className="btn-primary w-full py-3 disabled:opacity-50"
+                                            className="w-full py-5 bg-purple-600 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-purple-500 transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
                                         >
-                                            {status === 'sending' && 'Enviando...'}
-                                            {status === 'waiting' && 'Aguardando confirmação...'}
-                                            {status === 'confirmed' && 'Confirmado!'}
-                                            {status === 'failed' && 'Falhou - Tentar novamente'}
-                                            {status === 'idle' && 'Depositar'}
+                                            {status === 'idle' ? `Confirmar Transferência ${selectedChain}` : status === 'sending' ? 'Processando...' : status === 'waiting' ? 'Validando Chain...' : '✅ Sucesso'}
                                         </button>
-                                    </div>
+                                    )}
                                 </div>
+                            </section>
 
-                                {depositHistory.length > 0 && (
-                                    <div className="surface-strong p-6">
-                                        <h3 className="text-lg font-semibold text-neutral-100 mb-4">Histórico de Depósitos</h3>
-                                        <div className="space-y-3">
-                                            {depositHistory.slice(0, 5).map((dep) => (
-                                                <div key={dep.id} className="surface p-4 flex justify-between">
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-neutral-100">
-                                                            {dep.amount_token} {dep.token_symbol}
-                                                        </p>
-                                                        <p className="text-xs text-neutral-500 mt-1">
-                                                            {new Date(dep.created_at).toLocaleString('pt-BR')}
-                                                        </p>
-                                                    </div>
-                                                    <span className="text-xs bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 px-3 py-1 rounded-full">
-                                                        {dep.status}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Withdraw Tab */}
-                {activeTab === 'withdraw' && (
-                    <div className="mt-8 space-y-6">
-                        <div className="surface-strong p-6">
-                            <h2 className="text-lg font-semibold text-neutral-100">Saldo Disponível</h2>
-                            <div className="mt-4 text-4xl font-bold text-emerald-400">
-                                ${usdBalance.toFixed(2)} USD
-                            </div>
-                            <p className="mt-2 text-xs text-neutral-500">
-                                Valor livre para saque (não inclui posições abertas)
-                            </p>
-                        </div>
-
-                        <div className="surface-strong p-6">
-                            <h2 className="text-lg font-semibold text-neutral-100 mb-6">Solicitar Saque</h2>
-
-                            {withdrawError && (
-                                <div className="mb-6 border border-rose-500/40 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-                                    {withdrawError}
-                                </div>
-                            )}
-
-                            {withdrawSuccess && (
-                                <div className="mb-6 border border-emerald-500/40 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-200">
-                                    Saque solicitado com sucesso! Aguarde aprovação.
-                                </div>
-                            )}
-
-                            <form onSubmit={handleWithdraw} className="space-y-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-neutral-300 mb-2">
-                                        Valor (USD)
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={withdrawAmount}
-                                            onChange={(e) => setWithdrawAmount(e.target.value)}
-                                            className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 text-neutral-100"
-                                            placeholder="100.00"
-                                            disabled={withdrawLoading}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={withdrawAll}
-                                            className="btn-secondary px-4 text-sm"
-                                            disabled={withdrawLoading}
-                                        >
-                                            Sacar Tudo
-                                        </button>
-                                    </div>
-                                    <p className="mt-2 text-xs text-neutral-500">
-                                        Disponível: ${usdBalance.toFixed(2)}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-neutral-300 mb-2">
-                                        Endereço da Wallet
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={withdrawWallet}
-                                        onChange={(e) => setWithdrawWallet(e.target.value)}
-                                        className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 text-neutral-100 font-mono text-sm"
-                                        placeholder="0x..."
-                                        disabled={withdrawLoading}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-neutral-300 mb-2">
-                                        Blockchain
-                                    </label>
-                                    <select
-                                        value={withdrawChain}
-                                        onChange={(e) => setWithdrawChain(e.target.value)}
-                                        className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 text-neutral-100"
-                                        disabled={withdrawLoading}
-                                    >
-                                        <option value="BSC">BSC (Binance Smart Chain)</option>
-                                        <option value="ETH">Ethereum</option>
-                                        <option value="SOL">Solana</option>
-                                    </select>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={withdrawLoading || usdBalance <= 0}
-                                    className="btn-primary w-full py-3 text-sm font-semibold disabled:opacity-50"
-                                >
-                                    {withdrawLoading ? 'Processando...' : 'Solicitar Saque'}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Historico de Saques */}
-                        {withdrawals.length > 0 && (
-                            <div className="surface-strong p-6">
-                                <h3 className="text-lg font-semibold text-neutral-100 mb-4">Histórico de Saques</h3>
-                                <div className="space-y-3">
-                                    {withdrawals.map((w) => (
-                                        <div key={w.id} className="surface p-4">
-                                            <div className="flex flex-wrap items-center justify-between gap-4">
+                            <section className="bg-neutral-900/20 border border-neutral-900 rounded-3xl p-10">
+                                <h3 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-8 flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
+                                    Log de Atividade
+                                </h3>
+                                <div className="space-y-4">
+                                    {depositHistory.slice(0, 5).map(dep => (
+                                        <div key={dep.id} className="p-5 border border-neutral-800 rounded-2xl flex items-center justify-between hover:bg-neutral-800/30 transition-all">
+                                            <div className="flex items-center gap-5">
+                                                <div className="w-12 h-12 rounded-xl bg-neutral-900 flex items-center justify-center text-xl shadow-inner">{chainIcons[dep.chain] || '❓'}</div>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-neutral-100">
-                                                        ${w.amount_usd.toFixed(2)} USD
-                                                    </p>
-                                                    <p className="text-xs text-neutral-500 font-mono mt-1">
-                                                        {w.wallet_address.substring(0, 20)}...
-                                                    </p>
-                                                    <p className="text-xs text-neutral-500 mt-1">
-                                                        {new Date(w.created_at).toLocaleString('pt-BR')}
-                                                    </p>
+                                                    <p className="text-sm font-bold text-neutral-100">{dep.amount_token} {dep.token_symbol}</p>
+                                                    <p className="text-[10px] text-neutral-500 font-mono mt-1 opacity-60">{dep.chain} • {new Date(dep.created_at).toLocaleDateString()}</p>
                                                 </div>
-                                                <div className="text-right">
-                                                    <span
-                                                        className={`inline-block text-xs px-3 py-1 rounded-full ${w.status === 'completed'
-                                                            ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-300'
-                                                            : w.status === 'pending'
-                                                                ? 'bg-amber-500/10 border border-amber-500/40 text-amber-300'
-                                                                : w.status === 'rejected'
-                                                                    ? 'bg-rose-500/10 border border-rose-500/40 text-rose-300'
-                                                                    : 'bg-neutral-500/10 border border-neutral-500/40 text-neutral-300'
-                                                            }`}
-                                                    >
-                                                        {w.status}
-                                                    </span>
-                                                    {w.tx_hash && (
-                                                        <a
-                                                            href={`https://bscscan.com/tx/${w.tx_hash}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="block mt-2 text-xs text-purple-400 hover:text-purple-300 underline"
-                                                        >
-                                                            Ver TX
-                                                        </a>
-                                                    )}
-                                                </div>
+                                            </div>
+                                            <div className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-neutral-700 bg-neutral-900/50">
+                                                {dep.status}
                                             </div>
                                         </div>
                                     ))}
+                                    {depositHistory.length === 0 && <div className="text-center py-10 opacity-30 text-xs italic">Sem registros recentes</div>}
+                                </div>
+                            </section>
+                        </div>
+
+                        <aside className="space-y-8">
+                            <div className="bg-gradient-to-br from-neutral-900/50 to-neutral-950 border border-neutral-800 rounded-3xl p-8 space-y-8">
+                                <div>
+                                    <h4 className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-4">Protocolo de Segurança</h4>
+                                    <p className="text-xs text-neutral-500 leading-relaxed italic">
+                                        "A segregação de ativos por blockchain mitiga riscos sistêmicos e garante liquidez persistente para execução de arbitragem."
+                                    </p>
+                                </div>
+                                
+                                <div className="pt-8 border-t border-neutral-800 space-y-5">
+                                    <div className="flex justify-between items-center text-[10px]">
+                                        <span className="font-bold text-neutral-600 uppercase tracking-tighter">Gateway Conectado</span>
+                                        <span className="font-mono text-neutral-400">{currentAccount ? `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 'Nenhum'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px]">
+                                        <span className="font-bold text-neutral-600 uppercase tracking-tighter">Confirmações Target</span>
+                                        <span className="font-bold text-purple-400">3 BLOCOS</span>
+                                    </div>
                                 </div>
                             </div>
-                        )}
+                        </aside>
+                    </div>
+                )}
+
+                {activeTab === 'withdraw' && (
+                    <div className="mt-12 max-w-2xl mx-auto space-y-12">
+                        <section className="bg-neutral-900/30 border border-neutral-900 rounded-3xl p-12 text-center backdrop-blur-md relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent"></div>
+                            <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.25em] mb-4">Saldo Liquidável Consolidado</p>
+                            <h2 className="text-6xl font-black text-white tracking-tighter">${usdBalance.toFixed(2)}</h2>
+                            <p className="text-[10px] text-neutral-600 mt-6 tracking-wide">Os valores em staking ou posições abertas não são exibidos aqui.</p>
+                        </section>
+
+                        <section className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-10">
+                            <h3 className="text-sm font-bold text-neutral-100 mb-8">Informar Destino</h3>
+                            <form onSubmit={handleWithdraw} className="space-y-8">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="col-span-1">
+                                        <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 block">Montante (USD)</label>
+                                        <input type="number" step="0.01" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-5 py-4 text-white font-mono" placeholder="0.00" />
+                                    </div>
+                                    <div className="col-span-1">
+                                        <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 block">Blockchain de Saída</label>
+                                        <select value={withdrawChain} onChange={e => setWithdrawChain(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-5 py-4 text-white uppercase text-xs font-bold">
+                                            <option value="BSC">BSC (BEP20)</option>
+                                            <option value="BASE">Base (L2)</option>
+                                            <option value="SOL">Solana</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 block">Endereço Público de Destino</label>
+                                    <input type="text" value={withdrawWallet} onChange={e => setWithdrawWallet(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-5 py-4 text-white font-mono text-xs" placeholder="Cole seu endereço de recebimento..." />
+                                </div>
+
+                                <button type="submit" disabled={withdrawLoading || usdBalance <= 0} className="w-full py-5 bg-emerald-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-emerald-500 transition-all shadow-lg active:scale-0.98 disabled:opacity-50">
+                                    {withdrawLoading ? 'Confirmando Protocolo...' : 'Extrair Capital'}
+                                </button>
+                                
+                                {withdrawSuccess && <p className="text-xs text-emerald-400 text-center font-bold">Solicitação registrada no ledger. Aguarde processamento.</p>}
+                                {withdrawError && <p className="text-xs text-rose-400 text-center font-bold">{withdrawError}</p>}
+                            </form>
+                        </section>
                     </div>
                 )}
             </div>

@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { ExecutorFactory } from './blockchain/executor-factory';
 import { WalletManager } from './blockchain/wallet-manager';
 import { ethers } from 'ethers';
+import { Connection, PublicKey } from '@solana/web3.js';
 
 export class RealTradingService {
     private pool: Pool;
@@ -88,8 +89,15 @@ export class RealTradingService {
         return result.rows[0]?.real_trading_enabled ?? false;
     }
 
+    private getBalanceColumn(chain: string): string {
+        const c = chain.toUpperCase();
+        if (c === 'SOLANA' || c === 'SOL') return 'balance_solana';
+        if (c === 'BASE') return 'balance_base';
+        return 'balance_bsc';
+    }
+
     /**
-     * Executa compra REAL
+     * Executa compra REAL com isolamento de tesouraria
      */
     async executeRealBuy(
         userId: string,
@@ -98,110 +106,126 @@ export class RealTradingService {
         amountUSD: number,
         chain: string = 'BSC'
     ): Promise<{ success: boolean; txHash?: string; error?: string }> {
+        const client = await this.pool.connect();
         try {
             console.log(`[RealTrading] 🔥 Executing REAL BUY for user ${userId} on ${chain}`);
+            
+            await client.query('BEGIN');
 
-            // 1. Obter private key
+            // 1. Verificar Saldo Isolado
+            const balanceCol = this.getBalanceColumn(chain);
+            const userRes = await client.query(
+                `SELECT ${balanceCol}, email FROM users WHERE id = $1 FOR UPDATE`,
+                [userId]
+            );
+            
+            if (userRes.rows.length === 0) throw new Error('User not found');
+            
+            const currentBalance = Number(userRes.rows[0][balanceCol] || 0);
             const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-            const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
-            const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
+            const userEmail = (userRes.rows[0].email || '').trim().toLowerCase();
             const isAdmin = adminEmail && userEmail === adminEmail;
 
+            // Admin tem saldo "infinito" se houver capital na master wallet, mas usuários normais são limitados
+            if (!isAdmin && currentBalance < amountUSD) {
+                throw new Error(`Insufficient ${chain} balance. Available: $${currentBalance}`);
+            }
+
+            // 2. Obter canais de execução e chaves
             let privateKey: string;
             if (isAdmin) {
                 let encryptedKey = '';
                 if (chain.toUpperCase() === 'SOLANA' || chain.toUpperCase() === 'SOL') {
                     encryptedKey = process.env.SOLANA_BOT_PRIVATE_KEY || '';
                 }
-
-                // Se não houver chave específica de Solana ou for outra chain, usar o BOT_WALLET_PRIVATE_KEY padrão
-                if (!encryptedKey) {
-                    encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
-                }
-
-                if (!encryptedKey) throw new Error(`Master wallet private key not defined for ${chain}`);
+                if (!encryptedKey) encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
+                if (!encryptedKey) throw new Error(`Master wallet key not defined for ${chain}`);
                 privateKey = await this.walletManager.decryptPrivateKey(encryptedKey);
-                console.log(`[RealTrading] 👮 Admin using master wallet`);
             } else {
                 const wallet = await this.walletManager.getWallet(userId, chain);
-                if (!wallet) throw new Error(`User does not have a ${chain} wallet`);
+                if (!wallet) throw new Error(`No wallet found for user on ${chain}`);
                 privateKey = await this.walletManager.decryptPrivateKey(wallet.encrypted_private_key);
             }
 
-            // 2. Inicializar Executor
-            const executor = ExecutorFactory.createExecutor(chain, this.pool);
-
-            // 3. Segurança: Honeypot check (GoPlus)
-            console.log(`[RealTrading] 🛡️ Honeypot check for ${tokenSymbol}...`);
+            // 3. Segurança & Cálculo
             const hp = await this.checkHoneypot(tokenAddress, chain);
-            if (!hp.isSafe) throw new Error(`Risk detected: ${hp.reason}`);
+            if (!hp.isSafe) throw new Error(`Risk: ${hp.reason}`);
 
-            // 4. Calcular quantidade nativa
             const nativePrice = await this.getNativePrice(chain);
             const amountNative = (amountUSD / nativePrice).toFixed(6);
-            console.log(`[RealTrading] 💱 Trade size: ${amountNative} ${this.getNativeSymbol(chain)} ($${amountUSD})`);
 
-            // 5. Executar Buy
+            // 4. Deduzir saldo ANTES da execução (lock preventivo)
+            if (!isAdmin) {
+                await client.query(
+                    `UPDATE users SET ${balanceCol} = ${balanceCol} - $1 WHERE id = $2`,
+                    [amountUSD, userId]
+                );
+            }
+
+            // 5. Executar Transação On-Chain
+            const executor = ExecutorFactory.createExecutor(chain, this.pool);
             const result = await executor.buyToken({
                 privateKey,
                 tokenAddress,
                 amountIn: amountNative,
-                slippage: 2
+                slippage: 3
             });
 
-            if (!result.success) throw new Error(result.error || 'Buy transaction failed');
+            if (!result.success) throw new Error(result.error || 'Transaction failed');
 
-            console.log(`[RealTrading] ✅ SUCCESS! TX: ${result.txHash}`);
+            // 6. Registrar Ledger com Chain específica
+            await client.query(
+                `INSERT INTO ledger_entries (user_id, type, amount_usd, description, chain) 
+                 VALUES ($1, 'BUY', $2, $3, $4)`,
+                [userId, -amountUSD, `Real Buy: ${tokenSymbol} on ${chain}`, chain.toUpperCase()]
+            );
+
+            await client.query('COMMIT');
+            console.log(`[RealTrading] ✅ BUY SUCCESS! TX: ${result.txHash}`);
             return { success: true, txHash: result.txHash };
 
         } catch (error: any) {
+            await client.query('ROLLBACK');
             console.error(`[RealTrading] ❌ Real BUY failed:`, error.message);
             return { success: false, error: error.message };
+        } finally {
+            client.release();
         }
     }
 
     /**
-     * Executa venda REAL
+     * Executa venda REAL com atualização de tesouraria
      */
     async executeRealSell(
         userId: string,
         tokenAddress: string,
         tokenSymbol: string,
         amountTokens: string,
+        receivedUSD: number, // Valor estimado ou real recebido
         chain: string = 'BSC'
     ): Promise<{ success: boolean; txHash?: string; error?: string }> {
+        const client = await this.pool.connect();
         try {
             console.log(`[RealTrading] 🔥 Executing REAL SELL for user ${userId} on ${chain}`);
+            await client.query('BEGIN');
 
-            // 1. Obter private key
+            // 1. Obter Key
             const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-            const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
-            const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
-            const isAdmin = adminEmail && userEmail === adminEmail;
+            const userRes = await client.query('SELECT email FROM users WHERE id = $1', [userId]);
+            const isAdmin = adminEmail && userRes.rows[0]?.email === adminEmail;
 
             let privateKey: string;
             if (isAdmin) {
-                let encryptedKey = '';
-                if (chain.toUpperCase() === 'SOLANA' || chain.toUpperCase() === 'SOL') {
-                    encryptedKey = process.env.SOLANA_BOT_PRIVATE_KEY || '';
-                }
-
-                if (!encryptedKey) {
-                    encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
-                }
-
-                if (!encryptedKey) throw new Error(`Master wallet private key not defined for ${chain}`);
-                privateKey = await this.walletManager.decryptPrivateKey(encryptedKey);
+                let encryptedKey = (chain.toUpperCase() === 'SOLANA') ? process.env.SOLANA_BOT_PRIVATE_KEY : process.env.BOT_WALLET_PRIVATE_KEY;
+                if (!encryptedKey) encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY;
+                privateKey = await this.walletManager.decryptPrivateKey(encryptedKey!);
             } else {
                 const wallet = await this.walletManager.getWallet(userId, chain);
-                if (!wallet) throw new Error(`No wallet for ${chain}`);
-                privateKey = await this.walletManager.decryptPrivateKey(wallet.encrypted_private_key);
+                privateKey = await this.walletManager.decryptPrivateKey(wallet!.encrypted_private_key);
             }
 
-            // 2. Inicializar Executor
+            // 2. Executar Venda
             const executor = ExecutorFactory.createExecutor(chain, this.pool);
-
-            // 3. Executar Sell (Slippage alto para proteção em flash dumps)
             const result = await executor.sellToken({
                 privateKey,
                 tokenAddress,
@@ -209,30 +233,46 @@ export class RealTradingService {
                 slippage: 15
             });
 
-            if (!result.success) throw new Error(result.error || 'Sell transaction failed');
+            if (!result.success) throw new Error(result.error || 'Sell failed');
 
-            console.log(`[RealTrading] ✅ SUCCESS! TX: ${result.txHash}`);
+            // 3. Recompor Saldo (Profit/Loss)
+            const balanceCol = this.getBalanceColumn(chain);
+            if (!isAdmin) {
+                await client.query(
+                    `UPDATE users SET ${balanceCol} = ${balanceCol} + $1 WHERE id = $2`,
+                    [receivedUSD, userId]
+                );
+            }
+
+            // 4. Ledger entry
+            await client.query(
+                `INSERT INTO ledger_entries (user_id, type, amount_usd, description, chain) 
+                 VALUES ($1, 'SELL', $2, $3, $4)`,
+                [userId, receivedUSD, `Real Sell: ${tokenSymbol} on ${chain}`, chain.toUpperCase()]
+            );
+
+            await client.query('COMMIT');
             return { success: true, txHash: result.txHash };
 
         } catch (error: any) {
-            console.error(`[RealTrading] ❌ Real SELL failed:`, error.message);
+            await client.query('ROLLBACK');
             return { success: false, error: error.message };
+        } finally {
+            client.release();
         }
     }
 
     async getRealBalance(userId: string): Promise<number> {
-        // Se for admin, retornar balanço da carteira master (simplificado para BSC por enquanto)
-        const residual = await this.getAdminResidualBalance(userId);
-        if (residual !== null) return residual;
-
-        const result = await this.pool.query(
-            `SELECT COALESCE(SUM(amount_usd), 0) as balance FROM ledger_entries WHERE user_id = $1`,
+        // Agora retorna a soma das 3 chains para o total, mas o executor deve usar individualmente
+        const res = await this.pool.query(
+            'SELECT (balance_bsc + balance_base + balance_solana) as total FROM users WHERE id = $1',
             [userId]
         );
-        return Number(result.rows[0]?.balance ?? 0);
+        return Number(res.rows[0]?.total || 0);
     }
 
     async getAdminResidualBalance(userId: string): Promise<number | null> {
+        // Redirecionar para lógica robusta multi-chain (deve simular o que o api-gateway faz)
         const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
         const userResult = await this.pool.query('SELECT email FROM users WHERE id = $1', [userId]);
         const userEmail = (userResult.rows[0]?.email || '').trim().toLowerCase();
@@ -240,18 +280,35 @@ export class RealTradingService {
         if (userEmail !== adminEmail) return null;
 
         try {
-            const masterAddress = process.env.BOT_DEPOSIT_ADDRESS;
-            const bnbPrice = await this.getNativePrice('BSC');
-            const provider = new ethers.JsonRpcProvider(process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org');
-
-            if (masterAddress) {
-                const balanceBNB = await provider.getBalance(masterAddress);
-                return Number(ethers.formatEther(balanceBNB)) * bnbPrice;
-            }
-            return 0;
+            // Soma simples dos resíduos on-chain (simplificado aqui, o gateway tem a versão de produção)
+            const bsc = await this.getChainResidue('BSC');
+            const sol = await this.getChainResidue('SOLANA');
+            const base = await this.getChainResidue('BASE');
+            return bsc + sol + base;
         } catch {
             return null;
         }
+    }
+
+    private async getChainResidue(chain: string): Promise<number> {
+        try {
+            const price = await this.getNativePrice(chain);
+            let address = process.env.BOT_DEPOSIT_ADDRESS;
+            if (chain === 'SOLANA') address = 'I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C';
+            
+            if (!address) return 0;
+
+            if (chain === 'SOLANA') {
+                const conn = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+                const bal = await conn.getBalance(new PublicKey(address));
+                return (bal / 1e9) * price;
+            } else {
+                const rpc = chain === 'BASE' ? process.env.BASE_RPC_URL : process.env.BSC_RPC_URL;
+                const provider = new ethers.JsonRpcProvider(rpc || 'https://bsc-dataseed1.binance.org');
+                const bal = await provider.getBalance(address);
+                return (Number(ethers.formatEther(bal))) * price;
+            }
+        } catch { return 0; }
     }
 
     async checkHoneypot(tokenAddress: string, chain: string): Promise<{ isSafe: boolean; reason: string }> {

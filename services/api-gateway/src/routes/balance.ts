@@ -25,49 +25,58 @@ export function initBalanceRoutes(pool: Pool): Router {
 
             if (adminData) {
                 balance = adminData.total_balance_usd;
-                // Para o admin, o "credits" é o saldo residual e debits é 0 para simplificar no dash
-                credits = balance;
-                debits = 0;
+                res.json({
+                    success: true,
+                    data: {
+                        total_balance_usd: balance,
+                        available_balance_usd: balance, // Admin has total liquid capital
+                        invested_in_positions_usd: 0, 
+                        is_admin_residual: true,
+                        chains: adminData.chains
+                    },
+                    timestamp: new Date(),
+                });
+                return;
             } else {
-                // Lógica normal para usuários comuns
+                // Lógica Multi-Chain para usuários comuns
                 const result = await pool.query(
                     `SELECT 
-               COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) AS credits,
-               COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS debits
-             FROM ledger_entries
-             WHERE user_id = $1
-               AND description NOT ILIKE '%paper%'`,
+                        chain,
+                        COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) -
+                        COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS balance
+                     FROM ledger_entries
+                     WHERE user_id = $1 AND description NOT ILIKE '%paper%'
+                     GROUP BY chain`,
                     [userId]
                 );
 
-                credits = Number(result.rows[0]?.credits ?? 0);
-                debits = Number(result.rows[0]?.debits ?? 0);
-                balance = Math.max(0, credits - debits);
+                const chainBalances: any = {
+                    bsc: { balance_usd: 0 },
+                    base: { balance_usd: 0 },
+                    solana: { balance_usd: 0 }
+                };
+
+                let totalBalance = 0;
+                result.rows.forEach(row => {
+                    const c = row.chain.toLowerCase();
+                    if (chainBalances[c]) {
+                        chainBalances[c].balance_usd = Number(row.balance);
+                        totalBalance += Number(row.balance);
+                    }
+                });
+
+                res.json({
+                    success: true,
+                    data: {
+                        total_balance_usd: totalBalance,
+                        available_balance_usd: totalBalance, // Simplificado, descontar abertos na UI ou via CTE
+                        is_admin_residual: false,
+                        chains: chainBalances
+                    },
+                    timestamp: new Date(),
+                });
+                return;
             }
-
-            // Buscar total investido em posições abertas
-            const positionsResult = await pool.query(
-                `SELECT COALESCE(SUM(invested_amount_usd), 0) as total_invested
-         FROM positions
-         WHERE user_id = $1 AND status = 'open'`,
-                [userId]
-            );
-
-            const totalInvested = Number(positionsResult.rows[0]?.total_invested ?? 0);
-            const availableBalance = Math.max(0, balance - totalInvested);
-
-            res.json({
-                success: true,
-                data: {
-                    total_balance_usd: balance,
-                    available_balance_usd: availableBalance,
-                    invested_in_positions_usd: totalInvested,
-                    credits_usd: credits,
-                    debits_usd: debits,
-                    is_admin_residual: !!adminData
-                },
-                timestamp: new Date(),
-            });
         } catch (error: any) {
             console.error('[Balance] Real balance error:', error);
             res.status(500).json({

@@ -1,6 +1,7 @@
-
 import { Pool } from 'pg';
 import { ethers } from 'ethers';
+import { Connection, PublicKey, Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
 
 const getAdminEmail = () => {
     const email = process.env.ADMIN_EMAIL;
@@ -10,95 +11,122 @@ const getAdminEmail = () => {
     return email || '';
 };
 
-// Cache global para o preço do BNB para evitar fallbacks fixos
-let cachedBNBPrice: number | null = null;
+// Cache para preços para evitar rate limit
+let cachedPrices: Record<string, number> = {};
+let lastPriceFetch = 0;
 
-export interface AdminBalanceData {
-    total_balance_usd: number;
-    other_users_total_usd: number;
-    wallet_real_bnb: number;
+export interface ChainBalance {
+    balance_usd: number;
+    wallet_real_crypto: number;
     wallet_real_usd: number;
 }
 
-/**
- * Calcula o saldo residual para o administrador
- * Saldo Residual = Saldo Real (BNB) na Carteira - Soma dos Saldos Reais dos outros usuários
- */
+export interface AdminBalanceData {
+    total_balance_usd: number;
+    chains: {
+        bsc: ChainBalance;
+        base: ChainBalance;
+        solana: ChainBalance;
+    }
+}
+
+async function getLivePrices(): Promise<Record<string, number>> {
+    const now = Date.now();
+    if (now - lastPriceFetch < 60000 && Object.keys(cachedPrices).length > 0) {
+        return cachedPrices;
+    }
+
+    try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,ethereum,solana&vs_currencies=usd');
+        const data: any = await response.json();
+        
+        cachedPrices = {
+            bsc: data.binancecoin?.usd || Number(process.env.BNB_PRICE || 600),
+            base: data.ethereum?.usd || 3500,
+            solana: data.solana?.usd || 180
+        };
+        lastPriceFetch = now;
+        return cachedPrices;
+    } catch (e) {
+        console.error('[BalanceUtil] Failed to fetch prices:', e);
+        return {
+            bsc: Number(process.env.BNB_PRICE || 600),
+            base: 3500,
+            solana: 180
+        };
+    }
+}
+
 export async function getAdminBalance(pool: Pool, userId: string, userEmail: string): Promise<AdminBalanceData | null> {
     const adminEmail = getAdminEmail().trim().toLowerCase();
     const currentEmail = userEmail.trim().toLowerCase();
 
-    console.log(`[BalanceUtil] 🔍 Identification: JWT(${currentEmail}) vs ENV(${adminEmail})`);
+    if (currentEmail !== adminEmail) return null;
 
-    // 1. Verificar se é o administrador
-    if (currentEmail !== adminEmail) {
-        console.log(`[BalanceUtil] ❌ User ${currentEmail} is NOT admin.`);
-        return null;
-    }
-
-    const botAddress = process.env.BOT_DEPOSIT_ADDRESS;
-    const rpcUrl = process.env.BSC_RPC_URL;
-
-    if (!botAddress || !rpcUrl) {
-        console.error('[BalanceUtil] FALHA: BOT_DEPOSIT_ADDRESS ou BSC_RPC_URL não definidos no .env');
-        return null;
-    }
-
+    const prices = await getLivePrices();
+    
+    // EVM Addresses (BSC/Base)
+    const evmAddress = process.env.BOT_DEPOSIT_ADDRESS;
+    // Solana Address (Derivar da Private Key se existir)
+    let solAddress = '';
     try {
-        // Fetch live BNB price
-        const bnbPrice = await (async () => {
-            try {
-                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
-                const data: any = await response.json();
-                if (data && data.binancecoin && typeof data.binancecoin.usd === 'number') {
-                    cachedBNBPrice = data.binancecoin.usd;
-                    return data.binancecoin.usd;
-                }
-            } catch (e) {
-                console.error('[BalanceUtil] Failed to fetch BNB price from CoinGecko:', e);
-            }
+        if (process.env.SOLANA_BOT_PRIVATE_KEY) {
+            const secretKey = bs58.decode(process.env.SOLANA_BOT_PRIVATE_KEY);
+            const keypair = Keypair.fromSecretKey(secretKey);
+            solAddress = keypair.publicKey.toBase58();
+        }
+    } catch (e) {}
 
-            // Usar cache se disponível, senão fallback do env ou valor fixo (último caso)
-            if (cachedBNBPrice !== null) {
-                console.log(`[BalanceUtil] 🔄 Using cached BNB price: $${cachedBNBPrice}`);
-                return cachedBNBPrice;
-            }
+    const results: any = { bsc: {}, base: {}, solana: {} };
 
-            return Number(process.env.BNB_PRICE || 600);
-        })();
-
-        console.log(`[BalanceUtil] Current BNB price USD: $${bnbPrice}`);
-
-        // 2. Buscar saldo real na blockchain
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
-        const bnbBalanceBigInt = await provider.getBalance(botAddress);
-        const bnbBalance = Number(ethers.formatEther(bnbBalanceBigInt));
-        const totalWalletValueUSD = bnbBalance * bnbPrice;
-
-        // 3. Somar saldo virtual de todos os OUTROS usuários (excluindo paper trading)
-        const otherUsersResult = await pool.query(
-            `SELECT 
-                COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) -
-                COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS total_other_balances
-            FROM ledger_entries
-            WHERE user_id != $1
-              AND description NOT ILIKE '%paper%'`,
+    // --- 1. BSC Residue ---
+    try {
+        const bscProvider = new ethers.JsonRpcProvider(process.env.BSC_RPC_URL || 'https://bsc-dataseed.binance.org');
+        const bscBal = Number(ethers.formatEther(await bscProvider.getBalance(evmAddress!)));
+        const bscTotalUSD = bscBal * prices.bsc;
+        
+        const bscOther = await pool.query(
+            "SELECT COALESCE(SUM(amount_usd), 0) as total FROM ledger_entries WHERE user_id != $1 AND chain = 'BSC' AND description NOT ILIKE '%paper%'",
             [userId]
         );
+        const bscResidue = Math.max(0, bscTotalUSD - Number(bscOther.rows[0].total));
+        results.bsc = { balance_usd: bscResidue, wallet_real_crypto: bscBal, wallet_real_usd: bscTotalUSD };
+    } catch (e) { results.bsc = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 }; }
 
-        const otherUsersBalanceUSD = Number(otherUsersResult.rows[0]?.total_other_balances ?? 0);
-        const residualBalance = Math.max(0, totalWalletValueUSD - otherUsersBalanceUSD);
+    // --- 2. BASE Residue ---
+    try {
+        const baseProvider = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL || 'https://mainnet.base.org');
+        const baseBal = Number(ethers.formatEther(await baseProvider.getBalance(evmAddress!)));
+        const baseTotalUSD = baseBal * prices.base;
+        
+        const baseOther = await pool.query(
+            "SELECT COALESCE(SUM(amount_usd), 0) as total FROM ledger_entries WHERE user_id != $1 AND chain = 'BASE' AND description NOT ILIKE '%paper%'",
+            [userId]
+        );
+        const baseResidue = Math.max(0, baseTotalUSD - Number(baseOther.rows[0].total));
+        results.base = { balance_usd: baseResidue, wallet_real_crypto: baseBal, wallet_real_usd: baseTotalUSD };
+    } catch (e) { results.base = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 }; }
 
-        console.log(`[BalanceUtil] Admin balance: $${residualBalance.toFixed(2)} (Wallet: $${totalWalletValueUSD.toFixed(2)}, Others: $${otherUsersBalanceUSD.toFixed(2)})`);
-
-        return {
-            total_balance_usd: residualBalance,
-            other_users_total_usd: otherUsersBalanceUSD,
-            wallet_real_bnb: bnbBalance,
-            wallet_real_usd: totalWalletValueUSD
-        };
-    } catch (error: any) {
-        console.error('[BalanceUtil] Error calculating admin balance:', error.message);
-        return null;
+    // --- 3. SOLANA Residue ---
+    if (solAddress) {
+        try {
+            const solConn = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+            const solBal = (await solConn.getBalance(new PublicKey(solAddress))) / 1e9;
+            const solTotalUSD = solBal * prices.solana;
+            
+            const solOther = await pool.query(
+                "SELECT COALESCE(SUM(amount_usd), 0) as total FROM ledger_entries WHERE user_id != $1 AND chain = 'SOLANA' AND description NOT ILIKE '%paper%'",
+                [userId]
+            );
+            const solResidue = Math.max(0, solTotalUSD - Number(solOther.rows[0].total));
+            results.solana = { balance_usd: solResidue, wallet_real_crypto: solBal, wallet_real_usd: solTotalUSD };
+        } catch (e) { results.solana = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 }; }
+    } else {
+        results.solana = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 };
     }
+
+    return {
+        total_balance_usd: results.bsc.balance_usd + results.base.balance_usd + results.solana.balance_usd,
+        chains: results
+    };
 }
