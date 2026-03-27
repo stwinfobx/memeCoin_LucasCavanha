@@ -15,6 +15,11 @@ const getAdminEmail = () => {
 let cachedPrices: Record<string, number> = {};
 let lastPriceFetch = 0;
 
+// Cache para saldo Admin (evitar spam de RPC)
+let cachedAdminBalance: AdminBalanceData | null = null;
+let lastAdminBalanceFetch = 0;
+const ADMIN_BALANCE_CACHE_TTL = 60000; // 60 segundos
+
 export interface ChainBalance {
     balance_usd: number;
     wallet_real_crypto: number;
@@ -62,6 +67,11 @@ export async function getAdminBalance(pool: Pool, userId: string, userEmail: str
     const currentEmail = userEmail.trim().toLowerCase();
 
     if (currentEmail !== adminEmail) return null;
+
+    const now = Date.now();
+    if (cachedAdminBalance && (now - lastAdminBalanceFetch < ADMIN_BALANCE_CACHE_TTL)) {
+        return cachedAdminBalance;
+    }
 
     const prices = await getLivePrices();
     
@@ -125,8 +135,13 @@ export async function getAdminBalance(pool: Pool, userId: string, userEmail: str
         results.solana = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 };
     }
 
-    return {
+    const finalResult = {
         total_balance_usd: results.bsc.balance_usd + results.base.balance_usd + results.solana.balance_usd,
         chains: results
     };
+
+    cachedAdminBalance = finalResult;
+    lastAdminBalanceFetch = now;
+
+    return finalResult;
 }

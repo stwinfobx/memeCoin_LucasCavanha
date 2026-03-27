@@ -72,12 +72,26 @@ export default function BalanceDisplay() {
         );
     }
 
-    if (!balance) return null;
+    if (!balance || !balance.chains) {
+        if (!loading && !balance) return null;
+        return (
+            <div className="surface-strong p-6 text-center text-neutral-500 italic">
+                Aguardando dados da tesouraria...
+            </div>
+        );
+    }
+    
+    // Fallback safe for missing chains
+    const safeChains = balance.chains || {
+        bsc: { balance_usd: 0 },
+        base: { balance_usd: 0 },
+        solana: { balance_usd: 0 }
+    };
 
     const chains = [
-        { id: 'bsc', ...balance.chains.bsc },
-        { id: 'base', ...balance.chains.base },
-        { id: 'solana', ...balance.chains.solana }
+        { id: 'bsc', ...safeChains.bsc },
+        { id: 'base', ...safeChains.base },
+        { id: 'solana', ...safeChains.solana }
     ];
 
     return (

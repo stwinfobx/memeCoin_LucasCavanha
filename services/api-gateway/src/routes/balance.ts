@@ -256,7 +256,8 @@ export function initBalanceRoutes(pool: Pool): Router {
                     invested_in_positions_usd: totalInvested,
                     credits_usd: credits,
                     debits_usd: debits,
-                    is_admin_residual: !!adminData
+                    is_admin_residual: !!adminData,
+                    chains: adminData ? adminData.chains : await getUserChainBalances(pool, userId!, balance)
                 },
                 timestamp: new Date(),
             });
@@ -271,6 +272,35 @@ export function initBalanceRoutes(pool: Pool): Router {
     });
 
     return router;
+}
+
+// Helper to get chain breakdown for standard users
+async function getUserChainBalances(pool: Pool, userId: string, totalBalance: number) {
+    const result = await pool.query(
+        `SELECT 
+            chain,
+            COALESCE(SUM(CASE WHEN entry_type IN ('deposit', 'trade_profit') THEN amount_usd ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN entry_type IN ('withdrawal', 'trade_loss', 'fee', 'gas') THEN ABS(amount_usd) ELSE 0 END), 0) AS balance
+         FROM ledger_entries
+         WHERE user_id = $1 AND description NOT ILIKE '%paper%'
+         GROUP BY chain`,
+        [userId]
+    );
+
+    const chainBalances: any = {
+        bsc: { balance_usd: 0 },
+        base: { balance_usd: 0 },
+        solana: { balance_usd: 0 }
+    };
+
+    result.rows.forEach(row => {
+        const c = row.chain.toLowerCase();
+        if (chainBalances[c]) {
+            chainBalances[c].balance_usd = Number(row.balance);
+        }
+    });
+
+    return chainBalances;
 }
 
 export default initBalanceRoutes;
