@@ -59,25 +59,32 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
 
   const now = new Date();
   let firstSeenDate: Date | null = null;
+  
+  const parseDateUTC = (val: any) => {
+    if (!val) return null;
+    // IF it's a number (timestamp), it's already UTC
+    if (typeof val === 'number') return new Date(val * 1000);
+    // If it's a string, ensure it has 'Z' or offset to avoid local time skew
+    const dateStr = String(val);
+    if (!dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
+        return new Date(dateStr + 'Z');
+    }
+    return new Date(dateStr);
+  };
+
   if (input.contractCreation?.timestamp) {
     firstSeenDate = new Date(Number(input.contractCreation.timestamp) * 1000);
   } else if (input.market.pairCreatedAt) {
-    const val = input.market.pairCreatedAt;
-    firstSeenDate = new Date(typeof val === 'string' && !(val as any).endsWith('Z') ? val + 'Z' : val);
+    firstSeenDate = parseDateUTC(input.market.pairCreatedAt);
   } else if (input.token.first_seen_at) {
-    const val = input.token.first_seen_at;
-    firstSeenDate = new Date(typeof val === 'string' && !(val as any).endsWith('Z') ? val + 'Z' : val);
+    firstSeenDate = parseDateUTC(input.token.first_seen_at);
   } else if (input.first_seen_at) {
-    const val = input.first_seen_at;
-    firstSeenDate = new Date(typeof val === 'string' && !(val as any).endsWith('Z') ? val + 'Z' : val);
+    firstSeenDate = parseDateUTC(input.first_seen_at);
   }
   
-  const ageSeconds = firstSeenDate ? differenceInSeconds(now, firstSeenDate) : 0;
+  // Clamping to 0 to avoid "Negative Age" paradox
+  const ageSeconds = firstSeenDate ? Math.max(0, differenceInSeconds(now, firstSeenDate)) : 0;
   const ageMinutes = ageSeconds / 60;
-  
-  // Normalize age input for consistent parsing (Database often returns WITHOUT 'Z')
-  // We force UTC by adding Z if not present to avoid -3h local offset paradox
-  const safeAgeMinutes = ageMinutes; 
 
   if (input.isHoneypot) {
     console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Honeypot Confirmed`);

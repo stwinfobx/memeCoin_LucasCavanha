@@ -218,6 +218,29 @@ export default function DepositWithdrawPage() {
                                     ))}
                                 </div>
 
+                                {/* Master Address Box */}
+                                <div className="mb-10 bg-neutral-950/50 border border-neutral-800 p-6 rounded-2xl">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Endereço de Depósito Master ({selectedChain})</span>
+                                        <button 
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(MASTER_ADDRESSES[selectedChain]);
+                                                alert('Endereço copiado!');
+                                            }}
+                                            className="text-[9px] bg-purple-600 px-3 py-1 rounded-lg text-white font-bold hover:bg-purple-500 transition-colors"
+                                        >
+                                            COPIAR
+                                        </button>
+                                    </div>
+                                    <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900 overflow-hidden">
+                                        <code className="text-[11px] text-purple-400 font-mono break-all">{MASTER_ADDRESSES[selectedChain]}</code>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-600 mt-4 flex items-center gap-2">
+                                        <span className="w-1 h-1 bg-purple-500 rounded-full"></span>
+                                        Envie apenas {chainNativeTokens[selectedChain]} para este endereço. O sistema detectará o depósito em até 2 minutos.
+                                    </p>
+                                </div>
+
                                 <div className="space-y-8">
                                     <div className="relative">
                                         <div className="flex justify-between items-end mb-3">

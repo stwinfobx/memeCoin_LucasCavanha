@@ -82,23 +82,22 @@ export class TradeExecutor {
     return totalBalance * riskFactor;
   }
 
-  /**
-   * Calcula valor investido baseado em confiança do sinal
-   */
   async calculateIntendedInvestment(
     userId: string,
     tokenId: string,
     signalId?: string
   ): Promise<{ amountUsd: number; baseAmount: number; confidenceFactor: number; multiplierFactor: number; available_balance: number }> {
-    // CORRIGIDO: Calcular saldo usando depósitos + lucros/perdas realizados das orders
-    // trade_profit do ledger representa valor total recebido, não lucro
-    // IMPORTANTE: Filtrar depósitos falsos se estivermos em modo LIVE
+    // Buscar chain do token para filtrar saldo
+    const tokenRes = await this.pool.query('SELECT chain FROM tokens WHERE id = $1', [tokenId]);
+    const chain = tokenRes.rows[0]?.chain?.toUpperCase() || 'BSC';
+
     const paperDepositFilter = this.executionMode === 'live' ? "AND description NOT ILIKE '%paper trading%'" : "";
+    const chainFilter = `AND (chain = '${chain}' OR chain IS NULL)`; 
 
     const depositsResult = await this.pool.query(
       `SELECT COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
        FROM ledger_entries
-       WHERE user_id = $1 ${paperDepositFilter}`,
+       WHERE user_id = $1 ${paperDepositFilter} ${chainFilter}`,
       [userId]
     );
     const totalDeposits = Number(depositsResult.rows[0]?.total_deposits ?? 0);
@@ -111,9 +110,10 @@ export class TradeExecutor {
       `SELECT 
          COALESCE(SUM(profit_loss_usd) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd > 0), 0) AS realized_profit,
          COALESCE(SUM(ABS(profit_loss_usd)) FILTER (WHERE order_type = 'SELL' AND status = 'completed' AND profit_loss_usd < 0), 0) AS realized_loss
-       FROM orders
-       WHERE user_id = $1 ${realOrderFilter}`,
-      [userId]
+       FROM orders o
+       JOIN tokens t ON o.token_id = t.id
+       WHERE o.user_id = $1 AND t.chain = $2 ${realOrderFilter}`,
+      [userId, chain]
     );
     const realizedProfit = Number(realizedPLResult.rows[0]?.realized_profit ?? 0);
     const realizedLoss = Number(realizedPLResult.rows[0]?.realized_loss ?? 0);
@@ -124,9 +124,10 @@ export class TradeExecutor {
     // Buscar investido em posições abertas
     const openPositionsResult = await this.pool.query(
       `SELECT COALESCE(SUM(invested_amount_usd), 0) AS total_invested
-       FROM positions
-       WHERE user_id = $1 AND status = 'open'`,
-      [userId]
+       FROM positions p
+       JOIN tokens t ON p.token_id = t.id
+       WHERE p.user_id = $1 AND p.status = 'open' AND t.chain = $2`,
+      [userId, chain]
     );
     const investedInPositions = Number(openPositionsResult.rows[0]?.total_invested ?? 0);
 

@@ -131,14 +131,22 @@ export class RealTradingService {
                 throw new Error(`Insufficient ${chain} balance. Available: $${currentBalance}`);
             }
 
-            // 2. Obter canais de execução e chaves
+            // 2. Obter canal de execução e chave
             let privateKey: string;
             if (isAdmin) {
                 let encryptedKey = '';
-                if (chain.toUpperCase() === 'SOLANA' || chain.toUpperCase() === 'SOL') {
+                const isSolana = chain.toUpperCase() === 'SOLANA' || chain.toUpperCase() === 'SOL';
+                if (isSolana) {
                     encryptedKey = process.env.SOLANA_BOT_PRIVATE_KEY || '';
+                    if (!encryptedKey) {
+                        // Fallback emergencial: se não houver chave SOLANA exclusiva, tentar a global
+                        console.warn(`[RealTrading] ⚠️ SOLANA_BOT_PRIVATE_KEY missing, using BOT_WALLET_PRIVATE_KEY fallback`);
+                        encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
+                    }
+                } else {
+                    encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
                 }
-                if (!encryptedKey) encryptedKey = process.env.BOT_WALLET_PRIVATE_KEY || '';
+                
                 if (!encryptedKey) throw new Error(`Master wallet key not defined for ${chain}`);
                 privateKey = await this.walletManager.decryptPrivateKey(encryptedKey);
             } else {
@@ -280,12 +288,15 @@ export class RealTradingService {
         if (userEmail !== adminEmail) return null;
 
         try {
-            // Soma simples dos resíduos on-chain (simplificado aqui, o gateway tem a versão de produção)
+            // Soma os resíduos on-chain por chain
             const bsc = await this.getChainResidue('BSC');
             const sol = await this.getChainResidue('SOLANA');
             const base = await this.getChainResidue('BASE');
+            
+            console.log(`[AdminBalance] Residuals: BSC=$${bsc.toFixed(2)}, SOL=$${sol.toFixed(2)}, BASE=$${base.toFixed(2)}`);
             return bsc + sol + base;
-        } catch {
+        } catch (e) {
+            console.error('[AdminBalance] Error calculating residual:', e);
             return null;
         }
     }
@@ -293,8 +304,24 @@ export class RealTradingService {
     private async getChainResidue(chain: string): Promise<number> {
         try {
             const price = await this.getNativePrice(chain);
-            let address = process.env.BOT_DEPOSIT_ADDRESS;
-            if (chain === 'SOLANA') address = 'I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C';
+            let address = '';
+            
+            if (chain.toUpperCase() === 'SOLANA' || chain.toUpperCase() === 'SOL') {
+                // Derivar endereço da Master Key se houver
+                if (process.env.SOLANA_BOT_PRIVATE_KEY) {
+                    try {
+                        const bs58 = require('bs58');
+                        const { Keypair } = require('@solana/web3.js');
+                        const secretKey = bs58.decode(process.env.SOLANA_BOT_PRIVATE_KEY);
+                        const keypair = Keypair.fromSecretKey(secretKey);
+                        address = keypair.publicKey.toBase58();
+                    } catch { address = 'I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C'; }
+                } else {
+                    address = 'I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C';
+                }
+            } else {
+                address = process.env.BOT_DEPOSIT_ADDRESS || '';
+            }
             
             if (!address) return 0;
 

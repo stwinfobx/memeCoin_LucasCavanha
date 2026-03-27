@@ -50,13 +50,28 @@ export class SolanaChainProvider implements ChainProvider {
             let name = 'Unknown Token';
 
             try {
-                const mintInfo = await getMint(this.connection, mintPubkey);
-                decimals = mintInfo.decimals;
-                supply = mintInfo.supply.toString();
+                // Retry with small delay if throttled
+                let retries = 2;
+                while (retries > 0) {
+                    try {
+                        const mintInfo = await getMint(this.connection, mintPubkey);
+                        decimals = mintInfo.decimals;
+                        supply = mintInfo.supply.toString();
+                        break;
+                    } catch (err: any) {
+                        if (err.message?.includes('429') && retries > 1) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                        retries--;
+                        if (retries === 0) throw err;
+                    }
+                }
             } catch (mintErr: any) {
-                console.warn(`[Solana] getMint failed for ${address}, returning fallback metadata (Pump Fun protection): ${mintErr.message}`);
+                console.warn(`[Solana] getMint failed for ${address} after retries: ${mintErr.message}`);
                 decimals = 6;
                 supply = '1000000000000000';
+                symbol = `SOL-${address.substring(0, 4)}`; // Melhora o fallback de UNKNOWN
+                name = `Solana Token ${address.substring(0, 4)}...`;
             }
 
             // Try Helius DAS first for metadata (more reliable for Pump.fun tokens)
