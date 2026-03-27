@@ -317,6 +317,7 @@ export class SignalAnalyzer {
         safety_score: score,
         overall_score: score,
         price_at_signal: priceAtSignal === null ? undefined : priceAtSignal,
+        liquidity_at_signal: liquidityUsd === 0 ? undefined : liquidityUsd,
       } as const;
 
       const latestSignal = await this.getLatestSignal(tokenId);
@@ -364,6 +365,7 @@ export class SignalAnalyzer {
       safety_score?: number;
       overall_score?: number;
       price_at_signal?: number | null;
+      liquidity_at_signal?: number | null;
       is_active: boolean;
     }
   ): Promise<Signal> {
@@ -380,7 +382,8 @@ export class SignalAnalyzer {
          safety_score = $10,
          overall_score = $11,
          price_at_signal = $12,
-         is_active = $13
+         liquidity_at_signal = $13,
+         is_active = $14
        WHERE id = $1
        RETURNING *`,
       [
@@ -396,6 +399,7 @@ export class SignalAnalyzer {
         payload.safety_score ?? null,
         payload.overall_score ?? null,
         payload.price_at_signal ?? null,
+        payload.liquidity_at_signal ?? null,
         payload.is_active,
       ]
     );
@@ -427,8 +431,8 @@ export class SignalAnalyzer {
       `INSERT INTO signals (
         token_id, signal_type, confidence_score, potential_multiplier,
         volume_score, liquidity_score, holders_score, age_score, safety_score, overall_score,
-        price_at_signal, reasoning, is_active, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+        price_at_signal, liquidity_at_signal, reasoning, is_active, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
       RETURNING *`,
       [
         signalData.token_id,
@@ -442,6 +446,7 @@ export class SignalAnalyzer {
         signalData.safety_score ?? null,
         signalData.overall_score ?? null,
         signalData.price_at_signal ?? null,
+        (signalData as any).liquidity_at_signal ?? null,
         signalData.reasoning,
         signalData.is_active ?? true,
       ]

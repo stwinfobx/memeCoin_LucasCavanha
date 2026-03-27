@@ -92,7 +92,7 @@ export class TradeExecutor {
     const chain = tokenRes.rows[0]?.chain?.toUpperCase() || 'BSC';
 
     const paperDepositFilter = this.executionMode === 'live' ? "AND description NOT ILIKE '%paper trading%'" : "";
-    const chainFilter = `AND (chain = '${chain}' OR chain IS NULL)`; 
+    const chainFilter = `AND (chain = '${chain}' OR chain IS NULL)`;
 
     const depositsResult = await this.pool.query(
       `SELECT COALESCE(SUM(CASE WHEN entry_type = 'deposit' THEN amount_usd ELSE 0 END), 0) AS total_deposits
@@ -644,6 +644,29 @@ export class TradeExecutor {
         throw new Error(`Safe Mode bloqueou a compra: Token muito antigo (${ageMinutes.toFixed(1)} min). O limite é 60 minutos.`);
       }
 
+      // NOVO: RE-AVALIAÇÃO EM TEMPO REAL (ANTI-DUMP/RUG)
+      // Compara os dados do momento do sinal com os dados atuais salvos no banco
+      const initialLiquidity = Number(signal.liquidity_at_signal ?? 0);
+      const currentLiquidity = Number(token.liquidity_usd ?? 0);
+      
+      if (initialLiquidity > 0) {
+        const liqDrop = ((initialLiquidity - currentLiquidity) / initialLiquidity) * 100;
+        if (liqDrop > 15) {
+          console.warn(`[Executor] 🛑 RE-AVALIAÇÃO FALHOU: Liquidez caiu ${liqDrop.toFixed(1)}% desde o sinal ($${initialLiquidity.toFixed(0)} -> $${currentLiquidity.toFixed(0)})`);
+          throw new Error(`Compra bloqueada: Liquidez evaporou ${liqDrop.toFixed(1)}% desde o sinal. Possível Rug/Exit Liquidity.`);
+        }
+      }
+
+      const initialPrice = Number(signal.price_at_signal ?? 0);
+      const currentPrice = Number(token.price_usd ?? 0);
+      if (initialPrice > 0 && currentPrice > 0) {
+        const priceDrop = ((initialPrice - currentPrice) / initialPrice) * 100;
+        if (priceDrop > 25) {
+          console.warn(`[Executor] 🛑 RE-AVALIAÇÃO FALHOU: Preço derreteu ${priceDrop.toFixed(1)}% desde o sinal ($${initialPrice.toFixed(8)} -> $${currentPrice.toFixed(8)})`);
+          throw new Error(`Compra bloqueada: Preço derreteu ${priceDrop.toFixed(1)}% desde o sinal. Possível Dump.`);
+        }
+      }
+
       const riskResult = await this.pool.query(
         'SELECT memecoin_score, risk_score, scam_probability FROM token_risk_assessments WHERE token_id = $1',
         [request.token_id]
@@ -963,7 +986,7 @@ export class TradeExecutor {
 
     // Buscar perfil de risco do usuário (incluindo novos campos de Sniper)
     const profileResult = await this.pool.query(
-      'SELECT risk_profile, max_loss_percent, max_gain_percent, liquidity_drop_threshold FROM user_profiles WHERE user_id = $1', 
+      'SELECT risk_profile, max_loss_percent, max_gain_percent, liquidity_drop_threshold FROM user_profiles WHERE user_id = $1',
       [userId]
     );
     const profile = profileResult.rows[0];
@@ -1019,9 +1042,9 @@ export class TradeExecutor {
       const dropPercent = ((peakLiquidity - currentLiquidity) / peakLiquidity) * 100;
       if (dropPercent >= liquidityDropThreshold) {
         console.error(`[Executor] 🚨 SAFETY LOCK ATIVADO: Liquidez caiu ${dropPercent.toFixed(2)}% do topo ($${peakLiquidity.toFixed(0)} -> $${currentLiquidity.toFixed(0)})`);
-        return { 
-          shouldSell: true, 
-          reason: `🛡️ Safety Lock: Liquidez caiu ${dropPercent.toFixed(2)}% do topo (limite: ${liquidityDropThreshold}%)` 
+        return {
+          shouldSell: true,
+          reason: `🛡️ Safety Lock: Liquidez caiu ${dropPercent.toFixed(2)}% do topo (limite: ${liquidityDropThreshold}%)`
         };
       }
     }
