@@ -62,15 +62,23 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   if (input.contractCreation?.timestamp) {
     firstSeenDate = new Date(Number(input.contractCreation.timestamp) * 1000);
   } else if (input.market.pairCreatedAt) {
-    firstSeenDate = new Date(input.market.pairCreatedAt);
+    const val = input.market.pairCreatedAt;
+    firstSeenDate = new Date(typeof val === 'string' && !(val as any).endsWith('Z') ? val + 'Z' : val);
   } else if (input.token.first_seen_at) {
-    firstSeenDate = new Date(input.token.first_seen_at);
+    const val = input.token.first_seen_at;
+    firstSeenDate = new Date(typeof val === 'string' && !(val as any).endsWith('Z') ? val + 'Z' : val);
   } else if (input.first_seen_at) {
-    firstSeenDate = new Date(input.first_seen_at);
+    const val = input.first_seen_at;
+    firstSeenDate = new Date(typeof val === 'string' && !(val as any).endsWith('Z') ? val + 'Z' : val);
   }
   
   const ageSeconds = firstSeenDate ? differenceInSeconds(now, firstSeenDate) : 0;
   const ageMinutes = ageSeconds / 60;
+  
+  // Normalize age input for consistent parsing (Database often returns WITHOUT 'Z')
+  // We force UTC by adding Z if not present to avoid -3h local offset paradox
+  const safeAgeMinutes = ageMinutes; 
+
   if (input.isHoneypot) {
     console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Honeypot Confirmed`);
     return shutDownWithScore(input, 0, 'Honeypot Confirmed');
@@ -164,6 +172,13 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
             safetyScore -= 15;
             rejectionReasons.push('Aging token penalty (-15)');
         }
+    }
+
+    // --- 2.2 LIQUIDITY LOCKED (V13 Safe Snipe) ---
+    // Mandatory requirement for early Elite signals (<15m)
+    if (ageMinutes < 15 && !input.liquidityLocked) {
+      safetyScore -= 30;
+      rejectionReasons.push('Liquidity NOT locked/burned (-30)');
     }
   }
 

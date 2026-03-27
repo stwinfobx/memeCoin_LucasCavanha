@@ -1,0 +1,151 @@
+# ======================================================
+# CONFIGURACOES GERAIS DO SISTEMA
+# ======================================================
+
+NODE_ENV=development
+PORT=4000
+APP_NAME=TradingBotAI
+FRONTEND_URL=http://31.97.253.85:3000
+BACKEND_URL=http://31.97.253.85:4000
+NEXT_PUBLIC_API_URL=http://31.97.253.85:4000
+
+# ======================================================
+# BANCO DE DADOS (Supabase)
+# ======================================================
+# Obter em: https://supabase.com/dashboard > Seu Projeto > Settings > Database
+# Copiar "Connection String" e preencher abaixo
+
+DATABASE_URL=postgresql://postgres:BtA2x6bo0rkf5Ia8@db.twewpjmctpqkzftprzxg.supabase.co:5432/postgres
+POSTGRES_HOST=db.twewpjmctpqkzftprzxg.supabase.co
+POSTGRES_PORT=5432
+POSTGRES_DB=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=BtA2x6bo0rkf5Ia8
+POSTGRES_SSL=true
+
+# ======================================================
+# SEGURANCA / AUTENTICACAO
+# ======================================================
+# IMPORTANTE: Gerar chaves unicas! Ver docs/GUIA_CONFIGURACAO_DEPLOY.md
+
+JWT_SECRET=Gjdu+Z7nQsNXeY/0eJQnDIwVAVGPHPrihpaGHQHQixM=
+JWT_EXPIRATION=1800min
+REFRESH_TOKEN_EXPIRATION=7d
+ENCRYPTION_KEY=7d6435928734a6210b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a
+CORS_ORIGIN=http://31.97.253.85:3000
+
+# ======================================================
+# EMAIL / NOTIFICACOES (Resend)
+# ======================================================
+# Obter em: https://resend.com/api-keys
+
+EMAIL_SERVICE=resend
+RESEND_API_KEY=re_Jn9LGn9W_2zsdFNNrXChjeDcS3Qr1c7e9
+EMAIL_FROM=onboarding@resend.dev
+EMAIL_ALERTS_ENABLED=true
+
+# ======================================================
+# MICROSERVICES URLS
+# ======================================================
+
+SIGNAL_SERVICE_URL=http://localhost:4002
+SIGNAL_REQUEST_TIMEOUT_MS=5000
+EXECUTOR_SERVICE_URL=http://localhost:4003
+EXECUTOR_REQUEST_TIMEOUT_MS=5000
+EXECUTOR_DEFAULT_USER_ID=00000000-0000-0000-0000-000000000001
+
+# ======================================================
+# APIs DE MERCADO / DEX
+# ======================================================
+
+GECKOTERMINAL_BASE_URL=https://api.geckoterminal.com/api/v2
+GECKOTERMINAL_NETWORK=bsc
+GECKOTERMINAL_PAGE=1
+DEX_API_URL=https://api.dexscreener.com/latest/dex
+COINGECKO_API_URL=https://api.coingecko.com/api/v3
+
+# BSCScan API Key
+# Obter em: https://bscscan.com/apis
+BSCSCAN_API_KEY=I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C
+
+# ======================================================
+# BLOCKCHAIN / BSC
+# ======================================================
+
+# RPC URL para BSC Mainnet
+BSC_RPC_URL=https://bsc-dataseed1.binance.org
+BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+
+# Wallet do Bot (CRITICA!)
+# 1. Criar nova wallet no MetaMask
+# 2. Exportar private key
+# 3. Encriptar usando script em docs/GUIA_CONFIGURACAO_DEPLOY.md
+# 4. Colar resultado abaixo
+BOT_WALLET_PRIVATE_KEY={"encrypted":"5635ee35264fbf5a651711c24b09b76389ae0f205d92a633b9ba53df9e70897ab68f2056f25ac237a89dfb2963c98fca3c4d305c4509c2dc69198d845f6d67fb","iv":"8e52fcad4578590ad6f2333ad40638db","authTag":"2859bdb1a53a5319230dbe24b27f0d8d"}
+
+# Endereco publico da wallet (para receber depositos)
+BOT_DEPOSIT_ADDRESS=0x25342611f754d1125752CcFC851eFCAE0208A9c0
+
+# PancakeSwap / DEX Addresses
+PANCAKESWAP_ROUTER=0x10ED43C718714eb63d5aA57B78B54704E256024E
+WBNB_ADDRESS=0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c
+BNB_PRICE=600
+
+# ======================================================
+# SOLANA (Opcional - para futuro)
+# ======================================================
+
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+SOLSCAN_API_KEY=SUA_CHAVE_SOLSCAN_OPCIONAL
+
+# ======================================================
+# MULTICHAIN SNIPING & SECURITY (ANTIGRAVITY)
+# IMPORTANTE: Estas chaves são do Antigravity, não do cliente.
+# ======================================================
+HELIUS_API_KEY=c0e8b22b-7ba2-425a-b501-83ce58400f19
+GOPLUS_API_KEY=Jhq34vVTnTCNyWXMRkZU
+GOPLUS_API_SECRET=UxcRv1csbND86DRq60dwSbn5h5FQHgXs
+RUGCHECK_API_KEY=322887e0-2053-4971-be81-977f8b58cdb3
+QUICKNODE_RPC_URL=https://alpha-convincing-hill.base-mainnet.quiknode.pro/4e2de075fd52bc19ba81fadbbb30db1083a6f28c/
+QUICKNODE_WSS_URL=wss://alpha-convincing-hill.base-mainnet.quiknode.pro/4e2de075fd52bc19ba81fadbbb30db1083a6f28c/
+BASE_WS_URL=wss://alpha-convincing-hill.base-mainnet.quiknode.pro/4e2de075fd52bc19ba81fadbbb30db1083a6f28c/
+SOLANA_WS_URL=wss://mainnet.helius-rpc.com/?api-key=c0e8b22b-7ba2-425a-b501-83ce58400f19
+BSC_WS_URL=wss://bsc-ws-node.nariox.org
+
+# ======================================================
+# CONFIGURACOES DO BOT
+# ======================================================
+
+# IMPORTANTE: Usar 'live' para trading real, 'simulation' para testes
+BOT_EXECUTION_MODE=live
+
+BOT_REFRESH_INTERVAL=5
+BOT_RISK_LEVEL=medium
+BOT_MAX_OPEN_TRADES=3
+BOT_MAX_LOSS_PERCENT=10
+BOT_MAX_GAIN_PERCENT=25
+
+# ======================================================
+# SINAIS / ESTRATEGIAS
+# ======================================================
+
+SIGNAL_CONFIDENCE_THRESHOLD=2
+SIGNAL_OVERALL_THRESHOLD=2.5
+SIGNAL_PRICE_THRESHOLD=0.02
+PRICE_COLLECTION_MINUTES=1
+AUTO_ANALYZE_INTERVAL_MINUTES=5
+
+# ======================================================
+# INTELIGENCIA ARTIFICIAL (Opcional)
+# ======================================================
+
+AI_SERVICE_URL=http://ia:5000
+AI_CONFIDENCE_THRESHOLD=0.8
+AI_SCAN_INTERVAL=60
+
+# ======================================================
+# LOGS / DOCKER
+# ======================================================
+
+LOG_LEVEL=info
+DOCKER_NETWORK=tradingbot_network

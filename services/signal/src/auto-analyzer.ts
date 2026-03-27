@@ -74,12 +74,19 @@ export class AutoAnalyzer {
              AND s.is_active = true
            )
            OR
-           -- Último sinal tem mais de 10 minutos
-           EXISTS (
+           -- V13: Moeda NOVINHA (< 15 min): checar a cada 3 minutos (Ponto Doce)
+           (t.validated_at > NOW() - INTERVAL '15 minutes' AND EXISTS (
+             SELECT 1 FROM signals s 
+             WHERE s.token_id = t.id 
+             AND s.created_at < NOW() - INTERVAL '3 minutes'
+           ))
+           OR
+           -- V13: Moeda ESTABELECIDA (> 15 min): checar a cada 10 minutos
+           (t.validated_at <= NOW() - INTERVAL '15 minutes' AND EXISTS (
              SELECT 1 FROM signals s 
              WHERE s.token_id = t.id 
              AND s.created_at < NOW() - INTERVAL '10 minutes'
-           )
+           ))
          )
          ORDER BY t.validated_at DESC
          LIMIT 10`

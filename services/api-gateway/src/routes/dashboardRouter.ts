@@ -89,6 +89,7 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
              t.chain
            FROM signals s
            JOIN tokens t ON t.id = s.token_id
+           WHERE s.confidence_score >= 80 AND s.signal_type = 'BUY'
            ORDER BY s.created_at DESC
            LIMIT 10`
         ),
