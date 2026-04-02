@@ -1,5 +1,6 @@
 import '../env';
 import axios, { AxiosInstance } from 'axios';
+import { solscanClient } from './solscan';
 
 /**
  * Helius DAS (Digital Asset Standard) Client for Solana
@@ -112,7 +113,14 @@ export class HeliusClient {
       setCache(cacheKey, holders, 5 * 60 * 1000); // 5 min TTL
       return holders;
     } catch (error: any) {
-      console.warn(`[Helius] Failed to get holders for ${mintAddress}: ${error.message}`);
+      console.warn(`[Helius] Failed to get holders for ${mintAddress}: ${error.message}. Attemting Solscan fallback...`);
+      
+      const solscanHolders = await solscanClient.getTopHolders(mintAddress, limit);
+      if (solscanHolders) {
+        setCache(cacheKey, solscanHolders, 5 * 60 * 1000);
+        return solscanHolders;
+      }
+      
       return null;
     }
   }
@@ -150,7 +158,14 @@ export class HeliusClient {
       setCache(cacheKey, result, 10 * 60 * 1000); // 10 min TTL
       return result;
     } catch (error: any) {
-      console.warn(`[Helius] Failed to get mint authority for ${mintAddress}: ${error.message}`);
+      console.warn(`[Helius] Failed to get mint authority for ${mintAddress}: ${error.message}. Attempting Solscan fallback...`);
+      
+      const solscanAuth = await solscanClient.getMintAuthority(mintAddress);
+      if (solscanAuth) {
+        setCache(cacheKey, solscanAuth, 10 * 60 * 1000);
+        return solscanAuth;
+      }
+      
       return null;
     }
   }
@@ -188,6 +203,12 @@ export class HeliusClient {
       return metadata;
     } catch (error: any) {
       // getAsset may not be available for all tokens - this is expected
+      console.warn(`[Helius] Failed to get metadata for ${mintAddress}. Attemting Solscan fallback...`);
+      const solscanMeta = await solscanClient.getTokenMetadata(mintAddress);
+      if (solscanMeta) {
+        setCache(cacheKey, solscanMeta, 10 * 60 * 1000);
+        return solscanMeta;
+      }
       return null;
     }
   }

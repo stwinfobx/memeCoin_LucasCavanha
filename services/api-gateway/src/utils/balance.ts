@@ -18,7 +18,7 @@ let lastPriceFetch = 0;
 // Cache para saldo Admin (evitar spam de RPC)
 let cachedAdminBalance: AdminBalanceData | null = null;
 let lastAdminBalanceFetch = 0;
-const ADMIN_BALANCE_CACHE_TTL = 60000; // 60 segundos
+const ADMIN_BALANCE_CACHE_TTL = 15000; // REDUZIDO: 15 segundos para resposta rápida a depósitos
 
 export interface ChainBalance {
     balance_usd: number;
@@ -77,15 +77,16 @@ export async function getAdminBalance(pool: Pool, userId: string, userEmail: str
     
     // EVM Addresses (BSC/Base)
     const evmAddress = process.env.BOT_DEPOSIT_ADDRESS;
-    // Solana Address (Derivar da Private Key se existir)
-    let solAddress = '';
-    try {
-        if (process.env.SOLANA_BOT_PRIVATE_KEY) {
-            const secretKey = bs58.decode(process.env.SOLANA_BOT_PRIVATE_KEY);
-            const keypair = Keypair.fromSecretKey(secretKey);
-            solAddress = keypair.publicKey.toBase58();
-        }
-    } catch (e) {}
+    let solAddress = process.env.SOLANA_DEPOSIT_ADDRESS || process.env.NEXT_PUBLIC_SOLANA_DEPOSIT_ADDRESS || '';
+    if (!solAddress) {
+        try {
+            if (process.env.SOLANA_BOT_PRIVATE_KEY) {
+                const secretKey = bs58.decode(process.env.SOLANA_BOT_PRIVATE_KEY);
+                const keypair = Keypair.fromSecretKey(secretKey);
+                solAddress = keypair.publicKey.toBase58();
+            }
+        } catch (e) {}
+    }
 
     const results: any = { bsc: {}, base: {}, solana: {} };
 
@@ -99,7 +100,16 @@ export async function getAdminBalance(pool: Pool, userId: string, userEmail: str
             "SELECT COALESCE(SUM(amount_usd), 0) as total FROM ledger_entries WHERE user_id != $1 AND chain = 'BSC' AND description NOT ILIKE '%paper%'",
             [userId]
         );
-        const bscResidue = Math.max(0, bscTotalUSD - Number(bscOther.rows[0].total));
+        const bscOtherTotal = Number(bscOther.rows[0].total);
+        const bscResidue = Math.max(0, bscTotalUSD - bscOtherTotal);
+        
+        console.log(`[BalanceUtil] 🏦 BSC Residue breakdown:`, {
+            wallet_real_bnb: bscBal,
+            wallet_real_usd: bscTotalUSD,
+            total_other_users_usd: bscOtherTotal,
+            residue_usd: bscResidue
+        });
+
         results.bsc = { balance_usd: bscResidue, wallet_real_crypto: bscBal, wallet_real_usd: bscTotalUSD };
     } catch (e) { results.bsc = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 }; }
 
@@ -113,14 +123,23 @@ export async function getAdminBalance(pool: Pool, userId: string, userEmail: str
             "SELECT COALESCE(SUM(amount_usd), 0) as total FROM ledger_entries WHERE user_id != $1 AND chain = 'BASE' AND description NOT ILIKE '%paper%'",
             [userId]
         );
-        const baseResidue = Math.max(0, baseTotalUSD - Number(baseOther.rows[0].total));
+        const baseOtherTotal = Number(baseOther.rows[0].total);
+        const baseResidue = Math.max(0, baseTotalUSD - baseOtherTotal);
+
+        console.log(`[BalanceUtil] 🏦 BASE Residue breakdown:`, {
+            wallet_real_eth: baseBal,
+            wallet_real_usd: baseTotalUSD,
+            total_other_users_usd: baseOtherTotal,
+            residue_usd: baseResidue
+        });
+
         results.base = { balance_usd: baseResidue, wallet_real_crypto: baseBal, wallet_real_usd: baseTotalUSD };
     } catch (e) { results.base = { balance_usd: 0, wallet_real_crypto: 0, wallet_real_usd: 0 }; }
 
     // --- 3. SOLANA Residue ---
     if (solAddress) {
         try {
-            const solConn = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+            const solConn = new Connection(process.env.SOLANA_RPC_URL || 'https://solana-rpc.publicnode.com');
             const solBal = (await solConn.getBalance(new PublicKey(solAddress))) / 1e9;
             const solTotalUSD = solBal * prices.solana;
             
@@ -137,8 +156,20 @@ export async function getAdminBalance(pool: Pool, userId: string, userEmail: str
 
     const finalResult = {
         total_balance_usd: results.bsc.balance_usd + results.base.balance_usd + results.solana.balance_usd,
-        chains: results
+        chains: results,
+        debug_info: {
+            bsc_raw: results.bsc.wallet_real_usd,
+            bsc_residue: results.bsc.balance_usd,
+            last_fetch: new Date(now).toLocaleString()
+        }
     };
+
+    console.log(`[BalanceUtil] 🏦 RESIDUE CALCULATION:`, {
+        BSC_WALLET_USD: results.bsc.wallet_real_usd.toFixed(2),
+        BSC_RESIDUE_USD: results.bsc.balance_usd.toFixed(2),
+        SOL_WALLET_USD: results.solana.wallet_real_usd.toFixed(2),
+        SOL_RESIDUE_USD: results.solana.balance_usd.toFixed(2),
+    });
 
     cachedAdminBalance = finalResult;
     lastAdminBalanceFetch = now;

@@ -270,6 +270,30 @@ export function initBalanceRoutes(pool: Pool): Router {
             });
         }
     });
+    
+    // GET /api/balance/debug - Debug admin-only informacoes de balanceamento
+    router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
+        try {
+            const userId = req.user?.userId;
+            const userEmail = req.user?.email || '';
+
+            // Verificar se é Admin
+            if (userEmail !== process.env.ADMIN_EMAIL) {
+                res.status(403).json({ success: false, message: 'Forbidden' });
+                return;
+            }
+
+            const adminData = await getAdminBalance(pool, userId!, userEmail);
+            res.json({
+                success: true,
+                debug_data: adminData,
+                note: 'Raw balance detection debug'
+            });
+        } catch (error: any) {
+            console.error('[Balance] Debug error:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    });
 
     return router;
 }

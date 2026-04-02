@@ -47,19 +47,27 @@ export default function WalletConnect() {
         return (
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-yellow-500 mb-2">
-                    MetaMask Not Installed
+                    MetaMask não detectado
                 </h3>
                 <p className="text-gray-400 mb-4">
-                    You need MetaMask to connect your wallet. Please install it from the official website.
+                    Instale a extensão MetaMask ou certifique-se de que ela está ativa em seu navegador.
                 </p>
-                <a
-                    href="https://metamask.io/download/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
-                >
-                    Install MetaMask
-                </a>
+                <div className="flex gap-3">
+                  <a
+                      href="https://metamask.io/download/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 bg-yellow-500 text-black font-medium rounded-lg hover:bg-yellow-400 transition-colors"
+                  >
+                      Baixar MetaMask
+                  </a>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-neutral-800 text-neutral-200 rounded-lg hover:bg-neutral-700 transition-colors"
+                  >
+                    Tentar Novamente
+                  </button>
+                </div>
             </div>
         );
     }

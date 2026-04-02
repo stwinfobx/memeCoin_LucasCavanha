@@ -20,10 +20,19 @@ export function initWalletRoutes(dbPool: Pool): Router {
             const userId = (req as any).user.userId;
             const { walletAddress, chain = 'BSC' } = req.body;
 
-            if (!walletAddress || !ethers.isAddress(walletAddress)) {
+            const isEvm = chain === 'BSC' || chain === 'BASE' || chain === 'ETH';
+            if (isEvm && (!walletAddress || !ethers.isAddress(walletAddress))) {
                 return res.status(400).json({
                     success: false,
-                    error: { code: 'INVALID_ADDRESS', message: 'Invalid wallet address' },
+                    error: { code: 'INVALID_ADDRESS', message: 'Invalid EVM wallet address' },
+                });
+            }
+
+            // Simple Solana validation (base58, approx length)
+            if (chain === 'SOLANA' && (!walletAddress || walletAddress.length < 32 || walletAddress.length > 44)) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: 'INVALID_ADDRESS', message: 'Invalid Solana wallet address' },
                 });
             }
 

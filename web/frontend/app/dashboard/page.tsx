@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../contexts/AuthContext'
+import { useMetaMask } from '../../hooks/useMetaMask'
 import BalanceDisplay from '../../components/BalanceDisplay'
 import InsufficientBalanceModal from '../../components/InsufficientBalanceModal'
+import WalletManagerModal from '../../components/WalletManagerModal'
 
 type DashboardSummary = {
   balance: number
@@ -142,6 +144,7 @@ const riskBadgeStyles: Record<NonNullable<TokenFeedItem['riskLevel']>, { label: 
 export default function DashboardPage() {
   const router = useRouter()
   const { token, isAuthenticated, isLoading, logout, user } = useAuth()
+  const { disconnect: disconnectWallet } = useMetaMask()
   const [data, setData] = useState<DashboardData | null>(null)
   const [botStatus, setBotStatus] = useState<BotStatus>(null)
   const [tokenFeed, setTokenFeed] = useState<TokenFeedItem[]>([])
@@ -151,6 +154,7 @@ export default function DashboardPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
   const [showBalanceModal, setShowBalanceModal] = useState(false)
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
 
   const userFirstLetter = useMemo(() => user?.email?.[0]?.toUpperCase() ?? 'U', [user?.email])
 
@@ -424,9 +428,18 @@ export default function DashboardPage() {
               </span>
               <div className="flex flex-col text-xs text-neutral-400">
                 <span className="font-medium text-neutral-200">{user?.email}</span>
-                <button onClick={logout} className="text-neutral-400 hover:text-neutral-200">
-                  Sair
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={logout} className="text-neutral-400 hover:text-neutral-200">
+                    Sair
+                  </button>
+                  <span className="text-neutral-700">|</span>
+                  <button 
+                    onClick={() => setIsWalletModalOpen(true)} 
+                    className="text-purple-400 hover:text-purple-300"
+                  >
+                    Gerenciar Carteiras
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -448,6 +461,16 @@ export default function DashboardPage() {
           <BalanceDisplay />
         </section>
 
+
+        {/* Saldo Real - NOVO */}
+        <section className="mt-10">
+          <BalanceDisplay />
+        </section>
+
+        <WalletManagerModal 
+            isOpen={isWalletModalOpen} 
+            onClose={() => setIsWalletModalOpen(false)} 
+        />
 
         {/* Últimos Trades - REMOVIDO */}
 

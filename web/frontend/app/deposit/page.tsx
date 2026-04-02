@@ -6,6 +6,7 @@ import { usePhantom } from '../../hooks/usePhantom';
 import Link from 'next/link';
 import { ethers } from 'ethers';
 import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import WalletManagerModal from '../../components/WalletManagerModal';
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -24,7 +25,7 @@ const chainNativeTokens: Record<string, string> = {
 const MASTER_ADDRESSES: Record<string, string> = {
     BSC: process.env.NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS || '0x3c9c21ac9dcffe929f19d552ea5cc80192a73c0b',
     BASE: process.env.NEXT_PUBLIC_BOT_DEPOSIT_ADDRESS || '0x3c9c21ac9dcffe929f19d552ea5cc80192a73c0b',
-    SOLANA: 'I1MUH2UARAKG41INDJMXR18GJ7J46MQJ9C'
+    SOLANA: process.env.NEXT_PUBLIC_SOLANA_DEPOSIT_ADDRESS || 'Endereço Solana Não Configurado'
 };
 
 export default function DepositWithdrawPage() {
@@ -37,6 +38,7 @@ export default function DepositWithdrawPage() {
     const [usdBalance, setUsdBalance] = useState(0);
     const [depositHistory, setDepositHistory] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
+    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
     // Withdraw states
     const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -257,10 +259,10 @@ export default function DepositWithdrawPage() {
 
                                     {!currentAccount ? (
                                         <button 
-                                            onClick={selectedChain === 'SOLANA' ? connectPH : connectMM}
+                                            onClick={() => setIsWalletModalOpen(true)}
                                             className="w-full py-5 bg-neutral-50 text-neutral-950 text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-white transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-[0.98]"
                                         >
-                                            Conectar {selectedChain === 'SOLANA' ? 'Phantom' : 'MetaMask'}
+                                            Conectar Carteira ({selectedChain === 'SOLANA' ? 'Phantom' : 'MetaMask'})
                                         </button>
                                     ) : (
                                         <button 
@@ -366,6 +368,11 @@ export default function DepositWithdrawPage() {
                     </div>
                 )}
             </div>
+            
+            <WalletManagerModal 
+                isOpen={isWalletModalOpen} 
+                onClose={() => setIsWalletModalOpen(false)} 
+            />
         </div>
     );
 }
