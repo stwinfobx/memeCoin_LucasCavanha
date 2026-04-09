@@ -1,7 +1,10 @@
 import { ethers } from 'ethers';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { Pool } from 'pg';
+import { Pool, Client } from 'pg';
 import { TokenValidator, ValidationContext } from './validator';
+import { SettingsManager } from './utils/settings';
+import { heliusClient } from './providers/helius';
+import { healthTracker } from './utils/health';
 
 const BSC_WS_URL = process.env.BSC_WS_URL;
 const BASE_WS_URL = process.env.BASE_WS_URL;
@@ -34,6 +37,8 @@ export class MemecoinIngestion {
   private readonly pool: Pool;
   private readonly freshnessMinutes: number;
   private running = false;
+  private settingsManager: SettingsManager;
+  private dbClient?: Client;
 
   private evmProviders: { [network: string]: ethers.WebSocketProvider } = {};
   private solanaConnection?: Connection;
@@ -44,10 +49,81 @@ export class MemecoinIngestion {
     this.validator = options.validator;
     this.pool = options.pool;
     this.freshnessMinutes = Math.max(options.freshnessMinutes, 30);
+    this.settingsManager = new SettingsManager(this.pool);
+    this.setupSettingsListener();
+    this.startHeartbeat();
   }
 
-  start() {
+  private startHeartbeat() {
+    setInterval(async () => {
+      try {
+        const isActive = await this.settingsManager.getSetting('VALIDATOR_ENGINE_ACTIVE', 'true');
+        if (isActive === 'true' && !this.running) {
+          console.log('[Ingestion Heartbeat] 🟢 LIGANDO ENGINE (Recuperação de falha)...');
+          this.start();
+        } else if (isActive !== 'true' && this.running) {
+          console.log('[Ingestion Heartbeat] 🔴 DESLIGANDO ENGINE (Recuperação de falha)...');
+          this.stop();
+        }
+      } catch {}
+    }, 60000); // Check a cada 60s
+  }
+
+  private async setupSettingsListener() {
+    try {
+      this.dbClient = new Client({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+      });
+      await this.dbClient.connect();
+      await this.dbClient.query('LISTEN settings_changed');
+      
+      this.dbClient.on('notification', async (msg) => {
+        if (msg.channel === 'settings_changed' && msg.payload) {
+          const { key, value } = JSON.parse(msg.payload);
+          console.log(`[Ingestion] Setting updated: ${key} = ${value}`);
+          
+          if (key === 'VALIDATOR_ENGINE_ACTIVE') {
+            if (value === 'true' || value === true) {
+              console.log('[Ingestion] 🟢 Reactivating engine via Admin command...');
+              this.start();
+            } else {
+              console.log('[Ingestion] 🔴 Deactivating engine via Admin command...');
+              this.stop();
+            }
+          }
+
+          if (key === 'HELIUS_API_KEY') {
+            console.log('[Ingestion] 🔑 Updating Helius API Key...');
+            heliusClient.setApiKey(String(value));
+          }
+
+          // Atualiza cache local
+          this.settingsManager.setSettingLocal(key, String(value));
+        }
+      });
+
+      // Checagem inicial
+      const isActive = await this.settingsManager.getSetting('VALIDATOR_ENGINE_ACTIVE', 'true');
+      if (isActive !== 'true') {
+        console.log('[Ingestion] ℹ️ Engine inactive by default in system_settings.');
+        this.running = false;
+      }
+    } catch (error) {
+      console.error('[Ingestion] Failed to setup DB listener:', error);
+    }
+  }
+
+  async start() {
     if (this.running) return;
+    
+    // Verificar se pode ligar
+    const isActive = await this.settingsManager.getSetting('VALIDATOR_ENGINE_ACTIVE', 'true');
+    if (isActive !== 'true') {
+      console.log('[Ingestion] ⚠️ Cannot start: Engine is disabled in Admin Panel.');
+      return;
+    }
+
     this.running = true;
 
     console.log(`🛰️ Memecoin Multichain Ingestion starting via WebSockets/Webhooks...`);
@@ -66,7 +142,7 @@ export class MemecoinIngestion {
     });
 
     if (this.solanaSubscriptionId) {
-      clearInterval(this.solanaSubscriptionId as any);
+      clearTimeout(this.solanaSubscriptionId as any);
       this.solanaSubscriptionId = undefined;
     }
   }
@@ -260,10 +336,13 @@ export class MemecoinIngestion {
           const status = res.status;
           if (status === 429) {
             console.warn(`[Solana] ⚠️ GeckoTerminal rate limited (429). Backing off... (failures: ${consecutiveFailures})`);
+            healthTracker.reportError('GECKO', 'max usage reached (429)', true);
           } else if (status === 403) {
             console.warn(`[Solana] 🚫 GeckoTerminal access denied (403). Check IP/proxy.`);
+            healthTracker.reportError('GECKO', 'Forbidden (403)');
           } else {
             console.warn(`[Solana] ⚠️ GeckoTerminal HTTP ${status}. Backing off...`);
+            healthTracker.reportError('GECKO', `HTTP ${status}`);
           }
           // Exponential backoff
           currentIntervalMs = Math.min(MAX_INTERVAL_MS, currentIntervalMs * 2);
@@ -281,6 +360,7 @@ export class MemecoinIngestion {
         }
         consecutiveFailures = 0;
         currentIntervalMs = baseIntervalMs;
+        healthTracker.reportSuccess('GECKO');
 
         for (const pool of pools) {
           const baseTokenId = pool.relationships?.base_token?.data?.id;
@@ -296,6 +376,7 @@ export class MemecoinIngestion {
         if (consecutiveFailures <= 3 || consecutiveFailures % 10 === 0) {
           console.warn(`[Solana] ⚠️ Gecko poll error (failure #${consecutiveFailures}): ${err.message}`);
         }
+        healthTracker.reportError('GECKO', err.message || 'Network error');
         currentIntervalMs = Math.min(MAX_INTERVAL_MS, currentIntervalMs * 2);
       }
 

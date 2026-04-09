@@ -33,6 +33,7 @@ import { initDepositRoutes } from './routes/deposits';
 import { initBalanceRoutes } from './routes/balance';
 import statsRoutes from './routes/stats';
 import withdrawalsRoutes from './routes/withdrawals';
+import adminRoutes from './routes/admin';
 
 const app: Express = express();
 const PORT = Number(process.env.API_GATEWAY_PORT ?? process.env.PORT ?? 4000);
@@ -58,6 +59,8 @@ const pool = connectionString
     password: process.env.POSTGRES_PASSWORD || 'botpass',
     ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   });
+
+app.set('pool', pool);
 
 // Inicializar serviço WebSocket
 let priceUpdateService: PriceUpdateService | null = null;
@@ -143,6 +146,7 @@ app.use('/api/investment', investmentRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/cleanup', cleanupRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Initialize wallet routes
 const walletRoutes = initWalletRoutes(pool);

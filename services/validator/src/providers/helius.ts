@@ -1,6 +1,7 @@
 import '../env';
 import axios, { AxiosInstance } from 'axios';
 import { solscanClient } from './solscan';
+import { healthTracker } from '../utils/health';
 
 /**
  * Helius DAS (Digital Asset Standard) Client for Solana
@@ -12,13 +13,15 @@ import { solscanClient } from './solscan';
  *  - Falls back gracefully if API is unavailable
  */
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
-const HELIUS_RPC_URL = HELIUS_API_KEY
-  ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`
-  : '';
-const HELIUS_DAS_URL = HELIUS_API_KEY
-  ? `https://api.helius.xyz/v0`
-  : '';
+let cachedApiKey = process.env.HELIUS_API_KEY || '';
+let HELIUS_RPC_URL = cachedApiKey ? `https://mainnet.helius-rpc.com/?api-key=${cachedApiKey}` : '';
+let HELIUS_DAS_URL = cachedApiKey ? `https://api.helius.xyz/v0` : '';
+
+function updateHeliusUrls(key: string) {
+  cachedApiKey = key;
+  HELIUS_RPC_URL = key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : '';
+  HELIUS_DAS_URL = key ? `https://api.helius.xyz/v0` : '';
+}
 
 export interface SolanaHolderInfo {
   address: string;
@@ -58,16 +61,18 @@ function setCache(key: string, data: any, ttlMs: number) {
 }
 
 export class HeliusClient {
-  private readonly apiKey: string;
   private readonly http: AxiosInstance;
 
   constructor() {
-    this.apiKey = HELIUS_API_KEY;
     this.http = axios.create({ timeout: 8000 });
   }
 
   isAvailable(): boolean {
-    return Boolean(this.apiKey);
+    return Boolean(cachedApiKey);
+  }
+
+  setApiKey(key: string) {
+    updateHeliusUrls(key);
   }
 
   /**
@@ -111,8 +116,14 @@ export class HeliusClient {
       }));
 
       setCache(cacheKey, holders, 5 * 60 * 1000); // 5 min TTL
+      healthTracker.reportSuccess('HELIUS');
       return holders;
     } catch (error: any) {
+      if (error.response?.status === 429 || error.message?.includes('429')) {
+        healthTracker.reportError('HELIUS', 'max usage reached (429)', true);
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        healthTracker.reportError('HELIUS', 'invalid api key (401/403)');
+      }
       console.warn(`[Helius] Failed to get holders for ${mintAddress}: ${error.message}. Attemting Solscan fallback...`);
       
       const solscanHolders = await solscanClient.getTopHolders(mintAddress, limit);
@@ -156,8 +167,14 @@ export class HeliusClient {
       };
 
       setCache(cacheKey, result, 10 * 60 * 1000); // 10 min TTL
+      healthTracker.reportSuccess('HELIUS');
       return result;
     } catch (error: any) {
+      if (error.response?.status === 429 || error.message?.includes('429')) {
+        healthTracker.reportError('HELIUS', 'max usage reached (429)', true);
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        healthTracker.reportError('HELIUS', 'invalid api key (401/403)');
+      }
       console.warn(`[Helius] Failed to get mint authority for ${mintAddress}: ${error.message}. Attempting Solscan fallback...`);
       
       const solscanAuth = await solscanClient.getMintAuthority(mintAddress);
@@ -200,8 +217,14 @@ export class HeliusClient {
       };
 
       setCache(cacheKey, metadata, 10 * 60 * 1000); // 10 min TTL
+      healthTracker.reportSuccess('HELIUS');
       return metadata;
     } catch (error: any) {
+      if (error.response?.status === 429 || error.message?.includes('429')) {
+        healthTracker.reportError('HELIUS', 'max usage reached (429)', true);
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        healthTracker.reportError('HELIUS', 'invalid api key (401/403)');
+      }
       // getAsset may not be available for all tokens - this is expected
       console.warn(`[Helius] Failed to get metadata for ${mintAddress}. Attemting Solscan fallback...`);
       const solscanMeta = await solscanClient.getTokenMetadata(mintAddress);
@@ -226,7 +249,7 @@ export class HeliusClient {
 
     try {
       // Use Helius DAS getTokenAccounts for total unique holders
-      const response = await this.http.post(`${HELIUS_DAS_URL}/token-metadata?api-key=${this.apiKey}`, {
+      const response = await this.http.post(`${HELIUS_DAS_URL}/token-metadata?api-key=${cachedApiKey}`, {
         mintAccounts: [mintAddress],
         includeOffChain: false,
         disableTokenWrap: true,
@@ -237,8 +260,14 @@ export class HeliusClient {
       const count = holders?.length || 0;
 
       setCache(cacheKey, count, 5 * 60 * 1000);
+      healthTracker.reportSuccess('HELIUS');
       return count;
-    } catch {
+    } catch (error: any) {
+      if (error.response?.status === 429 || error.message?.includes('429')) {
+        healthTracker.reportError('HELIUS', 'max usage reached (429)', true);
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        healthTracker.reportError('HELIUS', 'invalid api key (401/403)');
+      }
       return 0;
     }
   }

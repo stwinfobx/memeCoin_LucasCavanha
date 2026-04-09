@@ -151,6 +151,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [botActionLoading, setBotActionLoading] = useState(false)
+  const [settings, setSettings] = useState<any[]>([])
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
   const [showBalanceModal, setShowBalanceModal] = useState(false)
@@ -204,11 +205,21 @@ export default function DashboardPage() {
           const botData = await botResponse.json()
           setBotStatus(botData.data)
         } else if (botResponse.status === 401) {
-          // Se for 401 (token expirado), redirecionar para login
           console.warn('[Dashboard] Token expirado ou inválido, redirecionando para login...')
           logout()
           router.push('/auth/login')
           return
+        }
+
+        // Fetch settings separately to know the engine state
+        const settingsRes = await fetch(`${apiBase}/api/admin/settings`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
+        }).catch(() => null)
+        
+        if (settingsRes && settingsRes.ok) {
+           const settingsJson = await settingsRes.json()
+           setSettings(settingsJson.data || [])
         }
 
         const tokensResponse = await fetch(`${apiBase}/api/tokens?limit=20`, {
@@ -439,6 +450,17 @@ export default function DashboardPage() {
                   >
                     Gerenciar Carteiras
                   </button>
+                  {user?.email === 'mulack.zuguenberg@gmail.com' && (
+                    <>
+                      <span className="text-neutral-700">|</span>
+                      <Link 
+                        href="/admin" 
+                        className="text-amber-400 hover:text-amber-300 font-bold"
+                      >
+                        Painel Admin
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -462,10 +484,7 @@ export default function DashboardPage() {
         </section>
 
 
-        {/* Saldo Real - NOVO */}
-        <section className="mt-10">
-          <BalanceDisplay />
-        </section>
+
 
         <WalletManagerModal 
             isOpen={isWalletModalOpen} 
@@ -669,12 +688,16 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
-
         <section className="mt-12">
           <div className="surface-strong p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-neutral-100">Memecoins recém analisadas</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2 text-neutral-50">
+                  <span className="text-purple-400">⚡</span> 
+                  {settings.find(s => s.key === 'VALIDATOR_ENGINE_ACTIVE')?.value === 'true' 
+                    ? 'Memecoins recém analisadas' 
+                    : 'Memecoins (Motor Desligado - Exibindo Histórico)'}
+                </h2>
                 <p className="text-xs text-neutral-500">
                   Lista consolidada das últimas validações, com métricas de risco e liquidez para suportar a tomada de decisão.
                 </p>

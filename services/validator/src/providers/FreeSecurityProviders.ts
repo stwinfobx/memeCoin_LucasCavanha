@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { healthTracker } from '../utils/health';
+
 
 export type SecurityVerdict = 'safe' | 'warning' | 'danger' | 'unknown';
 
@@ -99,10 +101,17 @@ export class FreeSecurityProviders {
                     isBlacklisted,
                     ownerAddress,
                 };
+                healthTracker.reportSuccess('GOPLUS');
             } else {
                 sources.goplus = { checked: false, flagged: false };
+                healthTracker.reportSuccess('GOPLUS');
             }
-        } catch {
+        } catch (error: any) {
+            if (error.response?.status === 429) {
+                healthTracker.reportError('GOPLUS', 'max usage reached (429)', true);
+            } else {
+                healthTracker.reportError('GOPLUS', error.message || 'Unknown error');
+            }
             sources.goplus = { checked: false, flagged: false };
         }
 
@@ -172,10 +181,17 @@ export class FreeSecurityProviders {
                     flagged: hasFreeze || hasMint,
                     reason: [hasFreeze && 'FreezeAuth', hasMint && 'MintAuth'].filter(Boolean).join(', ') || undefined,
                 };
+                healthTracker.reportSuccess('GOPLUS');
             } else {
                 sources.goplus = { checked: false, flagged: false };
+                healthTracker.reportSuccess('GOPLUS');
             }
-        } catch {
+        } catch (error: any) {
+            if (error.response?.status === 429) {
+                healthTracker.reportError('GOPLUS', 'max usage reached (429)', true);
+            } else {
+                healthTracker.reportError('GOPLUS', error.message || 'Unknown error');
+            }
             sources.goplus = { checked: false, flagged: false };
         }
 

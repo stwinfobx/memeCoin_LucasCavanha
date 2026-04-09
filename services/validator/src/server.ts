@@ -5,6 +5,7 @@ import { Pool, PoolConfig } from 'pg';
 import { TokenValidator } from './validator';
 import { TokenRiskAssessment, TokenValidationRequest, Token } from '@shared/types';
 import { MemecoinIngestion } from './ingestion';
+import { healthTracker } from './utils/health';
 
 
 const app: Express = express();
@@ -50,6 +51,8 @@ pool.on('error', (err) => {
   console.error('[Validator] Unexpected database pool error:', err.message);
   // Não encerrar o processo - o pool vai tentar reconectar automaticamente
 });
+
+healthTracker.setPool(pool);
 
 const validator = new TokenValidator(pool);
 

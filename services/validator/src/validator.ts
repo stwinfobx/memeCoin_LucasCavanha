@@ -13,6 +13,7 @@ import {
   normalizeChainName,
   getEnabledChains
 } from './chains';
+import { SettingsManager } from './utils/settings';
 
 
 
@@ -91,9 +92,11 @@ export interface ValidationContext {
 export class TokenValidator {
   private providers: Map<SupportedChain, ChainProvider>;
   private pool: Pool;
+  private settings: SettingsManager;
 
   constructor(pool: Pool) {
     this.pool = pool;
+    this.settings = new SettingsManager(this.pool);
     this.providers = new Map();
     this.initializeProviders();
   }
