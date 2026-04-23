@@ -2,6 +2,7 @@ import { differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { Token, TokenRiskAssessment, RiskLevel } from '@shared/types';
 import { ContractCreationInfo, TokenHolderInfo } from './providers/explorer';
 import { SecurityConsensus } from './providers/FreeSecurityProviders';
+import { SolanaMintAuthority } from './providers/helius';
 
 // Configurable thresholds per User Rules v3 + Financial Safety Patch
 const WASH_TRADING_RATIO = 100; // User rule: 100x ratio = -30 pts
@@ -39,6 +40,8 @@ export interface RiskComputationInput {
   topHolders?: TokenHolderInfo[] | null;
   // Security consensus results
   security?: SecurityConsensus;
+  // On-chain Solana mint/freeze authority (null for EVM)
+  mintAuthority?: SolanaMintAuthority | null;
   first_seen_at?: number; // Discovery timestamp fallback
 }
 
@@ -95,6 +98,20 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   if (isSolana && input.security?.isHoneypot) {
     console.log(`[RiskScoring] 💀 REJECTED ${symbol}: RugCheck/GoPlus Dangerous Flag`);
     return shutDownWithScore(input, 0, 'High Risk Solana Flag');
+  }
+
+  // Solana: On-chain mint authority killswitch (second independent layer)
+  // Fires even if GoPlus succeeded — defense-in-depth
+  if (isSolana && input.mintAuthority) {
+    const isPumpFun = input.token.contract_address?.endsWith('pump') || false;
+    if (!input.mintAuthority.isFreezeRenounced) {
+      console.log(`[RiskScoring] 💀 REJECTED ${symbol}: On-chain Freeze Authority active`);
+      return shutDownWithScore(input, 0, 'Freeze Authority Active (on-chain)');
+    }
+    if (!input.mintAuthority.isMintRenounced && !isPumpFun) {
+      console.log(`[RiskScoring] 💀 REJECTED ${symbol}: On-chain Mint Authority active (non-Pump.fun)`);
+      return shutDownWithScore(input, 0, 'Mint Authority Active (non-Pump.fun)');
+    }
   }
 
   // --- TIER 1: FREE MARKET DATA FILTERS (Cost: 0 credits) ---
@@ -316,11 +333,21 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   }
 
   // Holder Concentration (Universal) — Including Time-Scaled Whale Detection
-  if (input.topHolders && input.topHolders.length > 0) {
+  // Use Helius holders if available, fall back to RugCheck bundle data (free)
+  const effectiveTopHolders: TokenHolderInfo[] | null | undefined =
+    (input.topHolders && input.topHolders.length > 0)
+      ? input.topHolders
+      : input.security?.rugcheckTopHolders?.map(h => ({
+          address: h.address,
+          value: String(h.pct),
+          percentage: h.pct,
+        })) || null;
+
+  if (effectiveTopHolders && effectiveTopHolders.length > 0) {
     const ageMin = firstSeenDate ? Math.max(0, differenceInMinutes(now, firstSeenDate)) : 999;
     
     // Top 1 Whale check (Soft Rug protection) - SCALED BY TIME
-    const top1Pct = Number(input.topHolders[0]?.percentage) || 0;
+    const top1Pct = Number(effectiveTopHolders[0]?.percentage) || 0;
     if (top1Pct > TOP1_WHALE_DANGER) {
       let whalePenalty = 50; // Default (Old tokens)
       
@@ -332,7 +359,7 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
     }
 
     // Top 10 collective concentration - SCALED BY TIME
-    const totalTop10 = input.topHolders
+    const totalTop10 = effectiveTopHolders
       .slice(0, 10)
       .reduce((acc, holder) => acc + (Number(holder.percentage) || 0), 0);
     
@@ -344,6 +371,17 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
 
       safetyScore -= concentrationPenalty;
       rejectionReasons.push(`High Top-10 Concentration ${totalTop10.toFixed(1)}% (-${concentrationPenalty}${ageMin < 30 ? ' scaled' : ''})`);
+    }
+
+    // Insider/Bundle concentration (from RugCheck full report)
+    const insiders = input.security?.rugcheckTopHolders?.filter(h => h.isInsider) || [];
+    if (insiders.length > 0) {
+      const insiderTotal = insiders.reduce((acc, h) => acc + h.pct, 0);
+      if (insiderTotal > 15) {
+        const insiderPenalty = insiderTotal > 30 ? 35 : 20;
+        safetyScore -= insiderPenalty;
+        rejectionReasons.push(`Bundle/Insider wallets hold ${insiderTotal.toFixed(1)}% (-${insiderPenalty})`);
+      }
     }
   }
 

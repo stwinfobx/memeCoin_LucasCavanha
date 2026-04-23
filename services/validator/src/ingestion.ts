@@ -41,6 +41,8 @@ export class MemecoinIngestion {
   private dbClient?: Client;
 
   private evmProviders: { [network: string]: ethers.WebSocketProvider } = {};
+  private evmContracts: { [network: string]: ethers.Contract } = {};
+  private evmCallbacks: { [network: string]: any } = {};
   private solanaConnection?: Connection;
   private solanaSubscriptionId?: number;
   private retryMap: Map<string, RetryState> = new Map();
@@ -83,6 +85,9 @@ export class MemecoinIngestion {
           const { key, value } = JSON.parse(msg.payload);
           console.log(`[Ingestion] Setting updated: ${key} = ${value}`);
           
+          // Update local cache immediately so subsequent calls see the new value
+          this.settingsManager.setSettingLocal(key, String(value));
+
           if (key === 'VALIDATOR_ENGINE_ACTIVE') {
             if (value === 'true' || value === true) {
               console.log('[Ingestion] 🟢 Reactivating engine via Admin command...');
@@ -93,13 +98,39 @@ export class MemecoinIngestion {
             }
           }
 
+          if (key === 'INGESTION_BSC_ACTIVE') {
+            if (value === 'true' || value === true) {
+              if (this.evmProviders['BSC']) console.log('[Ingestion] BSC monitor already running');
+              else this.monitorEVM('BSC', BSC_WS_URL || '', PANCAKE_FACTORY_V2);
+            }
+            else this.stopEVM('BSC');
+          }
+
+          if (key === 'INGESTION_BASE_ACTIVE') {
+            if (value === 'true' || value === true) {
+              if (this.evmProviders['Base']) console.log('[Ingestion] Base monitor already running');
+              else this.monitorEVM('Base', BASE_WS_URL || '', UNISWAP_V2_FACTORY_BASE);
+            }
+            else this.stopEVM('Base');
+          }
+
+          if (key === 'INGESTION_SOLANA_ACTIVE') {
+            if (value === 'true' || value === true) {
+              if (this.solanaSubscriptionId) console.log('[Ingestion] Solana monitor already running');
+              else this.monitorSolana(SOLANA_RPC_URL || '', SOLANA_WS_URL || '');
+            }
+            else this.stopSolana();
+          }
+
           if (key === 'HELIUS_API_KEY') {
             console.log('[Ingestion] 🔑 Updating Helius API Key...');
             heliusClient.setApiKey(String(value));
           }
 
-          // Atualiza cache local
-          this.settingsManager.setSettingLocal(key, String(value));
+          if (key === 'BASESCAN_API_KEY') {
+            console.log('[Ingestion] 🔑 Updating BaseScan API Key...');
+            // Outros serviços podem usar isso
+          }
         }
       });
 
@@ -128,19 +159,44 @@ export class MemecoinIngestion {
 
     console.log(`🛰️ Memecoin Multichain Ingestion starting via WebSockets/Webhooks...`);
 
-    this.monitorEVM('BSC', BSC_WS_URL || '', PANCAKE_FACTORY_V2);
-    this.monitorEVM('Base', BASE_WS_URL || '', UNISWAP_V2_FACTORY_BASE);
-    this.monitorSolana(SOLANA_RPC_URL || '', SOLANA_WS_URL || '');
+    const bscActive = await this.settingsManager.getSetting('INGESTION_BSC_ACTIVE', 'true');
+    const baseActive = await this.settingsManager.getSetting('INGESTION_BASE_ACTIVE', 'true');
+    const solanaActive = await this.settingsManager.getSetting('INGESTION_SOLANA_ACTIVE', 'true');
+
+    if (bscActive === 'true') this.monitorEVM('BSC', BSC_WS_URL || '', PANCAKE_FACTORY_V2);
+    if (baseActive === 'true') this.monitorEVM('Base', BASE_WS_URL || '', UNISWAP_V2_FACTORY_BASE);
+    if (solanaActive === 'true') this.monitorSolana(SOLANA_RPC_URL || '', SOLANA_WS_URL || '');
   }
 
   stop() {
     this.running = false;
-    Object.keys(this.evmProviders).forEach(network => {
-      if (this.evmProviders[network].websocket && typeof (this.evmProviders[network].websocket as any).close === 'function') {
-        try { (this.evmProviders[network].websocket as any).close(); } catch (e) { }
-      }
-    });
+    this.stopEVM('BSC');
+    this.stopEVM('Base');
+    this.stopSolana();
+  }
 
+  private stopEVM(network: string) {
+    console.log(`[${network}] 🔴 Stopping EVM monitor...`);
+    if (this.evmContracts[network] && this.evmCallbacks[network]) {
+      try {
+        this.evmContracts[network].off('PairCreated', this.evmCallbacks[network]);
+      } catch (e) {}
+    }
+    
+    if (this.evmProviders[network]) {
+      try {
+        if (this.evmProviders[network].websocket && typeof (this.evmProviders[network].websocket as any).close === 'function') {
+          (this.evmProviders[network].websocket as any).close();
+        }
+      } catch (e) {}
+      delete this.evmProviders[network];
+    }
+    delete this.evmContracts[network];
+    delete this.evmCallbacks[network];
+  }
+
+  private stopSolana() {
+    console.log(`[Solana] 🔴 Stopping Solana monitor...`);
     if (this.solanaSubscriptionId) {
       clearTimeout(this.solanaSubscriptionId as any);
       this.solanaSubscriptionId = undefined;
@@ -177,6 +233,14 @@ export class MemecoinIngestion {
       const shouldSkip = await this.shouldSkipToken(tokenAddress, chainId);
       if (shouldSkip) {
         console.log(`[Ingestion] ⏭️ Skipping ${tokenAddress} - already processed recently`);
+        return;
+      }
+
+      // Final safety check: Is this network still active?
+      const networkKey = `INGESTION_${chainId.toUpperCase()}_ACTIVE`;
+      const isNetActive = await this.settingsManager.getSetting(networkKey, 'true');
+      if (isNetActive !== 'true') {
+        console.log(`[Ingestion] 🛑 Network ${chainId} deactivated during processing. Aborting.`);
         return;
       }
 
@@ -287,25 +351,39 @@ export class MemecoinIngestion {
       return;
     }
 
+    if (this.evmProviders[networkName]) {
+      console.log(`[${networkName}] ℹ️ Monitor already active.`);
+      return;
+    }
+
     try {
       const provider = new ethers.WebSocketProvider(wsUrl);
       this.evmProviders[networkName] = provider;
       const factory = new ethers.Contract(factoryAddress, PAIR_CREATED_ABI, provider);
+      this.evmContracts[networkName] = factory;
 
       console.log(`[${networkName}] 🟢 Monitoring Factory ${factoryAddress}`);
 
-      factory.on('PairCreated', async (token0: string, token1: string, pairAddress: string, pairIndex: any) => {
+      const callback = async (token0: string, token1: string, pairAddress: string, pairIndex: any) => {
         const targetToken = this.getTargetToken(networkName, token0, token1);
         await this.processNewToken(networkName, targetToken, pairAddress, 'factory_event');
-      });
+      };
+
+      this.evmCallbacks[networkName] = callback;
+      factory.on('PairCreated', callback);
 
       // Handle reconnects
       if (provider.websocket && typeof (provider.websocket as any).on === 'function') {
-        (provider.websocket as any).on('close', () => {
-          console.log(`[${networkName}] ⚠️ WebSocket closed. Reconnecting...`);
-          setTimeout(() => {
-            if (this.running) this.monitorEVM(networkName, wsUrl, factoryAddress);
-          }, 5000);
+        (provider.websocket as any).on('close', async () => {
+          const isActive = await this.settingsManager.getSetting(`INGESTION_${networkName.toUpperCase()}_ACTIVE`, 'true');
+          if (this.running && isActive === 'true') {
+            console.log(`[${networkName}] ⚠️ WebSocket closed. Reconnecting...`);
+            setTimeout(() => {
+              if (this.running) this.monitorEVM(networkName, wsUrl, factoryAddress);
+            }, 5000);
+          } else {
+            console.log(`[${networkName}] 🛑 WebSocket closed. Ingestion deactivated for this network.`);
+          }
         });
         (provider.websocket as any).on('error', (err: any) => {
           console.error(`[${networkName}] ❌ WebSocket Error: ${err.message}`);
@@ -327,6 +405,13 @@ export class MemecoinIngestion {
 
     const pollGecko = async () => {
       if (!this.running) return;
+      
+      const isActive = await this.settingsManager.getSetting('INGESTION_SOLANA_ACTIVE', 'true');
+      if (isActive !== 'true') {
+        console.log('[Solana] 🛑 Polling stopped: Network deactivated.');
+        this.solanaSubscriptionId = undefined;
+        return;
+      }
       try {
         const url = `https://api.geckoterminal.com/api/v2/networks/solana/new_pools?include=base_token`;
         const res = await fetch(url, { headers: { 'Accept': 'application/json' } });

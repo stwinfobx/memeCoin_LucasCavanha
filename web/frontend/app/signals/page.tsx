@@ -562,7 +562,7 @@ export default function SignalsPage() {
 
                   <div className="mt-4 flex flex-wrap gap-2 text-[11px] items-center">
                     <Link
-                      href={`https://dexscreener.com/solana/${signal.contract_address || signal.token_id}`}
+                      href={`https://dexscreener.com/${(signal.chain || 'bsc').toLowerCase()}/${signal.contract_address || signal.token_id}`}
                       className="rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-purple-200 hover:text-purple-100 transition-colors"
                       target="_blank"
                     >

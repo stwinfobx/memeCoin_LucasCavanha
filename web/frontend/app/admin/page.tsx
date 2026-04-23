@@ -204,14 +204,39 @@ export default function AdminPage() {
               <button
                 onClick={() => toggleEngine(engineStatus ? 'true' : 'false')}
                 disabled={isSaving}
-                className={`px-10 py-4 rounded-2xl font-bold text-lg transition-all ${
+                className={`px-10 py-4 rounded-2xl font-bold text-lg transition-all mb-8 ${
                   engineStatus 
                   ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/20' 
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20'
                 }`}
               >
-                {isSaving ? 'Processando...' : engineStatus ? 'DESLIGAR MOTOR' : 'LIGAR MOTOR'}
+                {isSaving ? 'Processando...' : engineStatus ? 'DESLIGAR MOTOR GERAL' : 'LIGAR MOTOR GERAL'}
               </button>
+
+              <div className="w-full grid grid-cols-3 gap-4 border-t border-neutral-800 pt-8">
+                {[
+                  { id: 'BSC', key: 'INGESTION_BSC_ACTIVE' },
+                  { id: 'BASE', key: 'INGESTION_BASE_ACTIVE' },
+                  { id: 'SOL', key: 'INGESTION_SOLANA_ACTIVE' }
+                ].map(net => {
+                  const isActive = settings.find(s => s.key === net.key)?.value === 'true';
+                  return (
+                    <div key={net.id} className="flex flex-col items-center">
+                      <span className="text-[10px] text-neutral-500 mb-2 font-bold uppercase">{net.id}</span>
+                      <button
+                        onClick={() => handleUpdateSetting(net.key, isActive ? 'false' : 'true')}
+                        disabled={isSaving || !engineStatus}
+                        className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${
+                          !engineStatus ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed' :
+                          isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {isActive ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="bg-neutral-900/50 border border-neutral-800 p-8 rounded-3xl">

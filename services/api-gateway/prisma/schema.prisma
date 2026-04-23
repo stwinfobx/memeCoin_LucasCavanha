@@ -88,6 +88,13 @@ model Token {
   firstSeenAt            DateTime?               @default(now()) @map("first_seen_at") @db.Timestamp(6)
   createdAt              DateTime?               @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt              DateTime?               @default(now()) @map("updated_at") @db.Timestamp(6)
+  // Security fields (added in migration 007)
+  freezeAuthority        String?                 @map("freeze_authority") @db.VarChar(100)
+  mintAuthority          String?                 @map("mint_authority") @db.VarChar(100)
+  buyTax                 Decimal?                @map("buy_tax") @db.Decimal(5, 2)
+  sellTax                Decimal?                @map("sell_tax") @db.Decimal(5, 2)
+  topHolder1Pct          Decimal?                @map("top_holder_1_pct") @db.Decimal(5, 2)
+  rugcheckScore          Int?                    @map("rugcheck_score")
   orders                 Order[]
   positions              positions[]
   price_candles          price_candles[]
@@ -98,8 +105,13 @@ model Token {
   @@index([chain], map: "idx_tokens_chain")
   @@index([safetyScore(sort: Desc)], map: "idx_tokens_safety_score")
   @@index([isValidated], map: "idx_tokens_validated")
+  @@index([freezeAuthority], map: "idx_tokens_freeze_active")
+  @@index([mintAuthority], map: "idx_tokens_mint_active")
+  @@index([topHolder1Pct(sort: Desc)], map: "idx_tokens_top_holder")
+  @@index([rugcheckScore(sort: Asc)], map: "idx_tokens_rugcheck_score")
   @@map("tokens")
 }
+
 
 model Signal {
   id                  String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid

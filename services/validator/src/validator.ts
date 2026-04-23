@@ -6,6 +6,7 @@ import { Token, TokenRiskAssessment, TokenValidationResponse } from '@shared/typ
 import { ExplorerClient, ContractCreationInfo, TokenHolderInfo } from './providers/explorer';
 import { computeRiskAssessment, MarketPairData } from './risk-scoring';
 import { FreeSecurityProviders, SecurityConsensus } from './providers/FreeSecurityProviders';
+import { heliusClient, SolanaMintAuthority } from './providers/helius';
 import {
   ChainProvider,
   SupportedChain,
@@ -98,6 +99,15 @@ export class TokenValidator {
     this.pool = pool;
     this.settings = new SettingsManager(this.pool);
     this.providers = new Map();
+    
+    // Debug connection
+    this.pool.query('SELECT current_database(), current_user, inet_server_addr()').then(res => {
+      const row = res.rows[0];
+      console.log(`[Validator] 🌐 Connected to DB: ${row.current_database} as ${row.current_user} at ${row.inet_server_addr}`);
+    }).catch(err => {
+      console.error('[Validator] ❌ DB Connection check failed:', err.message);
+    });
+
     this.initializeProviders();
   }
 
@@ -188,16 +198,54 @@ export class TokenValidator {
       // Only proceed if the contract passes security checks
       let isHoneypot = false;
       let securityConsensus: SecurityConsensus | undefined;
+      let mintAuth: SolanaMintAuthority | null = null;
 
       try {
         if (normalizedChain === SupportedChain.SOLANA) {
-          securityConsensus = await FreeSecurityProviders.checkSolana(contractAddress);
+          // Run GoPlus/RugCheck + on-chain mint authority check IN PARALLEL
+          // This ensures mint/freeze detection even when GoPlus is rate-limited
+          const [consensus, onChainAuth] = await Promise.all([
+            FreeSecurityProviders.checkSolana(contractAddress),
+            heliusClient.getMintAuthority(contractAddress), // ← On-chain fallback layer
+          ]);
+
+          securityConsensus = consensus;
+          mintAuth = onChainAuth;
+          isHoneypot = consensus.isHoneypot;
+          issues.push(...consensus.issues);
+
+          // On-chain authority check — independent of GoPlus result
+          // This fires even if GoPlus succeeded, as a secondary confirmation
+          if (mintAuth) {
+            const isPumpFun = contractAddress.endsWith('pump');
+
+            if (!mintAuth.isFreezeRenounced && mintAuth.freezeAuthority) {
+              if (!isHoneypot) {
+                isHoneypot = true;
+                issues.push(`On-chain: Freeze authority active (${mintAuth.freezeAuthority}) — REJECTED`);
+                console.warn(`[Validator] 🔴 On-chain freeze authority confirmed for ${contractAddress}`);
+              }
+            }
+
+            if (!mintAuth.isMintRenounced && mintAuth.mintAuthority && !isPumpFun) {
+              if (!isHoneypot) {
+                isHoneypot = true;
+                issues.push(`On-chain: Mint authority active (${mintAuth.mintAuthority}) — non-Pump.fun REJECTED`);
+                console.warn(`[Validator] 🔴 On-chain mint authority confirmed (non-pump) for ${contractAddress}`);
+              }
+            }
+
+            if (!mintAuth.isMintRenounced && mintAuth.mintAuthority && isPumpFun) {
+              // Pump.fun: expected during bonding curve — add warning but don't reject
+              if (!issues.some(i => i.includes('Mint authority'))) {
+                issues.push(`On-chain: Mint authority active (Pump.fun bonding curve — warning only)`);
+              }
+            }
+          }
+
         } else {
           const chainNum = normalizedChain === SupportedChain.BASE ? '8453' : '56';
           securityConsensus = await FreeSecurityProviders.checkEVM(contractAddress, chainNum as '56' | '8453');
-        }
-        
-        if (securityConsensus) {
           isHoneypot = securityConsensus.isHoneypot;
           issues.push(...securityConsensus.issues);
         }
@@ -261,6 +309,7 @@ export class TokenValidator {
         contractCreation,
         topHolders: holderList,
         security: securityConsensus,
+        mintAuthority: mintAuth,        // ← On-chain authority data (null for EVM)
         first_seen_at: context?.first_seen_at,
       });
 
@@ -297,6 +346,16 @@ export class TokenValidator {
         };
       }
 
+      // Extract security field values for DB persistence
+      const freezeAuthorityAddr = mintAuth?.freezeAuthority ?? null;
+      const mintAuthorityAddr = mintAuth?.mintAuthority ?? null;
+      const saveBuyTax = securityConsensus?.buyTax ?? null;
+      const saveSellTax = securityConsensus?.sellTax ?? null;
+      const saveTop1Pct = (holderList && holderList.length > 0)
+        ? Number(holderList[0].percentage)
+        : securityConsensus?.rugcheckTopHolders?.[0]?.pct ?? null;
+      const saveRugcheckScore = securityConsensus?.sources?.rugcheck?.score ?? null;
+
       const token = await this.saveToken({
         contract_address: provider.normalizeAddress(contractAddress),
         chain: normalizedChain,
@@ -312,6 +371,13 @@ export class TokenValidator {
         safety_score: safetyScore,
         is_honeypot: isHoneypot,
         is_validated: true,
+        // Security fields (migration 007)
+        freeze_authority: freezeAuthorityAddr,
+        mint_authority: mintAuthorityAddr,
+        buy_tax: saveBuyTax !== null ? Number(saveBuyTax) : undefined,
+        sell_tax: saveSellTax !== null ? Number(saveSellTax) : undefined,
+        top_holder_1_pct: saveTop1Pct !== null ? Number(saveTop1Pct) : undefined,
+        rugcheck_score: saveRugcheckScore !== null ? Number(saveRugcheckScore) : undefined,
       });
 
       // Sync risk_score with safety_score to ensure consistency across tables
@@ -395,8 +461,11 @@ export class TokenValidator {
       `INSERT INTO tokens (
         contract_address, chain, symbol, name, decimals, total_supply,
         liquidity_usd, liquidity_locked, holders_count, volume_24h_usd,
-        price_usd, safety_score, is_honeypot, is_validated, validated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+        price_usd, safety_score, is_honeypot, is_validated, validated_at,
+        freeze_authority, mint_authority, buy_tax, sell_tax,
+        top_holder_1_pct, rugcheck_score
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP,
+                $15, $16, $17, $18, $19, $20)
       ON CONFLICT (contract_address) 
       DO UPDATE SET
         chain = EXCLUDED.chain,
@@ -411,7 +480,13 @@ export class TokenValidator {
         is_honeypot = EXCLUDED.is_honeypot,
         is_validated = EXCLUDED.is_validated,
         validated_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = CURRENT_TIMESTAMP,
+        freeze_authority = EXCLUDED.freeze_authority,
+        mint_authority = EXCLUDED.mint_authority,
+        buy_tax = EXCLUDED.buy_tax,
+        sell_tax = EXCLUDED.sell_tax,
+        top_holder_1_pct = EXCLUDED.top_holder_1_pct,
+        rugcheck_score = EXCLUDED.rugcheck_score
       RETURNING *`,
       [
         tokenData.contract_address,
@@ -428,6 +503,13 @@ export class TokenValidator {
         tokenData.safety_score,
         tokenData.is_honeypot || false,
         tokenData.is_validated || false,
+        // Security fields ($15–$20)
+        tokenData.freeze_authority ?? null,
+        tokenData.mint_authority ?? null,
+        tokenData.buy_tax ?? null,
+        tokenData.sell_tax ?? null,
+        tokenData.top_holder_1_pct ?? null,
+        tokenData.rugcheck_score ?? null,
       ]
     );
 

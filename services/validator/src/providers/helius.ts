@@ -2,6 +2,7 @@ import '../env';
 import axios, { AxiosInstance } from 'axios';
 import { solscanClient } from './solscan';
 import { healthTracker } from '../utils/health';
+import { getTopHoldersWithRotation, getMintAuthorityWithRotation } from './rpc-rotator';
 
 /**
  * Helius DAS (Digital Asset Standard) Client for Solana
@@ -121,17 +122,24 @@ export class HeliusClient {
     } catch (error: any) {
       if (error.response?.status === 429 || error.message?.includes('429')) {
         healthTracker.reportError('HELIUS', 'max usage reached (429)', true);
+        console.warn(`[Helius] Rate-limited (429) for ${mintAddress}. Delegating to RpcRotator...`);
+        // RpcRotator will try Solscan, Triton, and Solana Labs in sequence
+        const rotated = await getTopHoldersWithRotation(mintAddress, limit);
+        if (rotated) {
+          setCache(cacheKey, rotated, 5 * 60 * 1000);
+          return rotated;
+        }
+        return null;
       } else if (error.response?.status === 401 || error.response?.status === 403) {
         healthTracker.reportError('HELIUS', 'invalid api key (401/403)');
+      } else {
+        console.warn(`[Helius] Failed to get holders for ${mintAddress}: ${error.message}. Trying RpcRotator...`);
+        const rotated = await getTopHoldersWithRotation(mintAddress, limit);
+        if (rotated) {
+          setCache(cacheKey, rotated, 5 * 60 * 1000);
+          return rotated;
+        }
       }
-      console.warn(`[Helius] Failed to get holders for ${mintAddress}: ${error.message}. Attemting Solscan fallback...`);
-      
-      const solscanHolders = await solscanClient.getTopHolders(mintAddress, limit);
-      if (solscanHolders) {
-        setCache(cacheKey, solscanHolders, 5 * 60 * 1000);
-        return solscanHolders;
-      }
-      
       return null;
     }
   }
@@ -172,17 +180,23 @@ export class HeliusClient {
     } catch (error: any) {
       if (error.response?.status === 429 || error.message?.includes('429')) {
         healthTracker.reportError('HELIUS', 'max usage reached (429)', true);
+        console.warn(`[Helius] Rate-limited (429) for mint authority ${mintAddress}. Delegating to RpcRotator...`);
+        const rotated = await getMintAuthorityWithRotation(mintAddress);
+        if (rotated) {
+          setCache(cacheKey, rotated, 10 * 60 * 1000);
+          return rotated;
+        }
+        return null;
       } else if (error.response?.status === 401 || error.response?.status === 403) {
         healthTracker.reportError('HELIUS', 'invalid api key (401/403)');
+      } else {
+        console.warn(`[Helius] Failed to get mint authority for ${mintAddress}: ${error.message}. Trying RpcRotator...`);
+        const rotated = await getMintAuthorityWithRotation(mintAddress);
+        if (rotated) {
+          setCache(cacheKey, rotated, 10 * 60 * 1000);
+          return rotated;
+        }
       }
-      console.warn(`[Helius] Failed to get mint authority for ${mintAddress}: ${error.message}. Attempting Solscan fallback...`);
-      
-      const solscanAuth = await solscanClient.getMintAuthority(mintAddress);
-      if (solscanAuth) {
-        setCache(cacheKey, solscanAuth, 10 * 60 * 1000);
-        return solscanAuth;
-      }
-      
       return null;
     }
   }

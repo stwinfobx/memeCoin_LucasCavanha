@@ -83,6 +83,13 @@ export interface Token {
   first_seen_at: Date;
   created_at: Date;
   updated_at: Date;
+  // Security fields (migration 007)
+  freeze_authority?: string | null;    // null = renounced; address = active
+  mint_authority?: string | null;      // null = renounced; address = active
+  buy_tax?: number | null;             // % detected by GoPlus / Honeypot.is
+  sell_tax?: number | null;            // % detected by GoPlus / Honeypot.is
+  top_holder_1_pct?: number | null;    // % held by the largest single holder
+  rugcheck_score?: number | null;      // 0 (safe) – 1000 (rugged)
 }
 
 export interface TokenValidationRequest {
