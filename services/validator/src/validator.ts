@@ -321,6 +321,27 @@ export class TokenValidator {
       if (safetyScore === 0 && !indexing) {
         const reason = riskAssessment.indicators?.rejectionReasons?.[0] || 'Score 0';
         addToBlacklist(contractAddress, reason);
+
+        // Se a moeda foi rejeitada por falta de liquidez/volume/dados, descartar sem salvar no DB
+        if (reason.toLowerCase().includes('liquidity') || reason.toLowerCase().includes('ghost') || reason.toLowerCase().includes('mcap') || reason.toLowerCase().includes('data')) {
+          console.log(`[Validator] 🗑️ Discarding ${symbol} permanently (No data). Not saving to DB.`);
+          return {
+            token: {
+              contract_address: contractAddress,
+              chain: normalizedChain,
+              symbol: String(symbol),
+              name: String(name),
+            } as Token,
+            validation_result: {
+              is_valid: false,
+              safety_score: 0,
+              is_honeypot: false,
+              liquidity_locked: false,
+              issues: [reason],
+            },
+            risk_assessment: riskAssessment,
+          };
+        }
       }
 
       // --- PERSISTENCE BYPASS ---

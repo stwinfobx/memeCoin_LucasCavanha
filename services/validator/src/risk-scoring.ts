@@ -119,30 +119,30 @@ export function computeRiskAssessment(input: RiskComputationInput): TokenRiskAss
   const volumeUsd = normalizeNumber(input.market.volume24hUsd);
   const fdvUsd = normalizeNumber(input.market.fdvUsd);
 
-  // Liquidity Killswitch: Universal (all chains)
-  if (liquidityUsd < MIN_LIQUIDITY_USD && !isSolana) {
-    console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Liquidity $${liquidityUsd} < $${MIN_LIQUIDITY_USD}`);
-    return shutDownWithScore(input, 0, `Liquidity too low ($${liquidityUsd})`);
+  // Liquidity Killswitch: Universal (all chains) with Indexing Grace Period (10 minutes)
+  if (liquidityUsd < MIN_LIQUIDITY_USD) {
+    if (ageSeconds > 600) { // Estendido para 10 minutos (600s) para todas as chains
+      console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Liquidity $${liquidityUsd} < $${MIN_LIQUIDITY_USD} (Age: ${ageSeconds}s)`);
+      return shutDownWithScore(input, 0, `Liquidity too low ($${liquidityUsd})`);
+    } else {
+      console.log(`[RiskScoring] 🕒 INDEXING ${symbol}: Data not yet available (Age: ${ageSeconds}s). Deferring save.`);
+      return {
+        ...shutDownWithScore(input, 0, 'Indexing Data'),
+        is_indexing: true
+      };
+    }
   }
 
-  if (isSolana) {
-    if (liquidityUsd < 500 && fdvUsd < 5000) {
-      if (ageSeconds > 300) { // Estendido de 120s para 300s (5 min) para carência de indexação
-        console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Solana Liq $${liquidityUsd} + MCAP $${fdvUsd} too low (Age: ${ageSeconds}s)`);
-        return shutDownWithScore(input, 0, 'Solana Liq/MCAP too low');
-      } else {
-        console.log(`[RiskScoring] 🕒 INDEXING ${symbol}: Data not yet available (Age: ${ageSeconds}s). Deferring save.`);
-        return {
-          ...shutDownWithScore(input, 0, 'Indexing Data'),
-          is_indexing: true
-        };
-      }
+  if (isSolana && fdvUsd > 0 && fdvUsd < 5000) {
+    if (ageSeconds > 600) {
+      console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Solana MCAP $${fdvUsd} too low (Age: ${ageSeconds}s)`);
+      return shutDownWithScore(input, 0, 'Solana MCAP too low');
     }
   }
 
   // Volume filter: Avoid ghost/dead tokens
-  // SNIPER FIX: Skip for very fresh Solana tokens (<5min) as volume indexing lags
-  const skipVolumeFilter = isSolana && ageSeconds > 0 && ageSeconds < 300;
+  // SNIPER FIX: Skip for very fresh tokens (<10min) as volume indexing lags
+  const skipVolumeFilter = ageSeconds > 0 && ageSeconds < 600;
   
   if (!skipVolumeFilter && volumeUsd < MIN_VOLUME_USD && liquidityUsd < 1000) {
     console.log(`[RiskScoring] 💀 REJECTED ${symbol}: Volume $${volumeUsd} < $${MIN_VOLUME_USD} (ghost token)`);

@@ -270,8 +270,8 @@ export class MemecoinIngestion {
       const firstDiscovered = retryState?.firstDiscovered || now;
       const ageSeconds = (now - firstDiscovered) / 1000;
 
-      // 1. Indexing Retry: If validator said 'indexing' and we are under 5 mins
-      if (isIndexing && ageSeconds < 300 && this.running) {
+      // 1. Indexing Retry: If validator said 'indexing' and we are under 10 mins (600s)
+      if (isIndexing && ageSeconds < 600 && this.running) {
         console.log(`[Ingestion] 🕒 Indexing in progress for ${label} (Age: ${ageSeconds.toFixed(0)}s). Retrying in 60s...`);
         this.retryMap.set(tokenAddress, { 
           attempts: (retryState?.attempts || 0) + 1, 
@@ -286,8 +286,8 @@ export class MemecoinIngestion {
         return; // Don't notify API yet
       }
 
-      // 2. Holder Re-validation Logic: Original logic for 0 holders
-      if (holders === 0 && ageSeconds < 300 && (!retryState || retryState.attempts < 3) && this.running) {
+      // 2. Holder Re-validation Logic: Original logic for 0 holders (extended to 600s)
+      if (holders === 0 && ageSeconds < 600 && (!retryState || retryState.attempts < 5) && this.running) {
         console.log(`[Ingestion] 🕒 Holders indexer lag detected for ${label}. Scheduling re-validation in 120s...`);
         this.retryMap.set(tokenAddress, { 
           attempts: (retryState?.attempts || 0) + 1, 
@@ -302,7 +302,7 @@ export class MemecoinIngestion {
       }
 
       // Clean up retry state if we completed successfully or timed out
-      if (!isIndexing || ageSeconds >= 300) {
+      if (!isIndexing || ageSeconds >= 600) {
         this.retryMap.delete(tokenAddress);
       }
 
