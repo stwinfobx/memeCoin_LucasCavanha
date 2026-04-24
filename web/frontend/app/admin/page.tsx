@@ -51,7 +51,7 @@ export default function AdminPage() {
   // States para modal de detalhes de usuário
   const [viewUser, setViewUser] = useState<UserPerformance | null>(null)
 
-  const isAdmin = user?.email === 'mulack.zuguenberg@gmail.com'
+  const isAdmin = user?.email === (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mulack.zuguenberg@gmail.com')
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !isAdmin)) {

@@ -450,7 +450,7 @@ export default function DashboardPage() {
                   >
                     Gerenciar Carteiras
                   </button>
-                  {user?.email === 'mulack.zuguenberg@gmail.com' && (
+                  {user?.email === (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mulack.zuguenberg@gmail.com') && (
                     <>
                       <span className="text-neutral-700">|</span>
                       <Link 
